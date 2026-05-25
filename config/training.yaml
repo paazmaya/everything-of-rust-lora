@@ -1,0 +1,26 @@
+# Training configuration
+models:
+  granite:
+    name: "ibm-granite/granite-8b-code-instruct"
+    max_seq_length: 4096
+    load_in_4bit: true
+    lora_r: 64
+    lora_alpha: 128
+    lora_dropout: 0.05
+    target_modules: ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
+    batch_size: 4
+    gradient_accumulation_steps: 4
+    learning_rate: 2.0e-4
+    num_train_epochs: 3
+  qwen:
+    name: "Qwen/Qwen2.5-7B-Instruct"
+    max_seq_length: 4096
+    load_in_4bit: true
+    lora_r: 64
+    lora_alpha: 128
+    lora_dropout: 0.05
+    target_modules: ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
+    batch_size: 4
+    gradient_accumulation_steps: 4
+    learning_rate: 2.0e-4
+    num_train_epochs: 3

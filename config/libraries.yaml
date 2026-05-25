@@ -1,0 +1,146 @@
+# Top 100 Rust Libraries for Training Data Collection
+libraries:
+  web_frameworks:
+    - name: axum
+      repo: tokio-rs/axum
+      docs_url: https://docs.rs/axum
+      priority: high
+    - name: actix-web
+      repo: actix/actix-web
+      docs_url: https://docs.rs/actix-web
+      priority: high
+    - name: rocket
+      repo: rocket-rs/rocket
+      docs_url: https://docs.rs/rocket
+      priority: high
+    - name: warp
+      repo: seanmonstar/warp
+      docs_url: https://docs.rs/warp
+      priority: medium
+    - name: tower
+      repo: tower-rs/tower
+      docs_url: https://docs.rs/tower
+      priority: high
+  async:
+    - name: tokio
+      repo: tokio-rs/tokio
+      docs_url: https://docs.rs/tokio
+      priority: critical
+    - name: async-std
+      repo: async-rs/async-std
+      docs_url: https://docs.rs/async-std
+      priority: high
+    - name: futures
+      repo: rust-lang/futures-rs
+      docs_url: https://docs.rs/futures
+      priority: critical
+    - name: embassy
+      repo: embassy-rs/embassy
+      docs_url: https://docs.embassy.dev
+      priority: critical
+  serialization:
+    - name: serde
+      repo: serde-rs/serde
+      docs_url: https://docs.rs/serde
+      priority: critical
+    - name: serde_json
+      repo: serde-rs/json
+      docs_url: https://docs.rs/serde_json
+      priority: critical
+  cli:
+    - name: clap
+      repo: clap-rs/clap
+      docs_url: https://docs.rs/clap
+      priority: critical
+    - name: ratatui
+      repo: ratatui/ratatui
+      docs_url: https://docs.rs/ratatui
+      priority: high
+  database:
+    - name: diesel
+      repo: diesel-rs/diesel
+      docs_url: https://docs.rs/diesel
+      priority: critical
+    - name: sqlx
+      repo: launchbadge/sqlx
+      docs_url: https://docs.rs/sqlx
+      priority: critical
+    - name: redis
+      repo: redis-rs/redis-rs
+      docs_url: https://docs.rs/redis
+      priority: high
+  http_clients:
+    - name: reqwest
+      repo: seanmonstar/reqwest
+      docs_url: https://docs.rs/reqwest
+      priority: critical
+  error_handling:
+    - name: anyhow
+      repo: dtolnay/anyhow
+      docs_url: https://docs.rs/anyhow
+      priority: critical
+    - name: thiserror
+      repo: dtolnay/thiserror
+      docs_url: https://docs.rs/thiserror
+      priority: critical
+  logging:
+    - name: tracing
+      repo: tokio-rs/tracing
+      docs_url: https://docs.rs/tracing
+      priority: critical
+  testing:
+    - name: proptest
+      repo: proptest-rs/proptest
+      docs_url: https://docs.rs/proptest
+      priority: high
+    - name: criterion
+      repo: bheisler/criterion.rs
+      docs_url: https://docs.rs/criterion
+      priority: high
+  embedded:
+    - name: esp-hal
+      repo: esp-rs/esp-hal
+      docs_url: https://docs.rs/esp-hal
+      priority: critical
+    - name: esp-idf-svc
+      repo: esp-rs/esp-idf-svc
+      docs_url: https://docs.rs/esp-idf-svc
+      priority: critical
+    - name: esp-wifi
+      repo: esp-rs/esp-wifi
+      docs_url: https://docs.rs/esp-wifi
+      priority: critical
+    - name: embedded-hal
+      repo: rust-embedded/embedded-hal
+      docs_url: https://docs.rs/embedded-hal
+      priority: critical
+    - name: defmt
+      repo: knurling-rs/defmt
+      docs_url: https://docs.rs/defmt
+      priority: high
+  iot_protocols:
+    - name: rumqttc
+      repo: bytebeamio/rumqtt
+      docs_url: https://docs.rs/rumqttc
+      priority: critical
+  utilities:
+    - name: itertools
+      repo: rust-itertools/itertools
+      docs_url: https://docs.rs/itertools
+      priority: high
+    - name: chrono
+      repo: chronotope/chrono
+      docs_url: https://docs.rs/chrono
+      priority: high
+    - name: regex
+      repo: rust-lang/regex
+      docs_url: https://docs.rs/regex
+      priority: critical
+    - name: rand
+      repo: rust-random/rand
+      docs_url: https://docs.rs/rand
+      priority: high
+    - name: uuid
+      repo: uuid-rs/uuid
+      docs_url: https://docs.rs/uuid
+      priority: high

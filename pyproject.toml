@@ -1,0 +1,64 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rust-lora"
+version = "0.1.0"
+license = "MIT"
+readme = "README.md"
+description = "Training a LoRA that knows everything about the Rust language"
+requires-python = ">=3.13"
+dependencies = [
+    "requests>=2.31.0",
+    "beautifulsoup4>=4.14.3",
+    "lxml>=6.1.1",
+    "markdown>=3.10.2",
+    "html2text>=2025.4.15",
+    "feedparser>=6.0.12",
+    "tqdm>=4.67.3",
+    "pandas>=3.0.3",
+    "pyarrow>=24.0.0",
+    "tiktoken>=0.13.0",
+    "chromadb>=1.5.9",
+    "langchain>=1.3.1",
+    "unsloth[colab-new]>=2026.5.7",
+    "transformers>=5.1.0",
+    "trl>=0.24.0",
+    "peft>=0.7.0",
+    "torch>=2.10.0",
+    "torchvision>=0.25.0",
+]
+
+[dependency-groups]
+dev = ["ruff>=0.15.11"]
+
+[[tool.uv.index]]
+name = "pytorch-cu130"
+url = "https://download.pytorch.org/whl/cu130"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu130" }
+torchvision = { index = "pytorch-cu130" }
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.format]
+docstring-code-format = true
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # Pyflakes
+    "I",    # isort
+    "C",    # flake8-comprehensions
+    "B",    # flake8-bugbear
+    "UP",   # pyupgrade
+]
+ignore = [
+    "E501",  # line too long, handled by formatter
+]

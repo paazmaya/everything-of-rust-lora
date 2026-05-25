@@ -1,0 +1,26 @@
+# Data sources configuration
+rust_official:
+  rust_book:
+    url: https://doc.rust-lang.org/book/
+    output_dir: raw/rust_book
+  rust_by_example:
+    url: https://doc.rust-lang.org/rust-by-example/
+    output_dir: raw/rust_by_example
+docs_rs:
+  base_url: https://docs.rs
+  rate_limit: 100
+github:
+  api_url: https://api.github.com
+  rate_limit: 1000
+esp_rs:
+  documentation:
+    - url: https://docs.esp-rs.org
+      output_dir: raw/esp_rs/docs
+best_practices:
+  rust_api_guidelines:
+    url: https://rust-lang.github.io/api-guidelines/
+    output_dir: raw/best_practices/api_guidelines
+stack_overflow:
+  api_url: https://api.stackexchange.com/2.3
+  tags: ["rust", "esp32", "embedded-rust", "tokio", "serde"]
+  min_score: 2
