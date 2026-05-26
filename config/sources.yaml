@@ -20,6 +20,9 @@ best_practices:
   rust_api_guidelines:
     url: https://rust-lang.github.io/api-guidelines/
     output_dir: raw/best_practices/api_guidelines
+  little_book_of_rust_macros:
+    url: https://lukaswirth.dev/tlborm/
+    output_dir: raw/best_practices/tlborm
 stack_overflow:
   api_url: https://api.stackexchange.com/2.3
   tags: ["rust", "esp32", "embedded-rust", "tokio", "serde"]

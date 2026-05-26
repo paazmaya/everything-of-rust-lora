@@ -9,6 +9,8 @@ import requests
 from bs4 import BeautifulSoup
 from tqdm import tqdm
 
+from cache_utils import CachedSession
+
 BASE_DIR = Path(__file__).parent.parent
 RAW_DIR = BASE_DIR / "data" / "raw"
 
@@ -16,8 +18,9 @@ RAW_DIR = BASE_DIR / "data" / "raw"
 class ESPCollector:
     def __init__(self):
         self.output_base = RAW_DIR
-        self.session = requests.Session()
-        self.session.headers.update({"User-Agent": "RustLoRA/1.0"})
+        session = requests.Session()
+        session.headers.update({"User-Agent": "RustLoRA/1.0"})
+        self.session = CachedSession(session)
         self.h2t = html2text.HTML2Text()
         self.h2t.ignore_images = True
         self.sites = [
@@ -31,6 +34,9 @@ class ESPCollector:
         out_dir.mkdir(parents=True, exist_ok=True)
         try:
             resp = self.session.get(base_url, timeout=30)
+            if not resp:
+                print(f"  {out_rel}: Not modified (using cache)")
+                return
             soup = BeautifulSoup(resp.text, "lxml")
             links = {
                 base_url + link["href"] if not link["href"].startswith("http") else link["href"]
@@ -41,6 +47,8 @@ class ESPCollector:
                 try:
                     time.sleep(0.1)
                     r = self.session.get(url, timeout=30)
+                    if not r:  # Content not modified
+                        continue
                     s = BeautifulSoup(r.text, "lxml")
                     main = s.find("main") or s.find("article")
                     if main and len(main.text) > 100:
@@ -57,6 +65,8 @@ class ESPCollector:
         print("Collecting ESP-RS...")
         for url, rel in self.sites:
             self.collect_site(url, rel)
+        stats = self.session.get_stats()
+        print(f"Cache stats: {stats['fetched']} fetched, {stats['skipped']} skipped (out of {stats['total_checked']} total)")
 
 
 if __name__ == "__main__":

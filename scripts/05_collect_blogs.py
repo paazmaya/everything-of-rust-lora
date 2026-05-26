@@ -10,6 +10,8 @@ import requests
 from bs4 import BeautifulSoup
 from tqdm import tqdm
 
+from cache_utils import CachedSession
+
 BASE_DIR = Path(__file__).parent.parent
 RAW_DIR = BASE_DIR / "data" / "raw"
 
@@ -17,8 +19,9 @@ RAW_DIR = BASE_DIR / "data" / "raw"
 class BlogsCollector:
     def __init__(self):
         self.output_base = RAW_DIR
-        self.session = requests.Session()
-        self.session.headers.update({"User-Agent": "RustLoRA/1.0"})
+        session = requests.Session()
+        session.headers.update({"User-Agent": "RustLoRA/1.0"})
+        self.session = CachedSession(session)
         self.h2t = html2text.HTML2Text()
         self.h2t.ignore_images = True
         self.feeds = [
@@ -41,6 +44,8 @@ class BlogsCollector:
                 else:
                     time.sleep(0.5)
                     r = self.session.get(entry.link, timeout=30)
+                    if not r:  # Content not modified
+                        continue
                     s = BeautifulSoup(r.text, "lxml")
                     article = s.find("article") or s.find("main")
                     content = self.h2t.handle(str(article)) if article else ""
@@ -56,6 +61,9 @@ class BlogsCollector:
         out_dir.mkdir(parents=True, exist_ok=True)
         try:
             resp = self.session.get(url, timeout=30)
+            if not resp:
+                print(f"  {rel}: Not modified (using cache)")
+                return
             soup = BeautifulSoup(resp.text, "lxml")
             links = [
                 url + link["href"]
@@ -65,6 +73,8 @@ class BlogsCollector:
             for link in tqdm(links, leave=False):
                 try:
                     r = self.session.get(link, timeout=30)
+                    if not r:  # Content not modified
+                        continue
                     s = BeautifulSoup(r.text, "lxml")
                     main = s.find("main")
                     if main:
@@ -84,6 +94,8 @@ class BlogsCollector:
             self.collect_feed(url, rel)
         for url, rel in self.sites:
             self.collect_site(url, rel)
+        stats = self.session.get_stats()
+        print(f"Cache stats: {stats['fetched']} fetched, {stats['skipped']} skipped (out of {stats['total_checked']} total)")
 
 
 if __name__ == "__main__":

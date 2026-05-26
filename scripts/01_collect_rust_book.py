@@ -10,6 +10,8 @@ import requests
 from bs4 import BeautifulSoup
 from tqdm import tqdm
 
+from cache_utils import CachedSession
+
 BASE_DIR = Path(__file__).parent.parent
 RAW_DIR = BASE_DIR / "data" / "raw"
 CONFIG_DIR = BASE_DIR / "config"
@@ -18,8 +20,9 @@ CONFIG_DIR = BASE_DIR / "config"
 class RustDocCollector:
     def __init__(self):
         self.output_base = RAW_DIR
-        self.session = requests.Session()
-        self.session.headers.update({"User-Agent": "RustLoRA/1.0"})
+        session = requests.Session()
+        session.headers.update({"User-Agent": "RustLoRA/1.0"})
+        self.session = CachedSession(session)
         self.h2t = html2text.HTML2Text()
         self.h2t.ignore_images = True
         self.h2t.body_width = 0
@@ -47,6 +50,9 @@ class RustDocCollector:
         output_dir = self.output_base / out_dir
         try:
             resp = self.session.get(base_url, timeout=30)
+            if not resp:
+                print(f"  {source_name}: Not modified (using cache)")
+                return
             soup = BeautifulSoup(resp.text, "lxml")
             links = {
                 base_url + link["href"]
@@ -56,6 +62,8 @@ class RustDocCollector:
             for url in tqdm(links):
                 try:
                     r = self.session.get(url, timeout=30)
+                    if not r:  # Content not modified
+                        continue
                     s = BeautifulSoup(r.text, "lxml")
                     main = s.find("main") or s.find("div", class_="content")
                     if main and len(main.text) > 100:
@@ -77,6 +85,8 @@ class RustDocCollector:
         )
         self.collect_site("https://doc.rust-lang.org/nomicon/", "rustonomicon", "rustonomicon")
         self.collect_site("https://doc.rust-lang.org/cargo/", "cargo_book", "cargo_book")
+        stats = self.session.get_stats()
+        print(f"\nCache stats: {stats['fetched']} fetched, {stats['skipped']} skipped (out of {stats['total_checked']} total)")
 
 
 if __name__ == "__main__":
