@@ -1,13 +1,19 @@
 #!/usr/bin/env python3
 """
-Unsloth Studio Training Script for IBM Granite 8B Code Instruct
+Unsloth Studio Training Script for IBM Granite 4.1 8B GGUF
 Run this in Unsloth Studio (Google Colab) or locally with a 24GB+ GPU.
+
+Documentation References:
+- Unsloth: https://unsloth.ai/docs/models/ibm-granite-4.1
+- HF Model Card: https://huggingface.co/unsloth/granite-4.1-8b-GGUF?show_file_info=granite-4.1-8b-Q4_K_M.gguf
+- HF Blog: https://huggingface.co/blog/ibm-granite/granite-4-1
+- IBM Docs: https://www.ibm.com/granite/docs/models/granite4-1
 """
 
 import torch
 from datasets import load_dataset
 from transformers import TrainingArguments
-from trl import SFTTrainer
+from trl.trainer.sft_trainer import SFTTrainer
 from unsloth import FastLanguageModel
 
 max_seq_length = 4096
@@ -15,7 +21,8 @@ dtype = None
 load_in_4bit = True
 
 model, tokenizer = FastLanguageModel.from_pretrained(
-    model_name="ibm-granite/granite-8b-code-instruct",
+    #model_name="unsloth/granite-4.1-8b-GGUF",
+    model_name="h:/granite-4.1-8b-Q4_K_M.gguf",
     max_seq_length=max_seq_length,
     dtype=dtype,
     load_in_4bit=load_in_4bit,
@@ -60,10 +67,10 @@ dataset = dataset.map(formatting_prompts_func, batched=True)
 
 trainer = SFTTrainer(
     model=model,
-    tokenizer=tokenizer,
+    tokenizer=tokenizer,  # type: ignore[arg-type]
     train_dataset=dataset,
-    dataset_text_field="text",
-    max_seq_length=max_seq_length,
+    dataset_text_field="text",  # type: ignore[arg-type]
+    max_seq_length=max_seq_length,  # type: ignore[arg-type]
     args=TrainingArguments(
         per_device_train_batch_size=4,
         gradient_accumulation_steps=4,

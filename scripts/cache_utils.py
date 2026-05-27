@@ -3,10 +3,11 @@
 HTTP cache utility for tracking remote content versions.
 Stores ETags and Last-Modified headers to avoid re-downloading unchanged content.
 """
+
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Any
 
 import requests
 
@@ -22,7 +23,7 @@ class CacheMetadata:
         self.cache_file = self.cache_dir / "fetch_metadata.json"
         self.metadata = self._load()
 
-    def _load(self) -> Dict[str, Dict[str, Any]]:
+    def _load(self) -> dict[str, dict[str, Any]]:
         """Load existing cache metadata."""
         if self.cache_file.exists():
             try:
@@ -37,11 +38,11 @@ class CacheMetadata:
         with open(self.cache_file, "w") as f:
             json.dump(self.metadata, f, indent=2)
 
-    def get(self, url: str) -> Optional[Dict[str, str]]:
+    def get(self, url: str) -> dict[str, str] | None:
         """Get cached metadata for a URL."""
         return self.metadata.get(url)
 
-    def should_fetch(self, url: str, response_headers: Dict) -> bool:
+    def should_fetch(self, url: str, response_headers: dict) -> bool:
         """
         Check if URL should be fetched based on cache.
         Returns True if:
@@ -65,7 +66,7 @@ class CacheMetadata:
 
         return True
 
-    def update(self, url: str, response_headers: Dict):
+    def update(self, url: str, response_headers: dict):
         """Update cache metadata after a successful fetch."""
         headers_to_cache = {}
         if "etag" in response_headers:
@@ -89,7 +90,7 @@ class CachedSession:
         self.skipped_count = 0
         self.fetched_count = 0
 
-    def get(self, url: str, **kwargs) -> Optional[requests.Response]:
+    def get(self, url: str, **kwargs) -> requests.Response | None:
         """
         Fetch URL with conditional request support.
         Returns None if content hasn't changed (304 Not Modified).
@@ -127,7 +128,7 @@ class CachedSession:
         except Exception:
             return None
 
-    def get_stats(self) -> Dict[str, int]:
+    def get_stats(self) -> dict[str, int]:
         """Return fetch statistics."""
         return {
             "fetched": self.fetched_count,

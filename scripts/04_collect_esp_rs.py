@@ -7,9 +7,8 @@ from pathlib import Path
 import html2text
 import requests
 from bs4 import BeautifulSoup
-from tqdm import tqdm
-
 from cache_utils import CachedSession
+from tqdm import tqdm
 
 BASE_DIR = Path(__file__).parent.parent
 RAW_DIR = BASE_DIR / "data" / "raw"
@@ -66,7 +65,9 @@ class ESPCollector:
         for url, rel in self.sites:
             self.collect_site(url, rel)
         stats = self.session.get_stats()
-        print(f"Cache stats: {stats['fetched']} fetched, {stats['skipped']} skipped (out of {stats['total_checked']} total)")
+        print(
+            f"Cache stats: {stats['fetched']} fetched, {stats['skipped']} skipped (out of {stats['total_checked']} total)"
+        )
 
 
 if __name__ == "__main__":

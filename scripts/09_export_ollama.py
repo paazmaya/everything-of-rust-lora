@@ -1,13 +1,33 @@
 #!/usr/bin/env python3
 """
-Export trained LoRA to Ollama GGUF format.
+Export trained LoRA to Ollama GGUF format with Q4_K_M quantization.
 Run this AFTER training is complete.
+
+Quantization: Q4_K_M (4-bit K_M) - recommended for Granite 4.1 8B
+See: https://huggingface.co/unsloth/granite-4.1-8b-GGUF?show_file_info=granite-4.1-8b-Q4_K_M.gguf
+
+Documentation References:
+- Unsloth: https://unsloth.ai/docs/models/ibm-granite-4.1
+- HF Model Card: https://huggingface.co/unsloth/granite-4.1-8b-GGUF?show_file_info=granite-4.1-8b-Q4_K_M.gguf
+- HF Blog: https://huggingface.co/blog/ibm-granite/granite-4-1
+- IBM Docs: https://www.ibm.com/granite/docs/models/granite4-1
 """
 
 from unsloth import FastLanguageModel
 
 
 def export_to_ollama(model_path: str, model_name: str, base_model: str, quant: str = "q4_k_m"):
+    """
+    Export trained LoRA to GGUF format and create Ollama Modelfile.
+
+    Args:
+        model_path: Path to trained LoRA weights (e.g., models/granite_rust_lora)
+        model_name: Name for the exported model (e.g., rust-granite)
+        base_model: Base model identifier or local path. Can be:
+            - HuggingFace model ID: "unsloth/granite-4.1-8b-GGUF" (downloads if not cached)
+            - Local file path: "/path/to/granite-4.1-8b-Q4_K_M.gguf" (no download needed)
+        quant: Quantization method (default: q4_k_m = Q4_K_M, 4-bit K_M)
+    """
     print(f"Loading model from {model_path}...")
     model, tokenizer = FastLanguageModel.from_pretrained(
         model_name=model_path,
@@ -60,7 +80,10 @@ if __name__ == "__main__":
         "--name", type=str, required=True, help="Name for Ollama model (e.g., rust-expert)"
     )
     parser.add_argument(
-        "--base", type=str, default="ibm-granite/granite-8b-code-instruct", help="Base model used"
+        "--base",
+        type=str,
+        default="unsloth/granite-4.1-8b-GGUF",
+        help="Base model (HF model ID or local GGUF file path). Examples: 'unsloth/granite-4.1-8b-GGUF' or '/path/to/granite-4.1-8b-Q4_K_M.gguf'",
     )
     args = parser.parse_args()
 
