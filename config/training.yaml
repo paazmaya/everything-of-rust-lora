@@ -1,7 +1,7 @@
 # Training configuration
 models:
   granite:
-    name: "unsloth/granite-4.1-8b-GGUF"
+    name: "ibm-granite/granite-4.1-8b"
     max_seq_length: 4096
     load_in_4bit: true
     lora_r: 64

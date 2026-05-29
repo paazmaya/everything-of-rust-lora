@@ -91,12 +91,26 @@ uv run ruff check . --fix
 
 ## Phase 3: Training with Unsloth Studio
 
-### Option A: Training IBM Granite 4.1 8B GGUF
+### Option A: Training IBM Granite 4.1 8B
+
+Uses the base HuggingFace model (`ibm-granite/granite-4.1-8b`) or a local model directory. The export script will later merge LoRA and create GGUF.
 
 1. Upload your project folder to Unsloth Studio (or upload `data/datasets/train.jsonl` directly).
 2. Open `train_granite.py` in the studio.
 3. Ensure the dataset path matches the uploaded location.
-4. Run the script.
+4. Run the script:
+
+   **Option 1: Use HuggingFace model (downloads if not cached)**
+   ```bash
+   uv run python train_granite.py
+   ```
+
+   **Option 2: Use local model directory**
+   ```bash
+   uv run python train_granite.py --model-path /path/to/granite-4.1-8b
+   ```
+
+5. Training parameters:
    - **VRAM Requirement:** ~16GB (fits on RTX 3090/4090 or free Colab tier).
    - **Time:** ~2-3 hours for 3 epochs on 50k+ samples.
 
@@ -122,25 +136,27 @@ Both scripts use the following optimized LoRA settings:
 
 Once training is complete (either locally or downloaded from Unsloth Studio):
 
-1. **Export to GGUF:**
+1. **Export to GGUF with Q4_K_M Quantization:**
    
-   **Option 1: Download base model from HuggingFace (automatic)**
+   The export script merges your trained LoRA adapter with the base model and quantizes to GGUF format.
+   
+   **Option 1: Standard export (downloads base model from HuggingFace if not cached)**
    ```bash
-   # For Granite 4.1 8B
-   uv run python scripts/09_export_ollama.py --model models/granite_rust_lora --name rust-granite --base unsloth/granite-4.1-8b-GGUF
+   # For Granite 4.1 8B (trained with ibm-granite/granite-4.1-8b)
+   uv run python scripts/09_export_ollama.py --model models/granite_rust_lora --name rust-granite --base ibm-granite/granite-4.1-8b
 
-   # For Qwen
+   # For Qwen 2.5 7B
    uv run python scripts/09_export_ollama.py --model models/qwen_rust_lora --name rust-qwen --base Qwen/Qwen2.5-7B-Instruct
    ```
    
-   **Option 2: Use local GGUF file (if already downloaded)**
+   **Option 2: Use local GGUF or model file**
    ```bash
-   # If you have the GGUF file already on disk, pass its local path:
+   # If you have a local GGUF file or model folder, pass its path:
    uv run python scripts/09_export_ollama.py --model models/granite_rust_lora --name rust-granite --base /path/to/granite-4.1-8b-Q4_K_M.gguf
    ```
-   *(This skips the download and uses your local file directly.)*
+   *(This skips downloading from HuggingFace and uses your local file directly.)*
    
-   *This script automatically merges the LoRA weights and quantizes them to Q4_K_M (4-bit K_M quantization).*
+   *This script automatically merges the LoRA weights with the base model and quantizes them to Q4_K_M (4-bit K_M quantization).*
 
 2. **Import into Ollama:**
    ```bash
