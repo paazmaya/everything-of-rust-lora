@@ -3,9 +3,18 @@ rust_official:
   rust_book:
     url: https://doc.rust-lang.org/book/
     output_dir: raw/rust_book
+  reference:
+    url: https://doc.rust-lang.org/reference/
+    output_dir: raw/rust_reference
   rust_by_example:
     url: https://doc.rust-lang.org/rust-by-example/
     output_dir: raw/rust_by_example
+  rust_cookbook:
+    url: https://rust-lang-nursery.github.io/rust-cookbook/
+    output_dir: raw/rust_cookbook
+  rustonomicon:
+    url: https://doc.rust-lang.org/nomicon/
+    output_dir: raw/best_practices/nomicon
 docs_rs:
   base_url: https://docs.rs
   rate_limit: 100
@@ -14,8 +23,10 @@ github:
   rate_limit: 1000
 esp_rs:
   documentation:
-    - url: https://docs.esp-rs.org
+    - url: https://docs.espressif.com/projects/rust/book/
       output_dir: raw/esp_rs/docs
+    - url: https://docs.rust-embedded.org/book/
+      output_dir: raw/best_practices/rust_embedded_book
 best_practices:
   rust_api_guidelines:
     url: https://rust-lang.github.io/api-guidelines/
@@ -23,6 +34,66 @@ best_practices:
   little_book_of_rust_macros:
     url: https://lukaswirth.dev/tlborm/
     output_dir: raw/best_practices/tlborm
+  awesome_rust:
+    url: https://github.com/rust-unofficial/awesome-rust
+    output_dir: raw/best_practices/awesome_rust
+  cheatsheet:
+    url: https://cheats.rs/
+    output_dir: raw/best_practices/cheats_rs
+  rust_guidelines:
+    url: https://github.com/microsoft/rust-guidelines
+    output_dir: raw/best_practices/rust_guidelines
+  rust_incubator_learning:
+    url: https://github.com/tyranron/rust-incubator
+    output_dir: raw/best_practices/rust_incubator
+  security:
+    rust_security_handbook:
+      url: https://yevh.github.io/rust-security-handbook/
+      repo: https://github.com/yevh/rust-security-handbook
+      output_dir: raw/best_practices/rust_security_handbook
+    high_assurance_rust:
+      url: https://highassurance.rs/
+      repo: https://github.com/tnballo/high-assurance-rust
+      output_dir: raw/best_practices/high_assurance_rust
+    rustsec_advisories:
+      url: https://rustsec.org/advisories/
+      repo: https://github.com/RustSec/advisory-db
+      description: Vulnerability database for Rust crates
+      output_dir: raw/best_practices/rustsec_advisories
+    rustsec_osv_database:
+      url: https://codeload.github.com/rustsec/advisory-db/zip/refs/heads/osv
+      description: RustSec advisories in OSV format
+      output_dir: raw/best_practices/rustsec_osv
+  embedded:
+    awesome_embedded_rust:
+      url: https://github.com/rust-embedded/awesome-embedded-rust
+      description: Curated list of resources for embedded Rust development
+      output_dir: raw/best_practices/awesome_embedded_rust
+web_frameworks:
+  leptos:
+    documentation:
+      url: https://book.leptos.dev/
+      output_dir: raw/web_frameworks/leptos_book
+  trunk:
+    documentation:
+      url: https://trunk-rs.github.io/trunk/guide/
+      output_dir: raw/web_frameworks/trunk_guide
+  yew:
+    documentation:
+      url: https://yew.rs/docs/getting-started/introduction
+      output_dir: raw/web_frameworks/yew_docs
+  cloudflare_workers:
+    documentation:
+      url: https://github.com/cloudflare/workers-rs
+      output_dir: raw/web_frameworks/cloudflare_workers
+  tauri:
+    documentation:
+      url: https://v2.tauri.app/start/
+      repo: https://github.com/tauri-apps/tauri
+      output_dir: raw/web_frameworks/tauri_docs
+    guides:
+      url: https://www.developermindset.com/yet-another-tauri-book/
+      output_dir: raw/web_frameworks/tauri_book
 stack_overflow:
   api_url: https://api.stackexchange.com/2.3
   tags: ["rust", "esp32", "embedded-rust", "tokio", "serde"]

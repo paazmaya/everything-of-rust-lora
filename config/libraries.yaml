@@ -34,6 +34,42 @@ libraries:
       repo: hyperium/h2
       docs_url: https://docs.rs/h2
       priority: high
+    - name: fastly
+      repo: fastly/fastly-rs
+      docs_url: https://docs.rs/fastly/latest/fastly/
+      description: Rust SDK for Fastly edge computing platform
+      priority: medium
+  edge_computing:
+    - name: cloudflare-workers-rs
+      repo: cloudflare/workers-rs
+      description: Cloudflare Workers Rust SDK for serverless edge computing
+      priority: high
+  frontend_frameworks:
+    - name: leptos
+      repo: leptos-rs/leptos
+      guide_url: https://book.leptos.dev/
+      description: Reactive web framework for building server-side or client-side web apps
+      priority: high
+    - name: trunk
+      repo: trunk-rs/trunk
+      guide_url: https://trunk-rs.github.io/trunk/guide/
+      description: Build tool for Rust WebAssembly applications
+      priority: high
+    - name: yew
+      repo: yewstack/yew
+      docs_url: https://docs.rs/yew
+      guide_url: https://yew.rs/docs/getting-started/introduction
+      description: Rust framework for building client-side web apps with WebAssembly
+      priority: high
+    - name: grass
+      repo: connorskees/grass
+      docs_url: https://docs.rs/grass
+      description: Sass-compatible CSS compiler for Rust web toolchains
+      priority: medium
+    - name: tauri
+      repo: tauri-apps/tauri
+      description: Build lightweight desktop applications with web technologies
+      priority: high
   async:
     - name: tokio
       repo: tokio-rs/tokio
@@ -256,6 +292,14 @@ libraries:
       repo: RustCrypto/utils
       docs_url: https://docs.rs/zeroize
       priority: high
+    - name: subtle
+      repo: dalek-cryptography/subtle
+      docs_url: https://docs.rs/subtle
+      priority: high
+    - name: secrecy
+      repo: iqlusioninc/secrecy
+      docs_url: https://docs.rs/secrecy
+      priority: high
     - name: openssl-probe
       repo: rustls/openssl-probe
       docs_url: https://docs.rs/openssl-probe
@@ -369,6 +413,65 @@ libraries:
       repo: bheisler/criterion.rs
       docs_url: https://docs.rs/criterion
       priority: high
+  security_audit_tools:
+    - name: cargo-geiger
+      repo: geiger-rs/cargo-geiger
+      docs_url: https://docs.rs/cargo-geiger
+      description: Detect unsafe code usage in crates and dependencies
+      priority: critical
+    - name: cargo-audit
+      repo: rustsec/rustsec
+      docs_url: https://docs.rs/cargo-audit
+      description: Audit Cargo.lock for vulnerable crates
+      priority: critical
+    - name: cargo-deny
+      repo: embarkstudios/cargo-deny
+      description: Audit dependencies for vulnerabilities, licenses, and sources
+      priority: high
+    - name: cargo-auditable
+      repo: rust-secure-code/cargo-auditable
+      docs_url: https://docs.rs/cargo-auditable
+      description: Embed dependency tree into compiled binaries
+      priority: high
+    - name: cargo-crev
+      repo: crev-dev/cargo-crev
+      docs_url: https://docs.rs/cargo-crev
+      description: Cryptographic code review system for Cargo
+      priority: high
+    - name: rusty-hog
+      repo: newrelic/rusty-hog
+      description: Secret scanner for sensitive data across storage and git repositories
+      priority: high
+  cargo_tools:
+    - name: cross
+      repo: cross-rs/cross
+      description: Zero-setup cross compilation for Rust
+      priority: high
+    - name: cargo-semver-checks
+      repo: obi1kenobi/cargo-semver-checks
+      description: Semantic versioning compatibility checks
+      priority: high
+    - name: cargo-llvm-cov
+      repo: taiki-e/cargo-llvm-cov
+      description: LLVM code coverage measurement
+      priority: high
+    - name: cargo-machete
+      repo: bnjbvr/cargo-machete
+      description: Remove unused dependencies
+      priority: high
+    - name: cargo-msrv
+      repo: foresterre/cargo-msrv
+      description: Find minimum supported Rust version
+      priority: high
+    - name: cargo-about
+      repo: embarkstudios/cargo-about
+      description: Generate license documentation
+      priority: medium
+    - name: cargo-public-api
+      repo: cargo-public-api/cargo-public-api
+      description: Track public API surface changes
+      docs_url: https://docs.rs/public-api
+      priority: high
   embedded:
     - name: esp-hal
       repo: esp-rs/esp-hal
@@ -390,6 +493,10 @@ libraries:
       repo: knurling-rs/defmt
       docs_url: https://docs.rs/defmt
       priority: high
+    - name: microbit
+      repo: nrf-rs/microbit
+      description: Support crate for Nordic Semiconductor micro:bit boards
+      priority: medium
   iot_protocols:
     - name: rumqttc
       repo: bytebeamio/rumqtt
@@ -400,6 +507,10 @@ libraries:
       repo: rust-lang/libc
       docs_url: https://docs.rs/libc
       priority: critical
+    - name: napi-rs
+      repo: napi-rs/napi-rs
+      description: Framework for building Node.js native bindings in Rust
+      priority: high
     - name: windows-sys
       repo: microsoft/windows-rs
       docs_url: https://docs.rs/windows-sys
@@ -416,6 +527,10 @@ libraries:
       repo: microsoft/windows-rs
       docs_url: https://docs.rs/windows_x86_64_gnu
       priority: high
+    - name: coral-tpu
+      repo: geraldo-netto/coral-tpu
+      description: Rust bindings and examples for Google Coral TPU accelerators
+      priority: medium
     - name: windows_aarch64_msvc
       repo: microsoft/windows-rs
       docs_url: https://docs.rs/windows_aarch64_msvc
@@ -645,6 +760,10 @@ libraries:
       repo: seanmonstar/num_cpus
       docs_url: https://docs.rs/num_cpus
       priority: high
+    - name: luminS
+      repo: wchang22/LuminS
+      description: Rust-based file synchronization and remote file management utility
+      priority: medium
     - name: strsim
       repo: rapidfuzz/strsim-rs
       docs_url: https://docs.rs/strsim
@@ -668,6 +787,55 @@ libraries:
     - name: prost-derive
       repo: tokio-rs/prost
       docs_url: https://docs.rs/prost-derive
+      priority: high
+  developer_tools:
+    - name: octocode
+      repo: Muvon/octocode
+      description: AI-powered code search and completion tool for Rust development
+      priority: medium
+    - name: graphrag-rs
+      repo: automataIA/graphrag-rs
+      description: Knowledge graph and reasoning tooling for Rust applications
+      priority: medium
+  machine_learning:
+    - name: candle
+      repo: huggingface/candle
+      description: Minimalist ML framework with CUDA, Metal support
+      priority: high
+    - name: burn
+      repo: tracel-ai/burn
+      description: Flexible and Comprehensive Deep Learning Framework
+      priority: high
+    - name: rig
+      repo: 0xPlaygrounds/rig
+      description: Modular framework for building Agentic AI systems
+      priority: high
+    - name: yolo-rs
+      repo: pan93412/yolo-rs
+      description: Rust bindings and examples for YOLO object detection
+      priority: medium
+    - name: object-detection-opencv-rust
+      repo: LdDl/object-detection-opencv-rust
+      description: Object detection examples using OpenCV and Rust
+      priority: medium
+  graphics:
+    - name: wgpu
+      repo: gfx-rs/wgpu
+      description: Safe and portable GPU graphics library for Rust
+      priority: high
+    - name: rust-rasterizer
+      repo: tchauffi/rust-rasterizer
+      description: Small software rasterizer and graphics learning project
+      priority: medium
+  wasm:
+    - name: wasmtime
+      repo: bytecodealliance/wasmtime
+      description: Standalone WebAssembly runtime
+      priority: critical
+  ui_frameworks:
+    - name: druid
+      repo: linebender/druid
+      description: A data-first GUI toolkit
       priority: high
   string_utilities:
     - name: unicode-ident
@@ -733,6 +901,10 @@ libraries:
       repo: BurntSushi/same-file
       docs_url: https://docs.rs/same-file
       priority: medium
+    - name: space
+      repo: emilevr/space
+      description: Utility for mounting remote folders and workspace file management in Rust
+      priority: medium
   build_tools:
     - name: cc
       repo: rust-lang/cc-rs
@@ -796,6 +968,10 @@ libraries:
       repo: krisprice/ipnet
       docs_url: https://docs.rs/ipnet
       priority: high
+    - name: suppaftp
+      repo: veeso/suppaftp
+      description: FTP client and server library for asynchronous Rust applications
+      priority: medium
   hashing:
     - name: ahash
       repo: tkaitchuck/ahash
@@ -902,4 +1078,52 @@ libraries:
     - name: mime
       repo: hyperium/mime
       docs_url: https://docs.rs/mime
+      priority: medium
+  documentation_tools:
+    - name: mdbook
+      repo: rust-lang/mdbook
+      description: Create books from Markdown files
+      priority: high
+  cli_tools:
+    - name: navi
+      repo: denisidoro/navi
+      description: An interactive cheatsheet tool for the command-line
+      priority: medium
+    - name: zola
+      repo: getzola/zola
+      description: A fast static site generator in one binary
+      priority: high
+    - name: dust
+      repo: bootandy/dust
+      description: More intuitive version of du in Rust
+      priority: medium
+    - name: presenterm
+      repo: mfontanini/presenterm
+      description: A slideshow tool for your terminal
+      priority: medium
+  parsing:
+    - name: lightningcss
+      repo: parcel-bundler/lightningcss
+      description: An extremely fast CSS parser, transformer, and minifier
+      priority: high
+  notable_rust_applications:
+    - name: deno
+      repo: denoland/deno
+      description: JavaScript and TypeScript runtime built in Rust
+      priority: high
+    - name: lapce
+      repo: lapce/lapce
+      description: Lightning-fast and powerful code editor
+      priority: high
+    - name: delta
+      repo: dandavison/delta
+      description: Syntax-highlighting pager for git, diff and grep output
+      priority: high
+    - name: fnm
+      repo: schniz/fnm
+      description: Fast Node version manager
+      priority: medium
+    - name: ruffle
+      repo: ruffle-rs/ruffle
+      description: Flash Player emulator written in Rust
       priority: medium
