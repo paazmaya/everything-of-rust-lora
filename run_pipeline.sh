@@ -6,7 +6,15 @@ echo "========================================"
 echo " Starting Rust LoRA Data Pipeline"
 echo "========================================"
 
-echo "[1/5] Collecting official Rust documentation..."
+if [ -z "$GITHUB_TOKEN" ]; then
+    echo "ERROR: GITHUB_TOKEN environment variable is required!"
+    echo "Set it with: export GITHUB_TOKEN='your_github_token'"
+    exit 1
+fi
+
+echo "GITHUB_TOKEN found. Proceeding with pipeline."
+
+echo "[1/8] Collecting official Rust documentation..."
 uv run python scripts/01_collect_rust_book.py
 
 echo "[2/5] Collecting docs.rs crate documentation..."

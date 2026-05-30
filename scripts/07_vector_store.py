@@ -20,9 +20,12 @@ class VectorStore:
 
     def index(self, filepath):
         print(f"Indexing {filepath.name} into ChromaDB...")
+        before_count = self.collection.count()
         batch_ids, batch_docs, batch_metas = [], [], []
+        input_count = 0
         with open(filepath) as f:
             for line in f:
+                input_count += 1
                 c = json.loads(line)
                 batch_ids.append(c["hash"])
                 batch_docs.append(c["content"][:50000])
@@ -34,7 +37,11 @@ class VectorStore:
                     batch_ids, batch_docs, batch_metas = [], [], []
         if batch_ids:
             self.collection.upsert(ids=batch_ids, documents=batch_docs, metadatas=batch_metas)
-        print(f"Indexed {self.collection.count()} total documents.")
+        after_count = self.collection.count()
+        net_change = after_count - before_count
+        print(
+            f"Indexed {input_count} chunks into vector storage. Vector store now contains {after_count} documents (was {before_count}, net change {net_change})."
+        )
 
     def update_source(self, source_type, chunks_file):
         print(f"Updating {source_type}...")

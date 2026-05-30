@@ -5,6 +5,15 @@ Write-Host "========================================" -ForegroundColor Cyan
 Write-Host " Starting Rust LoRA Data Pipeline" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 
+if (-not $env:GITHUB_TOKEN) {
+    Write-Host "`nERROR: GITHUB_TOKEN environment variable is required!" -ForegroundColor Red
+    Write-Host "Set it with: " -ForegroundColor Red -NoNewline
+    Write-Host "`$env:GITHUB_TOKEN='your_github_token'" -ForegroundColor Yellow
+    exit 1
+}
+
+Write-Host "`nGITHUB_TOKEN found. Proceeding with pipeline.`n" -ForegroundColor Green
+
 Write-Host "`n[1/5] Collecting official Rust documentation..." -ForegroundColor Green
 uv run python scripts/01_collect_rust_book.py
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

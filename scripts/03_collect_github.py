@@ -18,11 +18,17 @@ GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
 class GitHubCollector:
     def __init__(self):
         self.output_base = RAW_DIR
+        self.github_token = os.environ.get("GITHUB_TOKEN", "")
+        if not self.github_token:
+            raise RuntimeError(
+                "GITHUB_TOKEN environment variable is required for GitHub data collection. "
+                "Set it with: $env:GITHUB_TOKEN='your_token'"
+            )
         session = requests.Session()
         session.headers.update(
             {
                 "User-Agent": "RustLoRA/1.0",
-                "Authorization": f"token {GITHUB_TOKEN}" if GITHUB_TOKEN else "",
+                "Authorization": f"token {self.github_token}",
             }
         )
         self.session = CachedSession(session)
@@ -34,6 +40,11 @@ class GitHubCollector:
             for item in cat
             if "repo" in item
         ]
+
+    def count_files(self, out_dir):
+        if not out_dir.exists():
+            return 0
+        return sum(1 for _ in out_dir.rglob("*") if _.is_file())
 
     def get_file(self, repo, path):
         try:
@@ -49,20 +60,29 @@ class GitHubCollector:
     def collect_repo(self, repo):
         out_dir = self.output_base / "github" / repo.replace("/", "_")
         out_dir.mkdir(parents=True, exist_ok=True)
-        for fname in ["README.md", "CHANGELOG.md"]:
+        files = [
+            "README.md",
+            "CHANGELOG.md",
+            "CONTRIBUTING.md",
+            "docs/guide.md",
+            "examples/**/*.rs",
+        ]
+        for fname in files:
             content = self.get_file(repo, fname)
             if content and len(content) > 100:
-                with open(out_dir / fname, "w") as f:
+                safe_fname = fname.replace("/", "_").replace("*", "")
+                with open(out_dir / safe_fname, "w") as f:
                     f.write(content)
-        time.sleep(0.5)
+        time.sleep(0.3)
 
     def run_all(self):
         print("Collecting GitHub...")
-        if not GITHUB_TOKEN:
-            print("Warning: No GITHUB_TOKEN set. Rate limits apply.")
+        before_count = self.count_files(self.output_base / "github")
         for repo in tqdm(self.repos):
             self.collect_repo(repo)
+        after_count = self.count_files(self.output_base / "github")
         stats = self.session.get_stats()
+        print(f"Collected {after_count - before_count} new files, {after_count} total.")
         print(
             f"Cache stats: {stats['fetched']} fetched, {stats['skipped']} skipped (out of {stats['total_checked']} total)"
         )

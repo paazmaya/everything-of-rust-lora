@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import hashlib
 import json
+import sys
 import time
 from pathlib import Path
 
@@ -29,6 +30,11 @@ class DocsRsCollector:
             self.config = yaml.safe_load(f)
         self.crates = [item for cat in self.config["libraries"].values() for item in cat]
 
+    def count_docs(self, out_dir):
+        if not out_dir.exists():
+            return 0
+        return sum(1 for _ in out_dir.rglob("*.json") if _.is_file())
+
     def collect_crate(self, crate):
         name = crate["name"]
         out_dir = self.output_base / "docs_rs" / name
@@ -40,18 +46,22 @@ class DocsRsCollector:
             if not resp or resp.status_code != 200:
                 return []
             soup = BeautifulSoup(resp.text, "lxml")
-            links = list(
-                {
-                    f"https://docs.rs{link['href']}"
-                    if link["href"].startswith("/")
-                    else f"https://docs.rs/{name}/latest/{link['href']}"
-                    for link in soup.find_all("a", href=True)
-                    if ".html" in link.get("href", "") and "#" not in link.get("href", "")
-                }
-            )[:30]
+            links = set()
+            for link in soup.find_all("a", href=True):
+                href = link.get("href", "")
+                if ".html" in href and "#" not in href:
+                    full_url = (
+                        f"https://docs.rs{href}"
+                        if href.startswith("/")
+                        else f"https://docs.rs/{name}/latest/{href}"
+                    )
+                    if full_url not in links:
+                        links.add(full_url)
             for link in tqdm(links, desc=name, leave=False):
                 try:
-                    time.sleep(0.1)
+                    sys.stdout.write(".")
+                    sys.stdout.flush()
+                    time.sleep(0.05)
                     r = self.session.get(link, timeout=30)
                     if not r:  # Content not modified
                         continue
@@ -80,9 +90,12 @@ class DocsRsCollector:
 
     def run_all(self):
         print("Collecting docs.rs...")
+        before_count = self.count_docs(self.output_base / "docs_rs")
         for crate in tqdm(self.crates):
             self.collect_crate(crate)
+        after_count = self.count_docs(self.output_base / "docs_rs")
         stats = self.session.get_stats()
+        print(f"Collected {after_count - before_count} new docs, {after_count} total.")
         print(
             f"Cache stats: {stats['fetched']} fetched, {stats['skipped']} skipped (out of {stats['total_checked']} total)"
         )

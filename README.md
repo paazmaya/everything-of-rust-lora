@@ -16,6 +16,7 @@ This project contains the complete pipeline to train a specialized LoRA adapter 
 ## Phase 1: Environment Setup
 
 ### Local Setup (Linux)
+
 ```bash
 # Create virtual environment and install dependencies
 uv venv
@@ -32,7 +33,9 @@ curl -fsSL https://ollama.com/install.sh | sh
 ```
 
 ### Unsloth Studio (Google Colab) Setup
+
 Unsloth Studio is highly recommended if you don't have a local GPU with >24GB VRAM.
+
 1. Go to [Unsloth Studio](https://studio.unsloth.ai/).
 2. Create a new notebook.
 3. Run the Unsloth installation cell provided in the notebook.
@@ -41,9 +44,10 @@ Unsloth Studio is highly recommended if you don't have a local GPU with >24GB VR
 
 ## Phase 2: Data Collection & Processing (Local Machine)
 
-*Note: Do this locally or on a cheap CPU VM. You don't need a GPU for data collection.*
+_Note: Do this locally or on a cheap CPU VM. You don't need a GPU for data collection._
 
 1. **Run Data Collection Pipeline:**
+
    ```bash
    uv run python scripts/01_collect_rust_book.py
    uv run python scripts/02_collect_docs_rs.py
@@ -51,15 +55,19 @@ Unsloth Studio is highly recommended if you don't have a local GPU with >24GB VR
    uv run python scripts/04_collect_esp_rs.py
    uv run python scripts/05_collect_blogs.py
    ```
-   *Tip: If GitHub rate limits you, set `export GITHUB_TOKEN="your_token"`.*
+
+   _Tip: If GitHub rate limits you, set `export GITHUB_TOKEN="your_token"`._
 
 2. **Transform and Chunk Data:**
+
    ```bash
    uv run python scripts/06_transform_data.py
    ```
-   *Outputs to `data/processed/all_chunks.jsonl`*
+
+   _Outputs to `data/processed/all_chunks.jsonl`_
 
 3. **Store in Vector Database (For Updates):**
+
    ```bash
    uv run python scripts/07_vector_store.py
    ```
@@ -68,7 +76,7 @@ Unsloth Studio is highly recommended if you don't have a local GPU with >24GB VR
    ```bash
    uv run python scripts/08_create_dataset.py
    ```
-   *Outputs `data/datasets/train.jsonl` and `val.jsonl` in Alpaca format.*
+   _Outputs `data/datasets/train.jsonl` and `val.jsonl` in Alpaca format._
 
 ---
 
@@ -101,11 +109,13 @@ Uses the base HuggingFace model (`ibm-granite/granite-4.1-8b`) or a local model 
 4. Run the script:
 
    **Option 1: Use HuggingFace model (downloads if not cached)**
+
    ```bash
    uv run python train_granite.py
    ```
 
    **Option 2: Use local model directory**
+
    ```bash
    uv run python train_granite.py --model-path /path/to/granite-4.1-8b
    ```
@@ -122,7 +132,9 @@ Uses the base HuggingFace model (`ibm-granite/granite-4.1-8b`) or a local model 
    - **Note:** This script uses the ChatML prompt format native to Qwen.
 
 ### Training Configuration Details
+
 Both scripts use the following optimized LoRA settings:
+
 - **Rank (r):** 64
 - **Alpha:** 128
 - **Target Modules:** All attention and MLP projections (`q_proj`, `k_proj`, `v_proj`, `o_proj`, `gate_proj`, `up_proj`, `down_proj`).
@@ -137,10 +149,11 @@ Both scripts use the following optimized LoRA settings:
 Once training is complete (either locally or downloaded from Unsloth Studio):
 
 1. **Export to GGUF with Q4_K_M Quantization:**
-   
+
    The export script merges your trained LoRA adapter with the base model and quantizes to GGUF format.
-   
+
    **Option 1: Standard export (downloads base model from HuggingFace if not cached)**
+
    ```bash
    # For Granite 4.1 8B (trained with ibm-granite/granite-4.1-8b)
    uv run python scripts/09_export_ollama.py --model models/granite_rust_lora --name rust-granite --base ibm-granite/granite-4.1-8b
@@ -148,17 +161,20 @@ Once training is complete (either locally or downloaded from Unsloth Studio):
    # For Qwen 2.5 7B
    uv run python scripts/09_export_ollama.py --model models/qwen_rust_lora --name rust-qwen --base Qwen/Qwen2.5-7B-Instruct
    ```
-   
+
    **Option 2: Use local GGUF or model file**
+
    ```bash
    # If you have a local GGUF file or model folder, pass its path:
    uv run python scripts/09_export_ollama.py --model models/granite_rust_lora --name rust-granite --base /path/to/granite-4.1-8b-Q4_K_M.gguf
    ```
-   *(This skips downloading from HuggingFace and uses your local file directly.)*
-   
-   *This script automatically merges the LoRA weights with the base model and quantizes them to Q4_K_M (4-bit K_M quantization).*
+
+   _(This skips downloading from HuggingFace and uses your local file directly.)_
+
+   _This script automatically merges the LoRA weights with the base model and quantizes them to Q4_K_M (4-bit K_M quantization)._
 
 2. **Import into Ollama:**
+
    ```bash
    ollama create rust-granite -f models/rust-granite_gguf/Modelfile
    ```
@@ -177,18 +193,21 @@ Because we stored the raw data in ChromaDB (a local vector database), you do not
 ### Incremental Update Workflow:
 
 1. **Collect only new data:**
+
    ```bash
    python scripts/01_collect_rust_book.py  # Gets updated docs
    python scripts/02_collect_docs_rs.py    # Gets new crate versions
    ```
 
 2. **Re-transform the new raw data:**
+
    ```bash
    python scripts/06_transform_data.py
    ```
 
 3. **Update the Vector Store:**
    Instead of re-indexing everything, update specific sources:
+
    ```python
    from scripts.07_vector_store import VectorStore
    vs = VectorStore()

@@ -84,9 +84,7 @@ def train_granite(model_path: str = "ibm-granite/granite-4.1-8b"):
         inputs = examples["input"]
         outputs = examples["output"]
         texts = []
-        for instruction, input, output in zip(
-            instructions, inputs, outputs, strict=False
-        ):
+        for instruction, input, output in zip(instructions, inputs, outputs, strict=False):
             text = alpaca_prompt.format(instruction, input, output) + tokenizer.eos_token
             texts.append(text)
         return {"text": texts}

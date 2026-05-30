@@ -28,6 +28,11 @@ class DataTransformer:
         text = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", text)
         return re.sub(r"\n{3,}", "\n\n", text).strip()
 
+    def count_json_files(self, dir_path):
+        if not dir_path.exists():
+            return 0
+        return sum(1 for _ in dir_path.rglob("*.json") if _.is_file())
+
     def process_dir(self, dir_path, source_type):
         chunks = []
         if not dir_path.exists():
@@ -56,13 +61,25 @@ class DataTransformer:
 
     def run_all(self):
         print("Transforming data...")
+        sources = [
+            ("rust_book", "rust_book"),
+            ("docs_rs", "docs_rs"),
+            ("github", "github"),
+            ("esp_rs", "esp_rs"),
+            ("blogs", "blogs"),
+            ("best_practices", "best_practices"),
+        ]
         all_chunks = []
-        all_chunks.extend(self.process_dir(RAW_DIR / "rust_book", "rust_book"))
-        all_chunks.extend(self.process_dir(RAW_DIR / "docs_rs", "docs_rs"))
-        all_chunks.extend(self.process_dir(RAW_DIR / "github", "github"))
-        all_chunks.extend(self.process_dir(RAW_DIR / "esp_rs", "esp_rs"))
-        all_chunks.extend(self.process_dir(RAW_DIR / "blogs", "blogs"))
-        all_chunks.extend(self.process_dir(RAW_DIR / "best_practices", "best_practices"))
+        source_summary = []
+        for raw_subdir, source_type in sources:
+            raw_path = RAW_DIR / raw_subdir
+            raw_count = self.count_json_files(raw_path)
+            chunks = self.process_dir(raw_path, source_type)
+            all_chunks.extend(chunks)
+            source_summary.append((source_type, raw_count, len(chunks)))
+
+        for source_type, raw_count, chunk_count in source_summary:
+            print(f"  {source_type}: {raw_count} raw docs -> {chunk_count} transformed chunks")
 
         # Deduplicate
         seen = set()
@@ -71,7 +88,12 @@ class DataTransformer:
         with open(self.output_dir / "all_chunks.jsonl", "w") as f:
             for c in unique:
                 f.write(json.dumps(c) + "\n")
-        print(f"Saved {len(unique)} unique chunks.")
+
+        total_raw = sum(raw_count for _, raw_count, _ in source_summary)
+        total_chunks = len(all_chunks)
+        print(
+            f"Saved {len(unique)} unique chunks from {total_chunks} transformed chunks ({total_raw} raw source docs)."
+        )
 
 
 if __name__ == "__main__":

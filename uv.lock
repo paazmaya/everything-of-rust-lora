@@ -2808,7 +2808,7 @@ requires-dist = [
     { name = "tqdm", specifier = ">=4.67.3" },
     { name = "transformers", specifier = ">=5.1.0" },
     { name = "trl", specifier = ">=0.24.0" },
-    { name = "unsloth", extras = ["colab-new"], specifier = ">=2026.5.7" },
+    { name = "unsloth", extras = ["colab-new"], specifier = ">=2026.5.8" },
 ]
 
 [package.metadata.requires-dev]
@@ -3383,7 +3383,7 @@ wheels = [
 
 [[package]]
 name = "unsloth"
-version = "2026.5.7"
+version = "2026.5.8"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "accelerate" },
@@ -3415,9 +3415,9 @@ dependencies = [
     { name = "wheel" },
     { name = "xformers", marker = "(platform_machine == 'AMD64' and 'linux' in sys_platform) or (platform_machine == 'x86_64' and 'linux' in sys_platform) or (platform_machine == 'AMD64' and sys_platform == 'win32') or (platform_machine == 'x86_64' and sys_platform == 'win32')" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/5e/27/8e36f55340736b1da149e6868ca9642a0ab6ff9831354d783c3c81bdb20f/unsloth-2026.5.7.tar.gz", hash = "sha256:43b338055a479accb35f4d7708beaa4c429f4c72ce46ce40240a8ec7c7e6a423", size = 75668732, upload-time = "2026-05-24T14:16:20.764Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c1/4b/c4dacb114585a2af76d389bfb61c2258313b8e9ba0ba64cb970dd553c44c/unsloth-2026.5.8.tar.gz", hash = "sha256:c2e1269507f32c0565eabc0f4f98b5d73644d2f78c9a222f0e9aad16af44ee54", size = 75745444, upload-time = "2026-05-26T14:32:23.053Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/8c/77/a37eb0af45c5d9e8d27ac0cb5d9d5f23f2369fc99195ac84aa41c45d747a/unsloth-2026.5.7-py3-none-any.whl", hash = "sha256:fd15fae239280015f138cfae32fe4e5a1ee4609d37656df753ae45fc6c35356c", size = 71126969, upload-time = "2026-05-24T14:16:15.769Z" },
+    { url = "https://files.pythonhosted.org/packages/67/44/fdd475d04287ae729458220325948e389ec53152e5d1391c01f33cbfc220/unsloth-2026.5.8-py3-none-any.whl", hash = "sha256:dd26f66dc07be495c118d22910c48dbf91f75f7fd9ce9a7ce82124c5b4ae1423", size = 71212920, upload-time = "2026-05-26T14:32:18.406Z" },
 ]
 
 [package.optional-dependencies]

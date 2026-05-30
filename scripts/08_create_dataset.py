@@ -43,8 +43,10 @@ def main():
 
     print("Creating Alpaca dataset...")
     dataset = []
+    total_chunks = 0
     with open(chunks_file) as f:
         for line in tqdm(f):
+            total_chunks += 1
             chunk = json.loads(line)
             formatted = format_alpaca(chunk)
             if formatted:
@@ -60,7 +62,9 @@ def main():
         for item in dataset[split:]:
             f.write(json.dumps(item) + "\n")
 
-    print(f"Created {len(dataset)} samples. Train: {split}, Val: {len(dataset) - split}")
+    print(
+        f"Converted {total_chunks} chunks into {len(dataset)} dataset samples. Train: {split}, Val: {len(dataset) - split}"
+    )
 
 
 if __name__ == "__main__":
