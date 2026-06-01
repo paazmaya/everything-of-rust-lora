@@ -20,13 +20,15 @@ Documentation References:
 - IBM Docs: https://www.ibm.com/granite/docs/models/granite4-1
 """
 
+# ruff: noqa: I001
+from unsloth import FastLanguageModel
+
 import argparse
 
 import torch
 from datasets import load_dataset
 from transformers import TrainingArguments
 from trl.trainer.sft_trainer import SFTTrainer
-from unsloth import FastLanguageModel
 
 max_seq_length = 4096
 dtype = None
@@ -88,19 +90,20 @@ def train_granite(model_path: str = "ibm-granite/granite-4.1-8b"):
             text = alpaca_prompt.format(instruction, input, output) + tokenizer.eos_token
             texts.append(text)
         return {"text": texts}
+        
 
     dataset = load_dataset("json", data_files="data/datasets/train.jsonl", split="train")
     dataset = dataset.map(formatting_prompts_func, batched=True)
 
     trainer = SFTTrainer(
         model=model,
-        tokenizer=tokenizer,  # type: ignore[arg-type]
         train_dataset=dataset,
         dataset_text_field="text",  # type: ignore[arg-type]
         max_seq_length=max_seq_length,  # type: ignore[arg-type]
         args=TrainingArguments(
-            per_device_train_batch_size=4,
-            gradient_accumulation_steps=4,
+            per_device_train_batch_size=1,
+            gradient_accumulation_steps=8,
+            gradient_checkpointing=True,
             warmup_steps=100,
             num_train_epochs=3,
             learning_rate=2e-4,
