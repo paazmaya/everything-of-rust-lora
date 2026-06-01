@@ -90,7 +90,6 @@ def train_granite(model_path: str = "ibm-granite/granite-4.1-8b"):
             text = alpaca_prompt.format(instruction, input, output) + tokenizer.eos_token
             texts.append(text)
         return {"text": texts}
-        
 
     dataset = load_dataset("json", data_files="data/datasets/train.jsonl", split="train")
     dataset = dataset.map(formatting_prompts_func, batched=True)
