@@ -120,7 +120,16 @@ Uses the base HuggingFace model (`ibm-granite/granite-4.1-8b`) or a local model 
    uv run python train_granite.py --model-path /path/to/granite-4.1-8b
    ```
 
+   **Advanced: override training sizing**
+
+   ```bash
+   uv run python train_granite.py --max-seq-length 4096 --batch-size 1 --gradient-accumulation-steps 8
+   ```
+
 5. Training parameters:
+   - **Default sequence length:** `4096`
+   - **Default per-device batch size:** `1`
+   - **Default gradient accumulation:** `8`
    - **VRAM Requirement:** ~16GB (fits on RTX 3090/4090 or free Colab tier).
    - **Time:** ~2-3 hours for 3 epochs on 50k+ samples.
 

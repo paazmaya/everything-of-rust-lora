@@ -20,22 +20,29 @@ Documentation References:
 """
 
 # ruff: noqa: I001
+from unsloth import FastLanguageModel
+
 import argparse
 
 import torch
 from datasets import load_dataset
 from transformers import TrainingArguments
 from trl.trainer.sft_trainer import SFTTrainer
-from unsloth import FastLanguageModel
 
-max_seq_length = 2048
+max_seq_length = 1024
 # Qwen3.5 4B is best trained with bf16/16-bit LoRA; 4-bit QLoRA is not recommended for this model family.
+# Default max_seq_length is reduced for 12GB VRAM GPUs like a 4070.
 dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
 load_in_4bit = False
 load_in_16bit = True
 
 
-def train_qwen(model_path: str = "Qwen/Qwen3.5-4B"):
+def train_qwen(
+    model_path: str = "Qwen/Qwen3.5-4B",
+    max_seq_length: int = max_seq_length,
+    batch_size: int = 1,
+    gradient_accumulation_steps: int = 4,
+):
     """Train a LoRA adapter on Qwen 3.5 4B."""
     print(f"Loading model from: {model_path}")
     model, tokenizer = FastLanguageModel.from_pretrained(
@@ -95,8 +102,8 @@ You are an expert Rust programmer, specializing in systems programming, async Ru
         dataset_text_field="text",
         max_seq_length=max_seq_length,
         args=TrainingArguments(
-            per_device_train_batch_size=1,
-            gradient_accumulation_steps=4,
+            per_device_train_batch_size=batch_size,
+            gradient_accumulation_steps=gradient_accumulation_steps,
             warmup_steps=10,
             num_train_epochs=3,
             learning_rate=2e-4,
@@ -126,6 +133,29 @@ if __name__ == "__main__":
         help="Model path (HuggingFace ID or local directory). "
         "Examples: 'Qwen/Qwen3.5-4B' or '/path/to/Qwen3.5-4B'",
     )
+    parser.add_argument(
+        "--max-seq-length",
+        type=int,
+        default=max_seq_length,
+        help="Maximum sequence length for training. Lower values reduce VRAM use.",
+    )
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=1,
+        help="Per-device batch size for training.",
+    )
+    parser.add_argument(
+        "--gradient-accumulation-steps",
+        type=int,
+        default=4,
+        help="Gradient accumulation steps to simulate a larger batch size.",
+    )
     args = parser.parse_args()
 
-    train_qwen(model_path=args.model_path)
+    train_qwen(
+        model_path=args.model_path,
+        max_seq_length=args.max_seq_length,
+        batch_size=args.batch_size,
+        gradient_accumulation_steps=args.gradient_accumulation_steps,
+    )

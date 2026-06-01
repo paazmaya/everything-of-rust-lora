@@ -35,13 +35,21 @@ dtype = None
 load_in_4bit = True
 
 
-def train_granite(model_path: str = "ibm-granite/granite-4.1-8b"):
+def train_granite(
+    model_path: str = "ibm-granite/granite-4.1-8b",
+    max_seq_length: int = 4096,
+    batch_size: int = 1,
+    gradient_accumulation_steps: int = 8,
+):
     """
     Train a LoRA adapter on IBM Granite 4.1 8B model.
 
     Args:
         model_path: HuggingFace model ID or local directory path
                    (e.g., "ibm-granite/granite-4.1-8b" or "/path/to/granite-4.1-8b")
+        max_seq_length: Maximum sequence length for training.
+        batch_size: Per-device batch size for training.
+        gradient_accumulation_steps: Gradient accumulation steps to simulate a larger batch size.
     """
     print(f"Loading model from: {model_path}")
     model, tokenizer = FastLanguageModel.from_pretrained(
@@ -100,8 +108,8 @@ def train_granite(model_path: str = "ibm-granite/granite-4.1-8b"):
         dataset_text_field="text",  # type: ignore[arg-type]
         max_seq_length=max_seq_length,  # type: ignore[arg-type]
         args=TrainingArguments(
-            per_device_train_batch_size=1,
-            gradient_accumulation_steps=8,
+            per_device_train_batch_size=batch_size,
+            gradient_accumulation_steps=gradient_accumulation_steps,
             gradient_checkpointing=True,
             warmup_steps=100,
             num_train_epochs=3,
@@ -132,6 +140,29 @@ if __name__ == "__main__":
         help="Model path (HuggingFace ID or local directory). "
         "Examples: 'ibm-granite/granite-4.1-8b' or '/path/to/granite-4.1-8b'",
     )
+    parser.add_argument(
+        "--max-seq-length",
+        type=int,
+        default=max_seq_length,
+        help="Maximum sequence length for training. Lower values reduce VRAM use.",
+    )
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=1,
+        help="Per-device batch size for training.",
+    )
+    parser.add_argument(
+        "--gradient-accumulation-steps",
+        type=int,
+        default=8,
+        help="Gradient accumulation steps to simulate a larger batch size.",
+    )
     args = parser.parse_args()
 
-    train_granite(model_path=args.model_path)
+    train_granite(
+        model_path=args.model_path,
+        max_seq_length=args.max_seq_length,
+        batch_size=args.batch_size,
+        gradient_accumulation_steps=args.gradient_accumulation_steps,
+    )
