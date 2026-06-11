@@ -3,7 +3,7 @@
 Unsloth Studio Training Script for IBM Granite 4.1 8B
 
 Training uses the base HuggingFace model (ibm-granite/granite-4.1-8b) or a local model path.
-After training, the export script (scripts/09_export_ollama.py) merges the LoRA
+After training, the export script (scripts/10_export_ollama.py) merges the LoRA
 and creates a GGUF file with Q4_K_M quantization.
 
 Usage:

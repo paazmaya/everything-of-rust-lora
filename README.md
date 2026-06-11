@@ -165,17 +165,17 @@ Once training is complete (either locally or downloaded from Unsloth Studio):
 
    ```bash
    # For Granite 4.1 8B (trained with ibm-granite/granite-4.1-8b)
-   uv run python scripts/09_export_ollama.py --model models/granite_rust_lora --name rust-granite --base ibm-granite/granite-4.1-8b
+   uv run python scripts/10_export_ollama.py --model models/granite_rust_lora --name rust-granite --base ibm-granite/granite-4.1-8b
 
    # For Qwen 2.5 7B
-   uv run python scripts/09_export_ollama.py --model models/qwen_rust_lora --name rust-qwen --base Qwen/Qwen2.5-7B-Instruct
+   uv run python scripts/10_export_ollama.py --model models/qwen_rust_lora --name rust-qwen --base Qwen/Qwen2.5-7B-Instruct
    ```
 
    **Option 2: Use local GGUF or model file**
 
    ```bash
    # If you have a local GGUF file or model folder, pass its path:
-   uv run python scripts/09_export_ollama.py --model models/granite_rust_lora --name rust-granite --base /path/to/granite-4.1-8b-Q4_K_M.gguf
+   uv run python scripts/10_export_ollama.py --model models/granite_rust_lora --name rust-granite --base /path/to/granite-4.1-8b-Q4_K_M.gguf
    ```
 
    _(This skips downloading from HuggingFace and uses your local file directly.)_

@@ -6,6 +6,9 @@ Training uses the base HuggingFace model (NVIDIA/Nemotron-3-Nano-4B) or a local
 model path. This script uses 16-bit/bf16 LoRA training, which is the recommended
 fine-tuning mode for Nemotron 3 Nano.
 
+Note: local Nemotron model repos that require `trust_remote_code=True` may also
+require the `mamba-ssm` Python package, e.g. for FP8 or other custom builds.
+
 Usage:
     # Use HuggingFace model (downloads if not cached):
     uv run python train_nemotron3_nano.py
@@ -43,17 +46,27 @@ def train_nemotron(
     max_seq_length: int = max_seq_length,
     batch_size: int = 1,
     gradient_accumulation_steps: int = 4,
+    trust_remote_code: bool = False,
 ):
     """Train a LoRA adapter on NVIDIA Nemotron 3 Nano 4B."""
     print(f"Loading model from: {model_path}")
-    model, tokenizer = FastLanguageModel.from_pretrained(
-        model_name=model_path,
-        max_seq_length=max_seq_length,
-        dtype=dtype,
-        load_in_4bit=load_in_4bit,
-        load_in_16bit=load_in_16bit,
-        full_finetuning=False,
-    )
+    try:
+        model, tokenizer = FastLanguageModel.from_pretrained(
+            model_name=model_path,
+            max_seq_length=max_seq_length,
+            dtype=dtype,
+            load_in_4bit=load_in_4bit,
+            load_in_16bit=load_in_16bit,
+            full_finetuning=False,
+            trust_remote_code=trust_remote_code,
+        )
+    except ModuleNotFoundError as err:
+        if "mamba_ssm" in str(err) or "mamba-ssm" in str(err):
+            raise RuntimeError(
+                "The Nemotron model requires the `mamba-ssm` package when `trust_remote_code=True`. "
+                "Install it with `pip install mamba-ssm` and retry, or use a model path that does not require remote code execution."
+            ) from err
+        raise
 
     model = FastLanguageModel.get_peft_model(
         model,
@@ -151,6 +164,12 @@ if __name__ == "__main__":
         default=4,
         help="Gradient accumulation steps to simulate a larger batch size.",
     )
+    parser.add_argument(
+        "--trust-remote-code",
+        action="store_true",
+        help="Enable trust_remote_code for local models with custom config/modeling files. "
+        "May also require `pip install mamba-ssm` when using Nemotron FP8 or other custom builds.",
+    )
     args = parser.parse_args()
 
     train_nemotron(
@@ -158,4 +177,5 @@ if __name__ == "__main__":
         max_seq_length=args.max_seq_length,
         batch_size=args.batch_size,
         gradient_accumulation_steps=args.gradient_accumulation_steps,
+        trust_remote_code=args.trust_remote_code,
     )
