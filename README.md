@@ -9,9 +9,8 @@ This project contains the complete pipeline to train a specialized LoRA adapter 
 3. **Vector/Graph Storage** (Script 07): Stores data in ChromaDB for easy 6-month incremental updates.
 4. **Dataset Creation** (Script 08): Converts chunks into Alpaca instruction-response format.
 5. **Training** (`train_granite.py`, `train_qwen.py`): Trains LoRA using Unsloth.
-6. **Export** (Script 09): Merges LoRA and converts to GGUF for Ollama.
-
----
+6. **Export** (Script 09): Packages the trained LoRA adapter with metadata and a `Modelfile`.
+7. **Merge + GGUF** (Script 10): Merges the adapter with the base model and exports a runnable GGUF bundle for Ollama.
 
 ## Phase 1: Environment Setup
 
@@ -39,8 +38,6 @@ Unsloth Studio is highly recommended if you don't have a local GPU with >24GB VR
 1. Go to [Unsloth Studio](https://studio.unsloth.ai/).
 2. Create a new notebook.
 3. Run the Unsloth installation cell provided in the notebook.
-
----
 
 ## Phase 2: Data Collection & Processing (Local Machine)
 
@@ -78,8 +75,6 @@ _Note: Do this locally or on a cheap CPU VM. You don't need a GPU for data colle
    ```
    _Outputs `data/datasets/train.jsonl` and `val.jsonl` in Alpaca format._
 
----
-
 ## Code Formatting
 
 This project uses [Ruff](https://docs.astral.sh/ruff/) for code formatting and linting.
@@ -94,8 +89,6 @@ uv run ruff check .
 # Fix lint issues automatically
 uv run ruff check . --fix
 ```
-
----
 
 ## Phase 3: Training with Unsloth Studio
 
@@ -133,67 +126,87 @@ Uses the base HuggingFace model (`ibm-granite/granite-4.1-8b`) or a local model 
    - **VRAM Requirement:** ~16GB (fits on RTX 3090/4090 or free Colab tier).
    - **Time:** ~2-3 hours for 3 epochs on 50k+ samples.
 
-### Option B: Training Qwen 2.5 7B Instruct
+### Option B: Training Qwen 3.5 4B Instruct
 
 1. Open `train_qwen.py`.
 2. Run the script.
-   - **VRAM Requirement:** ~16GB.
+   - **VRAM Requirement:** ~12-16GB.
    - **Note:** This script uses the ChatML prompt format native to Qwen.
 
 ### Training Configuration Details
 
-Both scripts use the following optimized LoRA settings:
+The current implementation uses two separate LoRA recipes:
 
-- **Rank (r):** 64
-- **Alpha:** 128
-- **Target Modules:** All attention and MLP projections (`q_proj`, `k_proj`, `v_proj`, `o_proj`, `gate_proj`, `up_proj`, `down_proj`).
-- **Optimizer:** AdamW 8-bit
-- **Scheduler:** Cosine
-- **Batch Size:** 4 per device, 4 gradient accumulation steps (Effective batch size = 16).
+- `train_granite.py` (Granite 4.1 8B):
+  - **Rank (r):** 64
+  - **Alpha:** 128
+  - **Target Modules:** `q_proj`, `k_proj`, `v_proj`, `o_proj`, `gate_proj`, `up_proj`, `down_proj`
+  - **Optimizer:** AdamW 8-bit
+  - **Scheduler:** Cosine
+  - **Batch Size:** 1 per device, gradient accumulation 8 (effective 8)
+  - **Sequence Length:** 4096
+  - **VRAM:** ~16GB
 
----
+- `train_qwen.py` (Qwen 3.5 4B):
+  - **Rank (r):** 16
+  - **Alpha:** 16
+  - **Target Modules:** `q_proj`, `k_proj`, `v_proj`, `o_proj`, `gate_proj`, `up_proj`, `down_proj`
+  - **Optimizer:** AdamW 8-bit
+  - **Scheduler:** Cosine
+  - **Batch Size:** 1 per device, gradient accumulation 4 (effective 4)
+  - **Sequence Length:** 1024
+  - **VRAM:** ~12GB
 
 ## Phase 4: Exporting to Ollama
 
 Once training is complete (either locally or downloaded from Unsloth Studio):
 
-1. **Export to GGUF with Q4_K_M Quantization:**
+1. **Package the trained adapter with Script 09:**
 
-   The export script merges your trained LoRA adapter with the base model and quantizes to GGUF format.
+   Script `scripts/09_gguf_lora.py` now exports the trained LoRA adapter as an adapter-only package and writes a `Modelfile` with base model metadata and training economics.
+
+   ```bash
+   python scripts/09_gguf_lora.py --model models/granite_rust_lora --name rust-granite --base granite
+   python scripts/09_gguf_lora.py --model models/qwen3_5_4b_rust_lora --name rust-qwen --base qwen
+   ```
+
+   Optionally, provide `--base-model` to override the base model ID or local path used in the generated `Modelfile`.
+
+2. **Merge and export GGUF with Script 10:**
+
+   Use `scripts/10_export_ollama.py` to merge the adapter with the base model and export a runnable GGUF package.
 
    **Option 1: Standard export (downloads base model from HuggingFace if not cached)**
 
    ```bash
-   # For Granite 4.1 8B (trained with ibm-granite/granite-4.1-8b)
+   # For Granite 4.1 8B
    uv run python scripts/10_export_ollama.py --model models/granite_rust_lora --name rust-granite --base ibm-granite/granite-4.1-8b
 
-   # For Qwen 2.5 7B
-   uv run python scripts/10_export_ollama.py --model models/qwen_rust_lora --name rust-qwen --base Qwen/Qwen2.5-7B-Instruct
+   # For Qwen 3.5 4B
+   uv run python scripts/10_export_ollama.py --model models/qwen3_5_4b_rust_lora --name rust-qwen --base Qwen/Qwen3.5-4B
    ```
 
    **Option 2: Use local GGUF or model file**
 
    ```bash
-   # If you have a local GGUF file or model folder, pass its path:
    uv run python scripts/10_export_ollama.py --model models/granite_rust_lora --name rust-granite --base /path/to/granite-4.1-8b-Q4_K_M.gguf
    ```
 
    _(This skips downloading from HuggingFace and uses your local file directly.)_
 
-   _This script automatically merges the LoRA weights with the base model and quantizes them to Q4_K_M (4-bit K_M quantization)._
+   _Script 10 merges the LoRA weights with the specified base model and quantizes the merged model to Q4_K_M._
 
-2. **Import into Ollama:**
-
-   ```bash
+3. **Import into Ollama:**
    ollama create rust-granite -f models/rust-granite_gguf/Modelfile
+
    ```
 
-3. **Test the Model:**
+   ```
+
+4. **Test the Model:**
    ```bash
    ollama run rust-granite "How do I set up a WiFi connection on an ESP32 using esp-wifi and async Rust?"
    ```
-
----
 
 ## Phase 5: Maintenance & 6-Month Updates
 
@@ -229,8 +242,6 @@ Because we stored the raw data in ChromaDB (a local vector database), you do not
    uv run python scripts/08_create_dataset.py
    # Re-run train_granite.py in Unsloth Studio
    ```
-
----
 
 ## References: IBM Granite 4.1 8B
 

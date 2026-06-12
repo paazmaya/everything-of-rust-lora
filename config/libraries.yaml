@@ -380,6 +380,10 @@ libraries:
       docs_url: https://docs.rs/synstructure
       priority: high
   parsing:
+    - name: lightningcss
+      repo: parcel-bundler/lightningcss
+      description: An extremely fast CSS parser, transformer, and minifier
+      priority: high
     - name: regex
       repo: rust-lang/regex
       docs_url: https://docs.rs/regex
@@ -1101,11 +1105,6 @@ libraries:
       repo: mfontanini/presenterm
       description: A slideshow tool for your terminal
       priority: medium
-  parsing:
-    - name: lightningcss
-      repo: parcel-bundler/lightningcss
-      description: An extremely fast CSS parser, transformer, and minifier
-      priority: high
   notable_rust_applications:
     - name: deno
       repo: denoland/deno
