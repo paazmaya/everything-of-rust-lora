@@ -12,6 +12,7 @@ Documentation References:
 - HF Blog: https://huggingface.co/blog/ibm-granite/granite-4-1
 - IBM Docs: https://www.ibm.com/granite/docs/models/granite4-1
 """
+
 import os
 
 from peft import PeftModel
@@ -77,9 +78,7 @@ def export_to_ollama(model_path: str, model_name: str, base_model: str, quant: s
 
     # Create Ollama Modelfile
     if gguf_filename is None:
-        raise RuntimeError(
-            f"Could not determine GGUF filename in {gguf_dir}."
-        )
+        raise RuntimeError(f"Could not determine GGUF filename in {gguf_dir}.")
     from_path = gguf_filename
     modelfile_content = f"""FROM {from_path}
 PARAMETER stop "<|im_start|>"

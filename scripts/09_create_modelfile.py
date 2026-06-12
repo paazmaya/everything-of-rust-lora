@@ -1,29 +1,24 @@
 #!/usr/bin/env python3
 """
-Export a trained LoRA adapter checkpoint into a packaged adapter directory and
-generate a metadata-rich Modelfile describing the base model and training
-economics.
+Create a high-quality Modelfile for a trained LoRA adapter checkpoint.
 
-This script does not quantize the LoRA adapter to GGUF. LoRA adapters cannot be
-quantized directly; instead this script exports the adapter weights and creates
-metadata for a later merge with the base model.
+This script does not modify or export adapter weights. It validates the adapter
+checkpoint directory, reads the adapter config, and writes a structured Modelfile
+for later merging and GGUF export with script 10.
 
-The generated Modelfile contains:
-- Base model reference and GGUF link
-- Training economics summary
-- Adapter package notes and usage guidance
+The generated Modelfile includes:
+- Base model metadata
+- Training economics and prompt guidance
+- LoRA adapter metadata and file inventory
+- Recommended merge command for script 10
 """
 
 import argparse
 import datetime
-import os
+import json
 from pathlib import Path
-from typing import Dict, Optional
 
-from unsloth import FastLanguageModel
-from unsloth.save import save_lora_to_custom_dir
-
-BASE_MODEL_METADATA: Dict[str, Dict[str, str]] = {
+BASE_MODEL_METADATA: dict[str, dict[str, str]] = {
     "granite": {
         "name": "IBM Granite 4.1 8B",
         "reference": "ibm-granite/granite-4.1-8b",
@@ -73,7 +68,7 @@ BASE_MODEL_METADATA: Dict[str, Dict[str, str]] = {
 }
 
 
-def get_base_metadata(base_key: str) -> Dict[str, str]:
+def get_base_metadata(base_key: str) -> dict[str, str]:
     if base_key not in BASE_MODEL_METADATA:
         raise ValueError(
             f"Base model key must be one of: {', '.join(BASE_MODEL_METADATA)}. Got '{base_key}'."
@@ -81,90 +76,163 @@ def get_base_metadata(base_key: str) -> Dict[str, str]:
     return BASE_MODEL_METADATA[base_key]
 
 
+def safe_yaml_scalar(raw: str) -> str:
+    text = str(raw)
+    if "\n" in text:
+        escaped = text.replace("'", "''")
+        return "|\n  " + escaped.replace("\n", "\n  ")
+    if text == "" or text.strip() != text or any(c in text for c in ":#\"'"):
+        escaped = text.replace("'", "''")
+        return f"'{escaped}'"
+    return text
+
+
+def yaml_list(items: list[str], indent: int = 2) -> list[str]:
+    return [" " * indent + f"- {safe_yaml_scalar(item)}" for item in items]
+
+
+def load_adapter_config(adapter_dir: Path) -> dict[str, object]:
+    config_path = adapter_dir / "adapter_config.json"
+    if not config_path.exists():
+        raise FileNotFoundError(
+            f"Missing adapter_config.json in LoRA adapter directory: {adapter_dir}"
+        )
+    with config_path.open("r", encoding="utf-8") as handle:
+        return json.load(handle)
+
+
+def inventory_files(adapter_dir: Path) -> list[str]:
+    return sorted(
+        [
+            str(path.name)
+            for path in adapter_dir.iterdir()
+            if path.is_file() and not path.name.startswith(".")
+        ]
+    )
+
+
+def format_adapter_config(adapter_config: dict[str, object]) -> list[str]:
+    parts: list[str] = []
+    for key in [
+        "r",
+        "lora_alpha",
+        "lora_dropout",
+        "bias",
+        "fan_in_fan_out",
+        "target_modules",
+    ]:
+        if key in adapter_config:
+            value = adapter_config[key]
+            if isinstance(value, list):
+                parts.append(f"  {key}:")
+                parts.extend(yaml_list([str(v) for v in value], indent=4))
+            else:
+                parts.append(f"  {key}: {safe_yaml_scalar(value)}")
+    return parts
+
+
 def build_modelfile_content(
     model_name: str,
-    base_metadata: Dict[str, str],
-    base_override: Optional[str] = None,
+    base_metadata: dict[str, str],
+    adapter_dir: Path,
+    adapter_config: dict[str, object],
+    base_override: str | None = None,
 ) -> str:
     base_reference = base_override or base_metadata["reference"]
     created_at = datetime.datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+    adapter_id = adapter_config.get("adapter_id", "unknown")
+    adapter_files = inventory_files(adapter_dir)
+    merge_command = (
+        f"python scripts/10_export_ollama.py --model {adapter_dir.as_posix()} "
+        f"--name {model_name} --base {base_reference}"
+    )
 
-    lines = [
-        "# Modelfile for a packaged LoRA adapter",
-        "# This file documents the base model and training economics.",
-        "# LoRA adapters cannot be quantized directly to GGUF; merge with the base model first.",
-        "",
-        f"name: {model_name}",
-        f"created_at: {created_at}",
+    lines: list[str] = [
+        "format_version: '1.0'",
+        "artifact_type: loRA_adapter_metadata",
+        f"name: {safe_yaml_scalar(model_name)}",
+        f"created_at: {safe_yaml_scalar(created_at)}",
         "",
         "base_model:",
-        f"  name: {base_metadata['name']}",
-        f"  reference: {base_reference}",
-        f"  gguf: {base_metadata['gguf']}",
-        f"  source_url: {base_metadata['source_url']}",
+        f"  name: {safe_yaml_scalar(base_metadata['name'])}",
+        f"  reference: {safe_yaml_scalar(base_reference)}",
+        f"  gguf: {safe_yaml_scalar(base_metadata['gguf'])}",
+        f"  source_url: {safe_yaml_scalar(base_metadata['source_url'])}",
         "",
         "training_economics:",
-        f"  summary: '{base_metadata['training_economics']}'",
+        f"  summary: {safe_yaml_scalar(base_metadata['training_economics'])}",
         "  dataset: data/datasets/train.jsonl",
         "  instruction: Rust programming, systems, async Rust, embedded Rust, and library usage.",
         "",
-        "lora_adapter:",
-        f"  directory: models/{model_name}_lora",
-        "  export_type: adapter-only",
-        "  notes: LoRA adapter package contains only adapter weights and tokenizer metadata.",
-        "",
-        "notes:",
-        f"  - {base_metadata['notes']}",
-        "  - 'To create a runnable GGUF model, merge this adapter with the base model and quantize the merged model.'",
+        "adapter:",
+        f"  path: {safe_yaml_scalar(adapter_dir.as_posix())}",
+        f"  id: {safe_yaml_scalar(adapter_id)}",
+        "  type: adapter-only",
+        "  notes: This directory contains only the LoRA adapter checkpoint. Do not quantize it directly.",
     ]
+
+    config_lines = format_adapter_config(adapter_config)
+    if config_lines:
+        lines.append("  config:")
+        lines.extend(config_lines)
+
+    if adapter_files:
+        lines.append("  files:")
+        lines.extend(yaml_list(adapter_files, indent=4))
+
+    lines.extend(
+        [
+            "",
+            "merge:",
+            "  script: scripts/10_export_ollama.py",
+            f"  recommended_command: {safe_yaml_scalar(merge_command)}",
+            "  quantization: q4_k_m",
+            "  output_dir: models/{model_name}_gguf",
+            "",
+            "notes:",
+            f"  - {safe_yaml_scalar(base_metadata['notes'])}",
+            "  - 'To create a runnable GGUF model, merge this adapter with the base model using script 10.'",
+            "  - 'The Modelfile is a metadata manifest, not a runnable GGUF model itself.'",
+        ]
+    )
 
     return "\n".join(lines) + "\n"
 
 
-def export_lora_adapter(
-    model_path: str,
+def create_modelfile(
+    adapter_dir: Path,
     model_name: str,
     base_key: str,
-    base_override: Optional[str] = None,
-) -> None:
-    if not os.path.isdir(model_path) or not os.path.exists(
-        os.path.join(model_path, "adapter_config.json")
-    ):
-        raise ValueError(
-            "Model path must be a directory containing a LoRA adapter checkpoint (with adapter_config.json)."
-        )
+    base_override: str | None = None,
+    output_path: Path | None = None,
+) -> Path:
+    if not adapter_dir.is_dir():
+        raise ValueError(f"Adapter path must be a directory: {adapter_dir}")
 
-    print(f"Loading LoRA checkpoint from {model_path}...")
-    model, tokenizer = FastLanguageModel.from_pretrained(
-        model_name=model_path,
-        max_seq_length=4096,
-        dtype=None,
-        load_in_4bit=True,
-    )
-
-    output_dir = Path("models") / f"{model_name}_lora"
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    print(f"Saving LoRA adapter-only package to {output_dir}...")
-    save_lora_to_custom_dir(model, tokenizer, str(output_dir))
-
+    adapter_config = load_adapter_config(adapter_dir)
     base_metadata = get_base_metadata(base_key)
-    modelfile_path = output_dir / "Modelfile"
+    output_path = output_path or adapter_dir
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    modelfile_path = output_path / "Modelfile"
     print(f"Writing Modelfile to {modelfile_path}...")
-    modelfile_content = build_modelfile_content(model_name, base_metadata, base_override)
+    modelfile_content = build_modelfile_content(
+        model_name,
+        base_metadata,
+        adapter_dir,
+        adapter_config,
+        base_override,
+    )
     modelfile_path.write_text(modelfile_content, encoding="utf-8")
 
-    print("\nLoRA adapter export complete!")
-    print(f"Adapter package created at: {output_dir}")
-    print(f"Modelfile created at: {modelfile_path}")
-    print("\nNext step: merge this adapter with the specified base model and quantize the merged model separately.")
+    return modelfile_path
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description=(
-            "Export a LoRA adapter checkpoint and generate a Modelfile containing "
-            "the base model and training economics metadata."
+            "Create a high-quality Modelfile for a trained LoRA adapter checkpoint. "
+            "This script does not export or merge weights."
         )
     )
     parser.add_argument(
@@ -177,7 +245,7 @@ if __name__ == "__main__":
         "--name",
         type=str,
         required=True,
-        help="Name for the exported adapter package (e.g., rust-granite)",
+        help="Name for the Modelfile package (e.g., rust-granite)",
     )
     parser.add_argument(
         "--base",
@@ -198,6 +266,24 @@ if __name__ == "__main__":
             "If provided, this value will be used in the Modelfile instead of the default base reference."
         ),
     )
+    parser.add_argument(
+        "--output",
+        type=str,
+        default=None,
+        help=("Optional output directory for the Modelfile. Defaults to the adapter directory."),
+    )
     args = parser.parse_args()
 
-    export_lora_adapter(args.model, args.name, args.base, args.base_model)
+    adapter_dir = Path(args.model)
+    output_dir = Path(args.output) if args.output else None
+    modelfile_path = create_modelfile(
+        adapter_dir,
+        args.name,
+        args.base,
+        args.base_model,
+        output_dir,
+    )
+
+    print("\nModelfile creation complete!")
+    print(f"Modelfile saved to: {modelfile_path}")
+    print("Use script 10 to merge the adapter with the base model and export GGUF.")

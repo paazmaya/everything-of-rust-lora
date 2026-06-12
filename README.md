@@ -163,11 +163,11 @@ Once training is complete (either locally or downloaded from Unsloth Studio):
 
 1. **Package the trained adapter with Script 09:**
 
-   Script `scripts/09_gguf_lora.py` now exports the trained LoRA adapter as an adapter-only package and writes a `Modelfile` with base model metadata and training economics.
+   Script `scripts/09_create_modelfile.py` now exports the trained LoRA adapter as an adapter-only package and writes a `Modelfile` with base model metadata and training economics.
 
    ```bash
-   python scripts/09_gguf_lora.py --model models/granite_rust_lora --name rust-granite --base granite
-   python scripts/09_gguf_lora.py --model models/qwen3_5_4b_rust_lora --name rust-qwen --base qwen
+   uv run python scripts/09_create_modelfile.py --model models/granite_rust_lora --name rust-granite --base granite
+   uv run python scripts/09_create_modelfile.py --model models/qwen3_5_4b_rust_lora --name rust-qwen --base qwen
    ```
 
    Optionally, provide `--base-model` to override the base model ID or local path used in the generated `Modelfile`.
