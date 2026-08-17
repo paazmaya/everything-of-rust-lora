@@ -167,6 +167,7 @@ Once training is complete (either locally or downloaded from Unsloth Studio):
 
    ```bash
    uv run python scripts/09_create_modelfile.py --model models/granite_rust_lora --name rust-granite --base granite
+   
    uv run python scripts/09_create_modelfile.py --model models/qwen3_5_4b_rust_lora --name rust-qwen --base qwen
    ```
 
@@ -197,10 +198,10 @@ Once training is complete (either locally or downloaded from Unsloth Studio):
    _Script 10 merges the LoRA weights with the specified base model and quantizes the merged model to Q4_K_M._
 
 3. **Import into Ollama:**
+   
+
+   ```bash
    ollama create rust-granite -f models/rust-granite_gguf/Modelfile
-
-   ```
-
    ```
 
 4. **Test the Model:**
@@ -249,3 +250,8 @@ Because we stored the raw data in ChromaDB (a local vector database), you do not
 - **HuggingFace Model Card (GGUF):** https://huggingface.co/unsloth/granite-4.1-8b-GGUF?show_file_info=granite-4.1-8b-Q4_K_M.gguf
 - **HuggingFace Blog (Granite 4.1):** https://huggingface.co/blog/ibm-granite/granite-4-1
 - **IBM Granite Documentation:** https://www.ibm.com/granite/docs/models/granite4-1
+
+
+## License
+
+[MIT](./LICENSE)
