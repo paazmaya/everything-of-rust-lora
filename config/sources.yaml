@@ -1,139 +1,149 @@
-# Data sources configuration
-rust_official:
-  rust_book:
+# Official Rust documentation sources
+# Minimal format: name, url, output_dir
+sources:
+  - name: rust_book
     url: https://doc.rust-lang.org/book/
     output_dir: raw/rust_book
-  reference:
+
+  - name: rust_reference
     url: https://doc.rust-lang.org/reference/
     output_dir: raw/rust_reference
-  rust_edition_guide:
+
+  - name: rust_edition_guide
     url: https://doc.rust-lang.org/edition-guide/index.html
     output_dir: raw/rust_edition_guide
-  rustdoc:
+
+  - name: rustdoc
     url: https://doc.rust-lang.org/rustdoc/index.html
     output_dir: raw/rustdoc
-  rustc:
+
+  - name: rustc
     url: https://doc.rust-lang.org/rustc/index.html
     output_dir: raw/rustc
-  cargo:
+
+  - name: cargo
     url: https://doc.rust-lang.org/cargo/index.html
     output_dir: raw/cargo
-  std:
+
+  - name: std
     url: https://doc.rust-lang.org/std/index.html
     output_dir: raw/std
-  core:
+
+  - name: core
     url: https://doc.rust-lang.org/core/index.html
     output_dir: raw/core
-  rust_by_example:
+
+  - name: rust_by_example
     url: https://doc.rust-lang.org/rust-by-example/
     output_dir: raw/rust_by_example
-  rust_cookbook:
+
+  - name: rust_cookbook
     url: https://rust-lang-nursery.github.io/rust-cookbook/
     output_dir: raw/rust_cookbook
-  error_codes:
+
+  - name: error_codes
     url: https://doc.rust-lang.org/error_codes/error-index.html
     output_dir: raw/rust_error_index
+
+  - name: nomicon
+    url: https://doc.rust-lang.org/nomicon/
+    output_dir: raw/rustonomicon
+
+# Rust blogs and news
+blogs:
+  - name: rust_blog
+    url: https://blog.rust-lang.org/feed.xml
+    output_dir: raw/blogs/official
+
+# Best practices and learning resources
+best_practices:
+  - name: rust_cli_book
+    url: https://rust-cli.github.io/book/index.html
+    output_dir: raw/best_practices/rust_cli_book
+
+  - name: api_guidelines
+    url: https://rust-lang.github.io/api-guidelines/
+    output_dir: raw/best_practices/api_guidelines
+
+  - name: patterns
+    url: https://rust-unofficial.github.io/patterns/
+    output_dir: raw/best_practices/patterns
+
+  - name: little_book_macros
+    url: https://lukaswirth.dev/tlborm/
+    output_dir: raw/best_practices/tlborm
+
+  - name: awesome_rust
+    url: https://github.com/rust-unofficial/awesome-rust
+    output_dir: raw/best_practices/awesome_rust
+
+  - name: cheats_rs
+    url: https://cheats.rs/
+    output_dir: raw/best_practices/cheats_rs
+
+  - name: rust_guidelines
+    url: https://github.com/microsoft/rust-guidelines
+    output_dir: raw/best_practices/rust_guidelines
+
+  - name: rust_incubator
+    url: https://github.com/tyranron/rust-incubator
+    output_dir: raw/best_practices/rust_incubator
+
+  - name: idiomatic_rust
+    url: https://idiomatic-rust-snippets.org/
+    output_dir: raw/best_practices/idiomatic_rust
+
+# ESP-RS and embedded
+embedded:
+  - name: esp_rs_book
+    url: https://docs.esp-rs.org/book/
+    output_dir: raw/esp_rs/book
+
+  - name: esp_rs_no_std
+    url: https://docs.esp-rs.org/no-std-training/
+    output_dir: raw/esp_rs/no_std
+
+  - name: esp_rust_latest
+    url: https://docs.espressif.com/projects/rust/esp-rust/latest/
+    output_dir: raw/esp_rs/espressif
+
+  - name: embedded_hal
+    url: https://rust-embedded.github.io/
+    output_dir: raw/embedded/embedded_hal
+
+# Security resources
+security:
+  - name: rust_security_handbook
+    url: https://yevh.github.io/rust-security-handbook/
+    output_dir: raw/security/rust_security_handbook
+
+  - name: high_assurance_rust
+    url: https://highassurance.rs/
+    output_dir: raw/security/high_assurance_rust
+
+# Web frameworks
+web_frameworks:
+  - name: leptos_book
+    url: https://book.leptos.dev/
+    output_dir: raw/web_frameworks/leptos_book
+
+  - name: trunk_guide
+    url: https://trunk-rs.github.io/trunk/guide/
+    output_dir: raw/web_frameworks/trunk_guide
+
+  - name: yew_docs
+    url: https://yew.rs/docs/getting-started/introduction
+    output_dir: raw/web_frameworks/yew_docs
+
+  - name: tauri_docs
+    url: https://v2.tauri.app/start/
+    output_dir: raw/web_frameworks/tauri_docs
+
+# API configuration for special sources
 docs_rs:
   base_url: https://docs.rs
   rate_limit: 100
+
 github:
   api_url: https://api.github.com
   rate_limit: 1000
-esp_rs:
-  documentation:
-    - url: https://docs.espressif.com/projects/rust/book/
-      output_dir: raw/esp_rs/docs
-    - url: https://docs.rust-embedded.org/book/
-      output_dir: raw/study_rust/rust_embedded_book
-study_rust:
-  learn_rust_101:
-    url: https://rust-lang.guide/
-    output_dir: raw/study_rust/learn_rust_101
-  comprehensive_rust:
-    url: https://google.github.io/comprehensive-rust/
-    output_dir: raw/study_rust/comprehensive_rust
-  yet_another_rust_resource:
-    url: https://yet-another-rust-resource.pages.dev/introduction
-    output_dir: raw/study_rust/yet_another_rust_resource
-  rust_book_abridged:
-    url: https://jasonwalton.ca/rust-book-abridged/
-    output_dir: raw/study_rust/rust_book_abridged
-best_practices:
-  rust_cli_book:
-    url: https://rust-cli.github.io/book/index.html
-    output_dir: raw/best_practices/rust_cli_book
-  rust_api_guidelines:
-    url: https://rust-lang.github.io/api-guidelines/
-    output_dir: raw/best_practices/api_guidelines
-  little_book_of_rust_macros:
-    url: https://lukaswirth.dev/tlborm/
-    output_dir: raw/best_practices/tlborm
-  awesome_rust:
-    url: https://github.com/rust-unofficial/awesome-rust
-    output_dir: raw/best_practices/awesome_rust
-  cheatsheet:
-    url: https://cheats.rs/
-    output_dir: raw/best_practices/cheats_rs
-  rust_guidelines:
-    url: https://github.com/microsoft/rust-guidelines
-    output_dir: raw/best_practices/rust_guidelines
-  rust_incubator_learning:
-    url: https://github.com/tyranron/rust-incubator
-    output_dir: raw/best_practices/rust_incubator
-  idiomatic_rust_snippets:
-    url: https://idiomatic-rust-snippets.org/
-    output_dir: raw/best_practices/idiomatic_rust_snippets
-  rustonomicon:
-    url: https://doc.rust-lang.org/nomicon/
-    output_dir: raw/best_practices/nomicon
-security:
-  rust_security_handbook:
-    url: https://yevh.github.io/rust-security-handbook/
-    repo: https://github.com/yevh/rust-security-handbook
-    output_dir: raw/best_practices/rust_security_handbook
-  high_assurance_rust:
-    url: https://highassurance.rs/
-    repo: https://github.com/tnballo/high-assurance-rust
-    output_dir: raw/best_practices/high_assurance_rust
-  rustsec_advisories:
-    url: https://rustsec.org/advisories/
-    repo: https://github.com/RustSec/advisory-db
-    description: Vulnerability database for Rust crates
-    output_dir: raw/best_practices/rustsec_advisories
-  rustsec_osv_database:
-    url: https://codeload.github.com/rustsec/advisory-db/zip/refs/heads/osv
-    description: RustSec advisories in OSV format
-    output_dir: raw/best_practices/rustsec_osv
-embedded:
-  awesome_embedded_rust:
-    url: https://github.com/rust-embedded/awesome-embedded-rust
-    description: Curated list of resources for embedded Rust development
-    output_dir: raw/best_practices/awesome_embedded_rust
-web_frameworks:
-  leptos:
-    documentation:
-      url: https://book.leptos.dev/
-      output_dir: raw/web_frameworks/leptos_book
-  trunk:
-    documentation:
-      url: https://trunk-rs.github.io/trunk/guide/
-      output_dir: raw/web_frameworks/trunk_guide
-  yew:
-    documentation:
-      url: https://yew.rs/docs/getting-started/introduction
-      output_dir: raw/web_frameworks/yew_docs
-cloudflare_workers:
-    url: https://github.com/cloudflare/workers-rs
-    output_dir: raw/web_frameworks/cloudflare_workers
-tauri:
-  documentation:
-    url: https://v2.tauri.app/start/
-    repo: https://github.com/tauri-apps/tauri
-    output_dir: raw/web_frameworks/tauri_docs
-  guides:
-    url: https://www.developermindset.com/yet-another-tauri-book/
-    output_dir: raw/web_frameworks/tauri_book
-stack_overflow:
-  api_url: https://api.stackexchange.com/2.3
-  tags: ["rust", "esp32", "embedded-rust", "tokio", "serde"]
-  min_score: 2

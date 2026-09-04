@@ -15,11 +15,7 @@ def format_alpaca(chunk):
     content = chunk["content"]
     meta = chunk.get("metadata", {})
 
-    if source == "stack_overflow":
-        instruction = "Answer this Rust programming question accurately."
-        input_text = f"Question: {meta.get('title', '')}\n\n{meta.get('question_body', '')}"
-        output_text = meta.get("answer_body", "")
-    elif source == "docs_rs":
+    if source == "docs_rs":
         instruction = f"Explain the Rust crate '{meta.get('crate_name', 'unknown')}' and its usage based on the documentation."
         input_text = f"Focus on: {meta.get('title', 'general usage')}"
         output_text = content

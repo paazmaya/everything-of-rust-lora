@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 import hashlib
 import json
+import logging
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
 
 import html2text
@@ -11,6 +13,13 @@ import yaml
 from bs4 import BeautifulSoup
 from cache_utils import CachedSession
 from tqdm import tqdm
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
+)
+logger = logging.getLogger("rust_lora.docs_rs")
 
 BASE_DIR = Path(__file__).parent.parent
 RAW_DIR = BASE_DIR / "data" / "raw"
@@ -28,7 +37,8 @@ class DocsRsCollector:
         self.h2t.body_width = 0
         with open(CONFIG_DIR / "libraries.yaml") as f:
             self.config = yaml.safe_load(f)
-        self.crates = [item for cat in self.config["libraries"].values() for item in cat]
+        # Load all crates from flat array
+        self.crates = self.config["libraries"]
 
     def count_docs(self, out_dir):
         if not out_dir.exists():
@@ -44,6 +54,7 @@ class DocsRsCollector:
             url = f"https://docs.rs/{name}/latest/{name}/"
             resp = self.session.get(url, timeout=30)
             if not resp or resp.status_code != 200:
+                logger.warning(f"Failed to fetch crate index for {name}: status {resp.status_code if resp else 'no response'}")
                 return []
             soup = BeautifulSoup(resp.text, "lxml")
             links = set()
@@ -67,25 +78,30 @@ class DocsRsCollector:
                         continue
                     s = BeautifulSoup(r.text, "lxml")
                     main = s.find("div", class_="docblock") or s.find("main")
-                    if main and len(main.text) > 50:
+                    if main and len(main.text) > 200:
                         title = s.find("h1").text.strip() if s.find("h1") else name
                         md = self.h2t.handle(str(main))
                         h = hashlib.sha256(md.encode()).hexdigest()[:16]
-                        docs.append(
-                            {
-                                "crate_name": name,
-                                "url": link,
-                                "title": title,
-                                "content": md,
-                                "metadata": crate,
-                            }
-                        )
+                        doc = {
+                            "source": "docs_rs",
+                            "source_type": "api_docs",
+                            "url": link,
+                            "title": title,
+                            "content": md,
+                            "metadata": {**crate, "crate_name": name},
+                            "collected_at": datetime.now().isoformat(),
+                        }
+                        docs.append(doc)
                         with open(out_dir / f"{h}.json", "w") as f:
-                            json.dump(docs[-1], f)
-                except Exception:
-                    pass
-        except Exception:
-            pass
+                            json.dump(doc, f, indent=2)
+                except requests.Timeout as e:
+                    logger.warning(f"Timeout fetching {link}: {e}")
+                except Exception as e:
+                    logger.warning(f"Error processing {link}: {type(e).__name__}: {e}")
+        except requests.Timeout as e:
+            logger.warning(f"Timeout fetching crate index for {name}: {e}")
+        except Exception as e:
+            logger.warning(f"Error collecting docs for crate {name}: {type(e).__name__}: {e}")
         return docs
 
     def run_all(self):
@@ -97,8 +113,11 @@ class DocsRsCollector:
         stats = self.session.get_stats()
         print(f"Collected {after_count - before_count} new docs, {after_count} total.")
         print(
-            f"Cache stats: {stats['fetched']} fetched, {stats['skipped']} skipped (out of {stats['total_checked']} total)"
+            f"Cache stats: {stats['fetched']} fetched, {stats['skipped']} skipped, {stats.get('errors', 0)} errors"
         )
+        if self.session.get_errors():
+            print(f"\nCollection warnings: {len(self.session.get_errors())} URLs had issues.")
+            logger.info(f"See logs for details on failed URLs.")
 
 
 if __name__ == "__main__":

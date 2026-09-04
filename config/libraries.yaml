@@ -1,1128 +1,805 @@
-# Top Downloaded Rust Libraries for Training Data Collection
-# Compiled from crates.io all-time and recent downloads (200+ crates)
 libraries:
-  web_frameworks:
-    - name: axum
-      repo: tokio-rs/axum
-      docs_url: https://docs.rs/axum
-      priority: high
-    - name: actix-web
-      repo: actix/actix-web
-      docs_url: https://docs.rs/actix-web
-      priority: high
-    - name: rocket
-      repo: rocket-rs/rocket
-      docs_url: https://docs.rs/rocket
-      priority: high
-    - name: warp
-      repo: seanmonstar/warp
-      docs_url: https://docs.rs/warp
-      priority: medium
-    - name: tower
-      repo: tower-rs/tower
-      docs_url: https://docs.rs/tower
-      priority: high
-    - name: tower-service
-      repo: tower-rs/tower
-      docs_url: https://docs.rs/tower-service
-      priority: high
-    - name: hyper
-      repo: hyperium/hyper
-      docs_url: https://docs.rs/hyper
-      priority: critical
-    - name: h2
-      repo: hyperium/h2
-      docs_url: https://docs.rs/h2
-      priority: high
-    - name: fastly
-      repo: fastly/fastly-rs
-      docs_url: https://docs.rs/fastly/latest/fastly/
-      description: Rust SDK for Fastly edge computing platform
-      priority: medium
-  edge_computing:
-    - name: cloudflare-workers-rs
-      repo: cloudflare/workers-rs
-      description: Cloudflare Workers Rust SDK for serverless edge computing
-      priority: high
-  frontend_frameworks:
-    - name: leptos
-      repo: leptos-rs/leptos
-      guide_url: https://book.leptos.dev/
-      description: Reactive web framework for building server-side or client-side web apps
-      priority: high
-    - name: trunk
-      repo: trunk-rs/trunk
-      guide_url: https://trunk-rs.github.io/trunk/guide/
-      description: Build tool for Rust WebAssembly applications
-      priority: high
-    - name: yew
-      repo: yewstack/yew
-      docs_url: https://docs.rs/yew
-      guide_url: https://yew.rs/docs/getting-started/introduction
-      description: Rust framework for building client-side web apps with WebAssembly
-      priority: high
-    - name: grass
-      repo: connorskees/grass
-      docs_url: https://docs.rs/grass
-      description: Sass-compatible CSS compiler for Rust web toolchains
-      priority: medium
-    - name: tauri
-      repo: tauri-apps/tauri
-      description: Build lightweight desktop applications with web technologies
-      priority: high
-  async:
-    - name: tokio
-      repo: tokio-rs/tokio
-      docs_url: https://docs.rs/tokio
-      priority: critical
-    - name: async-std
-      repo: async-rs/async-std
-      docs_url: https://docs.rs/async-std
-      priority: high
-    - name: futures
-      repo: rust-lang/futures-rs
-      docs_url: https://docs.rs/futures
-      priority: critical
-    - name: futures-core
-      repo: rust-lang/futures-rs
-      docs_url: https://docs.rs/futures-core
-      priority: critical
-    - name: futures-util
-      repo: rust-lang/futures-rs
-      docs_url: https://docs.rs/futures-util
-      priority: critical
-    - name: futures-task
-      repo: rust-lang/futures-rs
-      docs_url: https://docs.rs/futures-task
-      priority: high
-    - name: futures-channel
-      repo: rust-lang/futures-rs
-      docs_url: https://docs.rs/futures-channel
-      priority: high
-    - name: futures-sink
-      repo: rust-lang/futures-rs
-      docs_url: https://docs.rs/futures-sink
-      priority: high
-    - name: futures-io
-      repo: rust-lang/futures-rs
-      docs_url: https://docs.rs/futures-io
-      priority: high
-    - name: futures-executor
-      repo: rust-lang/futures-rs
-      docs_url: https://docs.rs/futures-executor
-      priority: medium
-    - name: futures-macro
-      repo: rust-lang/futures-rs
-      docs_url: https://docs.rs/futures-macro
-      priority: medium
-    - name: embassy
-      repo: embassy-rs/embassy
-      docs_url: https://docs.embassy.dev
-      priority: critical
-    - name: tokio-util
-      repo: tokio-rs/tokio
-      docs_url: https://docs.rs/tokio-util
-      priority: high
-    - name: tokio-rustls
-      repo: rustls/tokio-rustls
-      docs_url: https://docs.rs/tokio-rustls
-      priority: high
-    - name: tokio-macros
-      repo: tokio-rs/tokio
-      docs_url: https://docs.rs/tokio-macros
-      priority: high
-    - name: async-trait
-      repo: dtolnay/async-trait
-      docs_url: https://docs.rs/async-trait
-      priority: high
-  serialization:
-    - name: serde
-      repo: serde-rs/serde
-      docs_url: https://docs.rs/serde
-      priority: critical
-    - name: serde_json
-      repo: serde-rs/json
-      docs_url: https://docs.rs/serde_json
-      priority: critical
-    - name: serde_derive
-      repo: serde-rs/serde
-      docs_url: https://docs.rs/serde_derive
-      priority: critical
-    - name: serde_core
-      repo: serde-rs/serde
-      docs_url: https://docs.rs/serde_core
-      priority: high
-    - name: toml
-      repo: toml-rs/toml
-      docs_url: https://docs.rs/toml
-      priority: high
-    - name: toml_edit
-      repo: toml-rs/toml
-      docs_url: https://docs.rs/toml_edit
-      priority: high
-    - name: toml_datetime
-      repo: toml-rs/toml
-      docs_url: https://docs.rs/toml_datetime
-      priority: high
-    - name: serde_urlencoded
-      repo: nox/serde_urlencoded
-      docs_url: https://docs.rs/serde_urlencoded
-      priority: high
-  cli:
-    - name: clap
-      repo: clap-rs/clap
-      docs_url: https://docs.rs/clap
-      priority: critical
-    - name: clap_builder
-      repo: clap-rs/clap
-      docs_url: https://docs.rs/clap_builder
-      priority: critical
-    - name: clap_derive
-      repo: clap-rs/clap
-      docs_url: https://docs.rs/clap_derive
-      priority: critical
-    - name: clap_lex
-      repo: clap-rs/clap
-      docs_url: https://docs.rs/clap_lex
-      priority: high
-    - name: ratatui
-      repo: ratatui/ratatui
-      docs_url: https://docs.rs/ratatui
-      priority: high
-    - name: anstyle
-      repo: rust-cli/anstyle
-      docs_url: https://docs.rs/anstyle
-      priority: high
-    - name: anstream
-      repo: rust-cli/anstyle
-      docs_url: https://docs.rs/anstream
-      priority: high
-    - name: anstyle-parse
-      repo: rust-cli/anstyle
-      docs_url: https://docs.rs/anstyle-parse
-      priority: high
-    - name: anstyle-query
-      repo: rust-cli/anstyle
-      docs_url: https://docs.rs/anstyle-query
-      priority: high
-    - name: colorchoice
-      repo: rust-cli/anstyle
-      docs_url: https://docs.rs/colorchoice
-      priority: medium
-    - name: termcolor
-      repo: BurntSushi/termcolor
-      docs_url: https://docs.rs/termcolor
-      priority: medium
-  database:
-    - name: diesel
-      repo: diesel-rs/diesel
-      docs_url: https://docs.rs/diesel
-      priority: critical
-    - name: sqlx
-      repo: launchbadge/sqlx
-      docs_url: https://docs.rs/sqlx
-      priority: critical
-    - name: redis
-      repo: redis-rs/redis-rs
-      docs_url: https://docs.rs/redis
-      priority: high
-  http_clients:
-    - name: reqwest
-      repo: seanmonstar/reqwest
-      docs_url: https://docs.rs/reqwest
-      priority: critical
-    - name: hyper-rustls
-      repo: rustls/hyper-rustls
-      docs_url: https://docs.rs/hyper-rustls
-      priority: high
-    - name: http
-      repo: hyperium/http
-      docs_url: https://docs.rs/http
-      priority: high
-    - name: http-body
-      repo: hyperium/http-body
-      docs_url: https://docs.rs/http-body
-      priority: high
-    - name: httparse
-      repo: seanmonstar/httparse
-      docs_url: https://docs.rs/httparse
-      priority: medium
-    - name: httpdate
-      repo: pyfisch/httpdate
-      docs_url: https://docs.rs/httpdate
-      priority: medium
-  cryptography:
-    - name: rustls
-      repo: rustls/rustls
-      docs_url: https://docs.rs/rustls
-      priority: critical
-    - name: rustls-webpki
-      repo: rustls/webpki
-      docs_url: https://docs.rs/rustls-webpki
-      priority: critical
-    - name: rustls-pemfile
-      repo: rustls/pemfile
-      docs_url: https://docs.rs/rustls-pemfile
-      priority: high
-    - name: webpki-roots
-      repo: rustls/webpki-roots
-      docs_url: https://docs.rs/webpki-roots
-      priority: high
-    - name: ring
-      repo: briansmith/ring
-      docs_url: https://docs.rs/ring
-      priority: high
-    - name: sha2
-      repo: RustCrypto/hashes
-      docs_url: https://docs.rs/sha2
-      priority: critical
-    - name: digest
-      repo: RustCrypto/traits
-      docs_url: https://docs.rs/digest
-      priority: critical
-    - name: hmac
-      repo: RustCrypto/MACs
-      docs_url: https://docs.rs/hmac
-      priority: high
-    - name: crypto-common
-      repo: RustCrypto/traits
-      docs_url: https://docs.rs/crypto-common
-      priority: high
-    - name: zeroize
-      repo: RustCrypto/utils
-      docs_url: https://docs.rs/zeroize
-      priority: high
-    - name: subtle
-      repo: dalek-cryptography/subtle
-      docs_url: https://docs.rs/subtle
-      priority: high
-    - name: secrecy
-      repo: iqlusioninc/secrecy
-      docs_url: https://docs.rs/secrecy
-      priority: high
-    - name: openssl-probe
-      repo: rustls/openssl-probe
-      docs_url: https://docs.rs/openssl-probe
-      priority: medium
-  error_handling:
-    - name: anyhow
-      repo: dtolnay/anyhow
-      docs_url: https://docs.rs/anyhow
-      priority: critical
-    - name: thiserror
-      repo: dtolnay/thiserror
-      docs_url: https://docs.rs/thiserror
-      priority: critical
-    - name: thiserror-impl
-      repo: dtolnay/thiserror
-      docs_url: https://docs.rs/thiserror-impl
-      priority: critical
-  logging:
-    - name: tracing
-      repo: tokio-rs/tracing
-      docs_url: https://docs.rs/tracing
-      priority: critical
-    - name: tracing-core
-      repo: tokio-rs/tracing
-      docs_url: https://docs.rs/tracing-core
-      priority: critical
-    - name: tracing-attributes
-      repo: tokio-rs/tracing
-      docs_url: https://docs.rs/tracing-attributes
-      priority: critical
-    - name: tracing-subscriber
-      repo: tokio-rs/tracing
-      docs_url: https://docs.rs/tracing-subscriber
-      priority: high
-    - name: log
-      repo: rust-lang/log
-      docs_url: https://docs.rs/log
-      priority: high
-    - name: env_logger
-      repo: rust-cli/env_logger
-      docs_url: https://docs.rs/env_logger
-      priority: high
-  macros:
-    - name: proc-macro2
-      repo: dtolnay/proc-macro2
-      docs_url: https://docs.rs/proc-macro2
-      priority: critical
-    - name: quote
-      repo: dtolnay/quote
-      docs_url: https://docs.rs/quote
-      priority: critical
-    - name: syn
-      repo: dtolnay/syn
-      docs_url: https://docs.rs/syn
-      priority: critical
-    - name: darling
-      repo: TedDriggs/darling
-      docs_url: https://docs.rs/darling
-      priority: high
-    - name: darling_core
-      repo: TedDriggs/darling
-      docs_url: https://docs.rs/darling_core
-      priority: high
-    - name: darling_macro
-      repo: TedDriggs/darling
-      docs_url: https://docs.rs/darling_macro
-      priority: high
-    - name: strum
-      repo: Peternator7/strum
-      docs_url: https://docs.rs/strum
-      priority: high
-    - name: strum_macros
-      repo: Peternator7/strum
-      docs_url: https://docs.rs/strum_macros
-      priority: high
-    - name: synstructure
-      repo: mystor/synstructure
-      docs_url: https://docs.rs/synstructure
-      priority: high
-  parsing:
-    - name: lightningcss
-      repo: parcel-bundler/lightningcss
-      description: An extremely fast CSS parser, transformer, and minifier
-      priority: high
-    - name: regex
-      repo: rust-lang/regex
-      docs_url: https://docs.rs/regex
-      priority: critical
-    - name: regex-syntax
-      repo: rust-lang/regex
-      docs_url: https://docs.rs/regex-syntax
-      priority: critical
-    - name: regex-automata
-      repo: rust-lang/regex
-      docs_url: https://docs.rs/regex-automata
-      priority: critical
-    - name: nom
-      repo: rust-bakery/nom
-      docs_url: https://docs.rs/nom
-      priority: high
-    - name: winnow
-      repo: winnow-rs/winnow
-      docs_url: https://docs.rs/winnow
-      priority: high
-    - name: aho-corasick
-      repo: BurntSushi/aho-corasick
-      docs_url: https://docs.rs/aho-corasick
-      priority: high
-  testing:
-    - name: proptest
-      repo: proptest-rs/proptest
-      docs_url: https://docs.rs/proptest
-      priority: high
-    - name: criterion
-      repo: bheisler/criterion.rs
-      docs_url: https://docs.rs/criterion
-      priority: high
-  security_audit_tools:
-    - name: cargo-geiger
-      repo: geiger-rs/cargo-geiger
-      docs_url: https://docs.rs/cargo-geiger
-      description: Detect unsafe code usage in crates and dependencies
-      priority: critical
-    - name: cargo-audit
-      repo: rustsec/rustsec
-      docs_url: https://docs.rs/cargo-audit
-      description: Audit Cargo.lock for vulnerable crates
-      priority: critical
-    - name: cargo-deny
-      repo: embarkstudios/cargo-deny
-      description: Audit dependencies for vulnerabilities, licenses, and sources
-      priority: high
-    - name: cargo-auditable
-      repo: rust-secure-code/cargo-auditable
-      docs_url: https://docs.rs/cargo-auditable
-      description: Embed dependency tree into compiled binaries
-      priority: high
-    - name: cargo-crev
-      repo: crev-dev/cargo-crev
-      docs_url: https://docs.rs/cargo-crev
-      description: Cryptographic code review system for Cargo
-      priority: high
-    - name: rusty-hog
-      repo: newrelic/rusty-hog
-      description: Secret scanner for sensitive data across storage and git repositories
-      priority: high
-  cargo_tools:
-    - name: cross
-      repo: cross-rs/cross
-      description: Zero-setup cross compilation for Rust
-      priority: high
-    - name: cargo-semver-checks
-      repo: obi1kenobi/cargo-semver-checks
-      description: Semantic versioning compatibility checks
-      priority: high
-    - name: cargo-llvm-cov
-      repo: taiki-e/cargo-llvm-cov
-      description: LLVM code coverage measurement
-      priority: high
-    - name: cargo-machete
-      repo: bnjbvr/cargo-machete
-      description: Remove unused dependencies
-      priority: high
-    - name: cargo-msrv
-      repo: foresterre/cargo-msrv
-      description: Find minimum supported Rust version
-      priority: high
-    - name: cargo-about
-      repo: embarkstudios/cargo-about
-      description: Generate license documentation
-      priority: medium
-    - name: cargo-public-api
-      repo: cargo-public-api/cargo-public-api
-      description: Track public API surface changes
-      docs_url: https://docs.rs/public-api
-      priority: high
-  embedded:
-    - name: esp-hal
-      repo: esp-rs/esp-hal
-      docs_url: https://docs.rs/esp-hal
-      priority: critical
-    - name: esp-idf-svc
-      repo: esp-rs/esp-idf-svc
-      docs_url: https://docs.rs/esp-idf-svc
-      priority: critical
-    - name: esp-wifi
-      repo: esp-rs/esp-wifi
-      docs_url: https://docs.rs/esp-wifi
-      priority: critical
-    - name: embedded-hal
-      repo: rust-embedded/embedded-hal
-      docs_url: https://docs.rs/embedded-hal
-      priority: critical
-    - name: defmt
-      repo: knurling-rs/defmt
-      docs_url: https://docs.rs/defmt
-      priority: high
-    - name: microbit
-      repo: nrf-rs/microbit
-      description: Support crate for Nordic Semiconductor micro:bit boards
-      priority: medium
-  iot_protocols:
-    - name: rumqttc
-      repo: bytebeamio/rumqtt
-      docs_url: https://docs.rs/rumqttc
-      priority: critical
-  system_bindings:
-    - name: libc
-      repo: rust-lang/libc
-      docs_url: https://docs.rs/libc
-      priority: critical
-    - name: napi-rs
-      repo: napi-rs/napi-rs
-      description: Framework for building Node.js native bindings in Rust
-      priority: high
-    - name: windows-sys
-      repo: microsoft/windows-rs
-      docs_url: https://docs.rs/windows-sys
-      priority: critical
-    - name: windows-targets
-      repo: microsoft/windows-rs
-      docs_url: https://docs.rs/windows-targets
-      priority: critical
-    - name: windows_x86_64_msvc
-      repo: microsoft/windows-rs
-      docs_url: https://docs.rs/windows_x86_64_msvc
-      priority: high
-    - name: windows_x86_64_gnu
-      repo: microsoft/windows-rs
-      docs_url: https://docs.rs/windows_x86_64_gnu
-      priority: high
-    - name: coral-tpu
-      repo: geraldo-netto/coral-tpu
-      description: Rust bindings and examples for Google Coral TPU accelerators
-      priority: medium
-    - name: windows_aarch64_msvc
-      repo: microsoft/windows-rs
-      docs_url: https://docs.rs/windows_aarch64_msvc
-      priority: high
-    - name: windows_i686_msvc
-      repo: microsoft/windows-rs
-      docs_url: https://docs.rs/windows_i686_msvc
-      priority: high
-    - name: windows_i686_gnu
-      repo: microsoft/windows-rs
-      docs_url: https://docs.rs/windows_i686_gnu
-      priority: high
-    - name: windows_aarch64_gnullvm
-      repo: microsoft/windows-rs
-      docs_url: https://docs.rs/windows_aarch64_gnullvm
-      priority: high
-    - name: windows_x86_64_gnullvm
-      repo: microsoft/windows-rs
-      docs_url: https://docs.rs/windows_x86_64_gnullvm
-      priority: high
-    - name: linux-raw-sys
-      repo: sunfishcode/linux-raw-sys
-      docs_url: https://docs.rs/linux-raw-sys
-      priority: high
-    - name: rustix
-      repo: bytecodealliance/rustix
-      docs_url: https://docs.rs/rustix
-      priority: high
-    - name: nix
-      repo: nix-rust/nix
-      docs_url: https://docs.rs/nix
-      priority: high
-    - name: wasi
-      repo: bytecodealliance/wasi-rs
-      docs_url: https://docs.rs/wasi
-      priority: high
-    - name: redox_syscall
-      repo: redox-os/syscall
-      docs_url: https://docs.rs/redox_syscall
-      priority: medium
-    - name: hermit-abi
-      repo: hermit-os/hermit-rs
-      docs_url: https://docs.rs/hermit-abi
-      priority: medium
-  concurrency:
-    - name: crossbeam-utils
-      repo: crossbeam-rs/crossbeam
-      docs_url: https://docs.rs/crossbeam-utils
-      priority: high
-    - name: crossbeam-epoch
-      repo: crossbeam-rs/crossbeam
-      docs_url: https://docs.rs/crossbeam-epoch
-      priority: high
-    - name: crossbeam-deque
-      repo: crossbeam-rs/crossbeam
-      docs_url: https://docs.rs/crossbeam-deque
-      priority: high
-    - name: crossbeam-channel
-      repo: crossbeam-rs/crossbeam
-      docs_url: https://docs.rs/crossbeam-channel
-      priority: high
-    - name: parking_lot
-      repo: Amanieu/parking_lot
-      docs_url: https://docs.rs/parking_lot
-      priority: high
-    - name: parking_lot_core
-      repo: Amanieu/parking_lot
-      docs_url: https://docs.rs/parking_lot_core
-      priority: high
-    - name: lock_api
-      repo: Amanieu/parking_lot
-      docs_url: https://docs.rs/lock_api
-      priority: high
-    - name: spin
-      repo: zesterer/spin
-      docs_url: https://docs.rs/spin
-      priority: medium
-    - name: sync_wrapper
-      repo: Actyx/sync_wrapper
-      docs_url: https://docs.rs/sync_wrapper
-      priority: medium
-    - name: thread_local
-      repo: Amanieu/thread_local-rs
-      docs_url: https://docs.rs/thread_local
-      priority: medium
-    - name: event-listener
-      repo: smol-rs/event-listener
-      docs_url: https://docs.rs/event-listener
-      priority: medium
-  data_structures:
-    - name: hashbrown
-      repo: rust-lang/hashbrown
-      docs_url: https://docs.rs/hashbrown
-      priority: critical
-    - name: indexmap
-      repo: indexmap-rs/indexmap
-      docs_url: https://docs.rs/indexmap
-      priority: critical
-    - name: bytes
-      repo: tokio-rs/bytes
-      docs_url: https://docs.rs/bytes
-      priority: critical
-    - name: slab
-      repo: tokio-rs/slab
-      docs_url: https://docs.rs/slab
-      priority: high
-    - name: smallvec
-      repo: servo/rust-smallvec
-      docs_url: https://docs.rs/smallvec
-      priority: high
-    - name: tinyvec
-      repo: Lokathor/tinyvec
-      docs_url: https://docs.rs/tinyvec
-      priority: high
-    - name: tinyvec_macros
-      repo: Soveu/tinyvec_macros
-      docs_url: https://docs.rs/tinyvec_macros
-      priority: high
-    - name: arrayvec
-      repo: bluss/arrayvec
-      docs_url: https://docs.rs/arrayvec
-      priority: high
-    - name: bitflags
-      repo: bitflags/bitflags
-      docs_url: https://docs.rs/bitflags
-      priority: high
-    - name: equivalent
-      repo: indexmap-rs/equivalent
-      docs_url: https://docs.rs/equivalent
-      priority: high
-    - name: generic-array
-      repo: fizyk20/generic-array.git
-      docs_url: https://docs.rs/generic-array
-      priority: high
-  random:
-    - name: rand
-      repo: rust-random/rand
-      docs_url: https://docs.rs/rand
-      priority: critical
-    - name: rand_core
-      repo: rust-random/rand_core
-      docs_url: https://docs.rs/rand_core
-      priority: critical
-    - name: getrandom
-      repo: rust-random/getrandom
-      docs_url: https://docs.rs/getrandom
-      priority: critical
-    - name: rand_chacha
-      repo: rust-random/rand
-      docs_url: https://docs.rs/rand_chacha
-      priority: high
-    - name: fastrand
-      repo: smol-rs/fastrand
-      docs_url: https://docs.rs/fastrand
-      priority: high
-  encoding:
-    - name: base64
-      repo: marshallpierce/rust-base64
-      docs_url: https://docs.rs/base64
-      priority: critical
-    - name: url
-      repo: servo/rust-url
-      docs_url: https://docs.rs/url
-      priority: critical
-    - name: form_urlencoded
-      repo: servo/rust-url
-      docs_url: https://docs.rs/form_urlencoded
-      priority: high
-    - name: idna
-      repo: servo/rust-url/
-      docs_url: https://docs.rs/idna
-      priority: high
-    - name: percent-encoding
-      repo: servo/rust-url/
-      docs_url: https://docs.rs/percent-encoding
-      priority: high
-    - name: hex
-      repo: KokaKiwi/rust-hex
-      docs_url: https://docs.rs/hex
-      priority: high
-    - name: utf8parse
-      repo: alacritty/vte
-      docs_url: https://docs.rs/utf8parse
-      priority: medium
-  utilities:
-    - name: itertools
-      repo: rust-itertools/itertools
-      docs_url: https://docs.rs/itertools
-      priority: high
-    - name: chrono
-      repo: chronotope/chrono
-      docs_url: https://docs.rs/chrono
-      priority: high
-    - name: uuid
-      repo: uuid-rs/uuid
-      docs_url: https://docs.rs/uuid
-      priority: high
-    - name: time
-      repo: time-rs/time
-      docs_url: https://docs.rs/time
-      priority: high
-    - name: time-core
-      repo: time-rs/time
-      docs_url: https://docs.rs/time-core
-      priority: high
-    - name: time-macros
-      repo: time-rs/time
-      docs_url: https://docs.rs/time-macros
-      priority: high
-    - name: iana-time-zone
-      repo: strawlab/iana-time-zone
-      docs_url: https://docs.rs/iana-time-zone
-      priority: medium
-    - name: num-traits
-      repo: rust-num/num-traits
-      docs_url: https://docs.rs/num-traits
-      priority: high
-    - name: num-integer
-      repo: rust-num/num-integer
-      docs_url: https://docs.rs/num-integer
-      priority: high
-    - name: num-bigint
-      repo: rust-num/num-bigint
-      docs_url: https://docs.rs/num-bigint
-      priority: high
-    - name: num_cpus
-      repo: seanmonstar/num_cpus
-      docs_url: https://docs.rs/num_cpus
-      priority: high
-    - name: luminS
-      repo: wchang22/LuminS
-      description: Rust-based file synchronization and remote file management utility
-      priority: medium
-    - name: strsim
-      repo: rapidfuzz/strsim-rs
-      docs_url: https://docs.rs/strsim
-      priority: high
-    - name: scopeguard
-      repo: bluss/scopeguard
-      docs_url: https://docs.rs/scopeguard
-      priority: high
-    - name: lazy_static
-      repo: rust-lang-nursery/lazy-static.rs
-      docs_url: https://docs.rs/lazy_static
-      priority: high
-    - name: once_cell
-      repo: matklad/once_cell
-      docs_url: https://docs.rs/once_cell
-      priority: high
-    - name: prost
-      repo: tokio-rs/prost
-      docs_url: https://docs.rs/prost
-      priority: high
-    - name: prost-derive
-      repo: tokio-rs/prost
-      docs_url: https://docs.rs/prost-derive
-      priority: high
-  developer_tools:
-    - name: octocode
-      repo: Muvon/octocode
-      description: AI-powered code search and completion tool for Rust development
-      priority: medium
-    - name: graphrag-rs
-      repo: automataIA/graphrag-rs
-      description: Knowledge graph and reasoning tooling for Rust applications
-      priority: medium
-  machine_learning:
-    - name: candle
-      repo: huggingface/candle
-      description: Minimalist ML framework with CUDA, Metal support
-      priority: high
-    - name: burn
-      repo: tracel-ai/burn
-      description: Flexible and Comprehensive Deep Learning Framework
-      priority: high
-    - name: rig
-      repo: 0xPlaygrounds/rig
-      description: Modular framework for building Agentic AI systems
-      priority: high
-    - name: yolo-rs
-      repo: pan93412/yolo-rs
-      description: Rust bindings and examples for YOLO object detection
-      priority: medium
-    - name: object-detection-opencv-rust
-      repo: LdDl/object-detection-opencv-rust
-      description: Object detection examples using OpenCV and Rust
-      priority: medium
-  graphics:
-    - name: wgpu
-      repo: gfx-rs/wgpu
-      description: Safe and portable GPU graphics library for Rust
-      priority: high
-    - name: rust-rasterizer
-      repo: tchauffi/rust-rasterizer
-      description: Small software rasterizer and graphics learning project
-      priority: medium
-  wasm:
-    - name: wasmtime
-      repo: bytecodealliance/wasmtime
-      description: Standalone WebAssembly runtime
-      priority: critical
-  ui_frameworks:
-    - name: druid
-      repo: linebender/druid
-      description: A data-first GUI toolkit
-      priority: high
-  string_utilities:
-    - name: unicode-ident
-      repo: dtolnay/unicode-ident
-      docs_url: https://docs.rs/unicode-ident
-      priority: critical
-    - name: unicode-xid
-      repo: unicode-rs/unicode-xid
-      docs_url: https://docs.rs/unicode-xid
-      priority: high
-    - name: unicode-width
-      repo: unicode-rs/unicode-width
-      docs_url: https://docs.rs/unicode-width
-      priority: high
-    - name: unicode-normalization
-      repo: unicode-rs/unicode-normalization
-      docs_url: https://docs.rs/unicode-normalization
-      priority: high
-    - name: unicode-bidi
-      repo: servo/unicode-bidi
-      docs_url: https://docs.rs/unicode-bidi
-      priority: high
-    - name: heck
-      repo: withoutboats/heck
-      docs_url: https://docs.rs/heck
-      priority: high
-    - name: shlex
-      repo: comex/rust-shlex
-      docs_url: https://docs.rs/shlex
-      priority: medium
-  compression:
-    - name: flate2
-      repo: rust-lang/flate2-rs
-      docs_url: https://docs.rs/flate2
-      priority: high
-    - name: miniz_oxide
-      repo: Frommi/miniz_oxide
-      docs_url: https://docs.rs/miniz_oxide
-      priority: high
-  numeric_conversion:
-    - name: itoa
-      repo: dtolnay/itoa
-      docs_url: https://docs.rs/itoa
-      priority: high
-    - name: ryu
-      repo: dtolnay/ryu
-      docs_url: https://docs.rs/ryu
-      priority: high
-  filesystem:
-    - name: walkdir
-      repo: BurntSushi/walkdir
-      docs_url: https://docs.rs/walkdir
-      priority: high
-    - name: tempfile
-      repo: Stebalien/tempfile
-      docs_url: https://docs.rs/tempfile
-      priority: high
-    - name: glob
-      repo: rust-lang/glob
-      docs_url: https://docs.rs/glob
-      priority: medium
-    - name: same-file
-      repo: BurntSushi/same-file
-      docs_url: https://docs.rs/same-file
-      priority: medium
-    - name: space
-      repo: emilevr/space
-      description: Utility for mounting remote folders and workspace file management in Rust
-      priority: medium
-  build_tools:
-    - name: cc
-      repo: rust-lang/cc-rs
-      docs_url: https://docs.rs/cc
-      priority: critical
-    - name: pkg-config
-      repo: rust-lang/pkg-config-rs
-      docs_url: https://docs.rs/pkg-config
-      priority: high
-    - name: autocfg
-      repo: cuviper/autocfg
-      docs_url: https://docs.rs/autocfg
-      priority: high
-    - name: version_check
-      repo: SergioBenitez/version_check
-      docs_url: https://docs.rs/version_check
-      priority: high
-    - name: rustc_version
-      repo: djc/rustc-version-rs
-      docs_url: https://docs.rs/rustc_version
-      priority: high
-    - name: rustc-demangle
-      repo: rust-lang/rustc-demangle
-      docs_url: https://docs.rs/rustc-demangle
-      priority: high
-    - name: rustversion
-      repo: dtolnay/rustversion
-      docs_url: https://docs.rs/rustversion
-      priority: high
-  bytecode_utils:
-    - name: byteorder
-      repo: BurntSushi/byteorder
-      docs_url: https://docs.rs/byteorder
-      priority: high
-    - name: bytes
-      repo: tokio-rs/bytes
-      docs_url: https://docs.rs/bytes
-      priority: critical
-    - name: memoffset
-      repo: Gilnaa/memoffset
-      docs_url: https://docs.rs/memoffset
-      priority: high
-    - name: memchr
-      repo: BurntSushi/memchr
-      docs_url: https://docs.rs/memchr
-      priority: critical
-    - name: zerocopy
-      repo: google/zerocopy
-      docs_url: https://docs.rs/zerocopy
-      priority: high
-  network_protocols:
-    - name: socket2
-      repo: rust-lang/socket2
-      docs_url: https://docs.rs/socket2
-      priority: high
-    - name: mio
-      repo: tokio-rs/mio
-      docs_url: https://docs.rs/mio
-      priority: high
-    - name: ipnet
-      repo: krisprice/ipnet
-      docs_url: https://docs.rs/ipnet
-      priority: high
-    - name: suppaftp
-      repo: veeso/suppaftp
-      description: FTP client and server library for asynchronous Rust applications
-      priority: medium
-  hashing:
-    - name: ahash
-      repo: tkaitchuck/ahash
-      docs_url: https://docs.rs/ahash
-      priority: high
-    - name: fnv
-      repo: servo/rust-fnv
-      docs_url: https://docs.rs/fnv
-      priority: high
-    - name: rustc-hash
-      repo: rust-lang/rustc-hash
-      docs_url: https://docs.rs/rustc-hash
-      priority: high
-  debugging:
-    - name: backtrace
-      repo: rust-lang/backtrace-rs
-      docs_url: https://docs.rs/backtrace
-      priority: high
-    - name: object
-      repo: gimli-rs/object
-      docs_url: https://docs.rs/object
-      priority: high
-    - name: gimli
-      repo: gimli-rs/gimli
-      docs_url: https://docs.rs/gimli
-      priority: high
-    - name: addr2line
-      repo: gimli-rs/addr2line
-      docs_url: https://docs.rs/addr2line
-      priority: high
-  misc_utilities:
-    - name: typenum
-      repo: paholg/typenum
-      docs_url: https://docs.rs/typenum
-      priority: high
-    - name: deranged
-      repo: jhpratt/deranged
-      docs_url: https://docs.rs/deranged
-      priority: high
-    - name: subtle
-      repo: dalek-cryptography/subtle
-      docs_url: https://docs.rs/subtle
-      priority: high
-    - name: untrusted
-      repo: briansmith/untrusted
-      docs_url: https://docs.rs/untrusted
-      priority: high
-    - name: block-buffer
-      repo: RustCrypto/utils
-      docs_url: https://docs.rs/block-buffer
-      priority: high
-    - name: pin-utils
-      repo: rust-lang-nursery/pin-utils
-      docs_url: https://docs.rs/pin-utils
-      priority: high
-    - name: pin-project-lite
-      repo: taiki-e/pin-project-lite
-      docs_url: https://docs.rs/pin-project-lite
-      priority: high
-    - name: pin-project
-      repo: taiki-e/pin-project
-      docs_url: https://docs.rs/pin-project
-      priority: high
-    - name: pin-project-internal
-      repo: taiki-e/pin-project
-      docs_url: https://docs.rs/pin-project-internal
-      priority: high
-    - name: try-lock
-      repo: seanmonstar/try-lock
-      docs_url: https://docs.rs/try-lock
-      priority: medium
-    - name: want
-      repo: seanmonstar/want
-      docs_url: https://docs.rs/want
-      priority: medium
-    - name: stable_deref_trait
-      repo: storyyeller/stable_deref_trait
-      docs_url: https://docs.rs/stable_deref_trait
-      priority: medium
-    - name: errno
-      repo: lambda-fairy/rust-errno
-      docs_url: https://docs.rs/errno
-      priority: high
-    - name: cpufeatures
-      repo: RustCrypto/utils
-      docs_url: https://docs.rs/cpufeatures
-      priority: high
-    - name: ppv-lite86
-      repo: cryptocorrosion/cryptocorrosion
-      docs_url: https://docs.rs/ppv-lite86
-      priority: high
-    - name: cfg-if
-      repo: rust-lang/cfg-if
-      docs_url: https://docs.rs/cfg-if
-      priority: high
-    - name: semver
-      repo: dtolnay/semver
-      docs_url: https://docs.rs/semver
-      priority: high
-    - name: either
-      repo: rayon-rs/either
-      docs_url: https://docs.rs/either
-      priority: high
-    - name: mime
-      repo: hyperium/mime
-      docs_url: https://docs.rs/mime
-      priority: medium
-  documentation_tools:
-    - name: mdbook
-      repo: rust-lang/mdbook
-      description: Create books from Markdown files
-      priority: high
-  cli_tools:
-    - name: navi
-      repo: denisidoro/navi
-      description: An interactive cheatsheet tool for the command-line
-      priority: medium
-    - name: zola
-      repo: getzola/zola
-      description: A fast static site generator in one binary
-      priority: high
-    - name: dust
-      repo: bootandy/dust
-      description: More intuitive version of du in Rust
-      priority: medium
-    - name: presenterm
-      repo: mfontanini/presenterm
-      description: A slideshow tool for your terminal
-      priority: medium
-  notable_rust_applications:
-    - name: deno
-      repo: denoland/deno
-      description: JavaScript and TypeScript runtime built in Rust
-      priority: high
-    - name: lapce
-      repo: lapce/lapce
-      description: Lightning-fast and powerful code editor
-      priority: high
-    - name: delta
-      repo: dandavison/delta
-      description: Syntax-highlighting pager for git, diff and grep output
-      priority: high
-    - name: fnm
-      repo: schniz/fnm
-      description: Fast Node version manager
-      priority: medium
-    - name: ruffle
-      repo: ruffle-rs/ruffle
-      description: Flash Player emulator written in Rust
-      priority: medium
+- name: axum
+  repo: tokio-rs/axum
+  url: https://docs.rs/axum
+- name: actix-web
+  repo: actix/actix-web
+  url: https://docs.rs/actix-web
+- name: rocket
+  repo: rocket-rs/rocket
+  url: https://docs.rs/rocket
+- name: warp
+  repo: seanmonstar/warp
+  url: https://docs.rs/warp
+- name: tower
+  repo: tower-rs/tower
+  url: https://docs.rs/tower
+- name: tower-service
+  repo: tower-rs/tower
+  url: https://docs.rs/tower-service
+- name: hyper
+  repo: hyperium/hyper
+  url: https://docs.rs/hyper
+- name: h2
+  repo: hyperium/h2
+  url: https://docs.rs/h2
+- name: fastly
+  repo: fastly/fastly-rs
+  url: https://docs.rs/fastly/latest/fastly/
+- name: cloudflare-workers-rs
+  repo: cloudflare/workers-rs
+  url: null
+- name: leptos
+  repo: leptos-rs/leptos
+  url: https://book.leptos.dev/
+- name: trunk
+  repo: trunk-rs/trunk
+  url: https://trunk-rs.github.io/trunk/guide/
+- name: yew
+  repo: yewstack/yew
+  url: https://docs.rs/yew
+- name: grass
+  repo: connorskees/grass
+  url: https://docs.rs/grass
+- name: tauri
+  repo: tauri-apps/tauri
+  url: null
+- name: tokio
+  repo: tokio-rs/tokio
+  url: https://docs.rs/tokio
+- name: async-std
+  repo: async-rs/async-std
+  url: https://docs.rs/async-std
+- name: futures
+  repo: rust-lang/futures-rs
+  url: https://docs.rs/futures
+- name: futures-core
+  repo: rust-lang/futures-rs
+  url: https://docs.rs/futures-core
+- name: futures-util
+  repo: rust-lang/futures-rs
+  url: https://docs.rs/futures-util
+- name: futures-task
+  repo: rust-lang/futures-rs
+  url: https://docs.rs/futures-task
+- name: futures-channel
+  repo: rust-lang/futures-rs
+  url: https://docs.rs/futures-channel
+- name: futures-sink
+  repo: rust-lang/futures-rs
+  url: https://docs.rs/futures-sink
+- name: futures-io
+  repo: rust-lang/futures-rs
+  url: https://docs.rs/futures-io
+- name: futures-executor
+  repo: rust-lang/futures-rs
+  url: https://docs.rs/futures-executor
+- name: futures-macro
+  repo: rust-lang/futures-rs
+  url: https://docs.rs/futures-macro
+- name: embassy
+  repo: embassy-rs/embassy
+  url: https://docs.embassy.dev
+- name: tokio-util
+  repo: tokio-rs/tokio
+  url: https://docs.rs/tokio-util
+- name: tokio-rustls
+  repo: rustls/tokio-rustls
+  url: https://docs.rs/tokio-rustls
+- name: tokio-macros
+  repo: tokio-rs/tokio
+  url: https://docs.rs/tokio-macros
+- name: async-trait
+  repo: dtolnay/async-trait
+  url: https://docs.rs/async-trait
+- name: serde
+  repo: serde-rs/serde
+  url: https://docs.rs/serde
+- name: serde_json
+  repo: serde-rs/json
+  url: https://docs.rs/serde_json
+- name: serde_derive
+  repo: serde-rs/serde
+  url: https://docs.rs/serde_derive
+- name: serde_core
+  repo: serde-rs/serde
+  url: https://docs.rs/serde_core
+- name: toml
+  repo: toml-rs/toml
+  url: https://docs.rs/toml
+- name: toml_edit
+  repo: toml-rs/toml
+  url: https://docs.rs/toml_edit
+- name: toml_datetime
+  repo: toml-rs/toml
+  url: https://docs.rs/toml_datetime
+- name: serde_urlencoded
+  repo: nox/serde_urlencoded
+  url: https://docs.rs/serde_urlencoded
+- name: clap
+  repo: clap-rs/clap
+  url: https://docs.rs/clap
+- name: clap_builder
+  repo: clap-rs/clap
+  url: https://docs.rs/clap_builder
+- name: clap_derive
+  repo: clap-rs/clap
+  url: https://docs.rs/clap_derive
+- name: clap_lex
+  repo: clap-rs/clap
+  url: https://docs.rs/clap_lex
+- name: ratatui
+  repo: ratatui/ratatui
+  url: https://docs.rs/ratatui
+- name: anstyle
+  repo: rust-cli/anstyle
+  url: https://docs.rs/anstyle
+- name: anstream
+  repo: rust-cli/anstyle
+  url: https://docs.rs/anstream
+- name: anstyle-parse
+  repo: rust-cli/anstyle
+  url: https://docs.rs/anstyle-parse
+- name: anstyle-query
+  repo: rust-cli/anstyle
+  url: https://docs.rs/anstyle-query
+- name: colorchoice
+  repo: rust-cli/anstyle
+  url: https://docs.rs/colorchoice
+- name: termcolor
+  repo: BurntSushi/termcolor
+  url: https://docs.rs/termcolor
+- name: diesel
+  repo: diesel-rs/diesel
+  url: https://docs.rs/diesel
+- name: sqlx
+  repo: launchbadge/sqlx
+  url: https://docs.rs/sqlx
+- name: redis
+  repo: redis-rs/redis-rs
+  url: https://docs.rs/redis
+- name: reqwest
+  repo: seanmonstar/reqwest
+  url: https://docs.rs/reqwest
+- name: hyper-rustls
+  repo: rustls/hyper-rustls
+  url: https://docs.rs/hyper-rustls
+- name: http
+  repo: hyperium/http
+  url: https://docs.rs/http
+- name: http-body
+  repo: hyperium/http-body
+  url: https://docs.rs/http-body
+- name: httparse
+  repo: seanmonstar/httparse
+  url: https://docs.rs/httparse
+- name: httpdate
+  repo: pyfisch/httpdate
+  url: https://docs.rs/httpdate
+- name: rustls
+  repo: rustls/rustls
+  url: https://docs.rs/rustls
+- name: rustls-webpki
+  repo: rustls/webpki
+  url: https://docs.rs/rustls-webpki
+- name: rustls-pemfile
+  repo: rustls/pemfile
+  url: https://docs.rs/rustls-pemfile
+- name: webpki-roots
+  repo: rustls/webpki-roots
+  url: https://docs.rs/webpki-roots
+- name: ring
+  repo: briansmith/ring
+  url: https://docs.rs/ring
+- name: sha2
+  repo: RustCrypto/hashes
+  url: https://docs.rs/sha2
+- name: digest
+  repo: RustCrypto/traits
+  url: https://docs.rs/digest
+- name: hmac
+  repo: RustCrypto/MACs
+  url: https://docs.rs/hmac
+- name: crypto-common
+  repo: RustCrypto/traits
+  url: https://docs.rs/crypto-common
+- name: zeroize
+  repo: RustCrypto/utils
+  url: https://docs.rs/zeroize
+- name: subtle
+  repo: dalek-cryptography/subtle
+  url: https://docs.rs/subtle
+- name: secrecy
+  repo: iqlusioninc/secrecy
+  url: https://docs.rs/secrecy
+- name: openssl-probe
+  repo: rustls/openssl-probe
+  url: https://docs.rs/openssl-probe
+- name: anyhow
+  repo: dtolnay/anyhow
+  url: https://docs.rs/anyhow
+- name: thiserror
+  repo: dtolnay/thiserror
+  url: https://docs.rs/thiserror
+- name: thiserror-impl
+  repo: dtolnay/thiserror
+  url: https://docs.rs/thiserror-impl
+- name: tracing
+  repo: tokio-rs/tracing
+  url: https://docs.rs/tracing
+- name: tracing-core
+  repo: tokio-rs/tracing
+  url: https://docs.rs/tracing-core
+- name: tracing-attributes
+  repo: tokio-rs/tracing
+  url: https://docs.rs/tracing-attributes
+- name: tracing-subscriber
+  repo: tokio-rs/tracing
+  url: https://docs.rs/tracing-subscriber
+- name: log
+  repo: rust-lang/log
+  url: https://docs.rs/log
+- name: env_logger
+  repo: rust-cli/env_logger
+  url: https://docs.rs/env_logger
+- name: proc-macro2
+  repo: dtolnay/proc-macro2
+  url: https://docs.rs/proc-macro2
+- name: quote
+  repo: dtolnay/quote
+  url: https://docs.rs/quote
+- name: syn
+  repo: dtolnay/syn
+  url: https://docs.rs/syn
+- name: darling
+  repo: TedDriggs/darling
+  url: https://docs.rs/darling
+- name: darling_core
+  repo: TedDriggs/darling
+  url: https://docs.rs/darling_core
+- name: darling_macro
+  repo: TedDriggs/darling
+  url: https://docs.rs/darling_macro
+- name: strum
+  repo: Peternator7/strum
+  url: https://docs.rs/strum
+- name: strum_macros
+  repo: Peternator7/strum
+  url: https://docs.rs/strum_macros
+- name: synstructure
+  repo: mystor/synstructure
+  url: https://docs.rs/synstructure
+- name: lightningcss
+  repo: parcel-bundler/lightningcss
+  url: null
+- name: regex
+  repo: rust-lang/regex
+  url: https://docs.rs/regex
+- name: regex-syntax
+  repo: rust-lang/regex
+  url: https://docs.rs/regex-syntax
+- name: regex-automata
+  repo: rust-lang/regex
+  url: https://docs.rs/regex-automata
+- name: nom
+  repo: rust-bakery/nom
+  url: https://docs.rs/nom
+- name: winnow
+  repo: winnow-rs/winnow
+  url: https://docs.rs/winnow
+- name: aho-corasick
+  repo: BurntSushi/aho-corasick
+  url: https://docs.rs/aho-corasick
+- name: proptest
+  repo: proptest-rs/proptest
+  url: https://docs.rs/proptest
+- name: criterion
+  repo: bheisler/criterion.rs
+  url: https://docs.rs/criterion
+- name: cargo-geiger
+  repo: geiger-rs/cargo-geiger
+  url: https://docs.rs/cargo-geiger
+- name: cargo-audit
+  repo: rustsec/rustsec
+  url: https://docs.rs/cargo-audit
+- name: cargo-deny
+  repo: embarkstudios/cargo-deny
+  url: null
+- name: cargo-auditable
+  repo: rust-secure-code/cargo-auditable
+  url: https://docs.rs/cargo-auditable
+- name: cargo-crev
+  repo: crev-dev/cargo-crev
+  url: https://docs.rs/cargo-crev
+- name: rusty-hog
+  repo: newrelic/rusty-hog
+  url: null
+- name: cross
+  repo: cross-rs/cross
+  url: null
+- name: cargo-semver-checks
+  repo: obi1kenobi/cargo-semver-checks
+  url: null
+- name: cargo-llvm-cov
+  repo: taiki-e/cargo-llvm-cov
+  url: null
+- name: cargo-machete
+  repo: bnjbvr/cargo-machete
+  url: null
+- name: cargo-msrv
+  repo: foresterre/cargo-msrv
+  url: null
+- name: cargo-about
+  repo: embarkstudios/cargo-about
+  url: null
+- name: cargo-public-api
+  repo: cargo-public-api/cargo-public-api
+  url: https://docs.rs/public-api
+- name: esp-hal
+  repo: esp-rs/esp-hal
+  url: https://docs.rs/esp-hal
+- name: esp-idf-svc
+  repo: esp-rs/esp-idf-svc
+  url: https://docs.rs/esp-idf-svc
+- name: esp-wifi
+  repo: esp-rs/esp-wifi
+  url: https://docs.rs/esp-wifi
+- name: embedded-hal
+  repo: rust-embedded/embedded-hal
+  url: https://docs.rs/embedded-hal
+- name: defmt
+  repo: knurling-rs/defmt
+  url: https://docs.rs/defmt
+- name: microbit
+  repo: nrf-rs/microbit
+  url: null
+- name: rumqttc
+  repo: bytebeamio/rumqtt
+  url: https://docs.rs/rumqttc
+- name: libc
+  repo: rust-lang/libc
+  url: https://docs.rs/libc
+- name: napi-rs
+  repo: napi-rs/napi-rs
+  url: null
+- name: windows-sys
+  repo: microsoft/windows-rs
+  url: https://docs.rs/windows-sys
+- name: windows-targets
+  repo: microsoft/windows-rs
+  url: https://docs.rs/windows-targets
+- name: windows_x86_64_msvc
+  repo: microsoft/windows-rs
+  url: https://docs.rs/windows_x86_64_msvc
+- name: windows_x86_64_gnu
+  repo: microsoft/windows-rs
+  url: https://docs.rs/windows_x86_64_gnu
+- name: coral-tpu
+  repo: geraldo-netto/coral-tpu
+  url: null
+- name: windows_aarch64_msvc
+  repo: microsoft/windows-rs
+  url: https://docs.rs/windows_aarch64_msvc
+- name: windows_i686_msvc
+  repo: microsoft/windows-rs
+  url: https://docs.rs/windows_i686_msvc
+- name: windows_i686_gnu
+  repo: microsoft/windows-rs
+  url: https://docs.rs/windows_i686_gnu
+- name: windows_aarch64_gnullvm
+  repo: microsoft/windows-rs
+  url: https://docs.rs/windows_aarch64_gnullvm
+- name: windows_x86_64_gnullvm
+  repo: microsoft/windows-rs
+  url: https://docs.rs/windows_x86_64_gnullvm
+- name: linux-raw-sys
+  repo: sunfishcode/linux-raw-sys
+  url: https://docs.rs/linux-raw-sys
+- name: rustix
+  repo: bytecodealliance/rustix
+  url: https://docs.rs/rustix
+- name: nix
+  repo: nix-rust/nix
+  url: https://docs.rs/nix
+- name: wasi
+  repo: bytecodealliance/wasi-rs
+  url: https://docs.rs/wasi
+- name: redox_syscall
+  repo: redox-os/syscall
+  url: https://docs.rs/redox_syscall
+- name: hermit-abi
+  repo: hermit-os/hermit-rs
+  url: https://docs.rs/hermit-abi
+- name: crossbeam-utils
+  repo: crossbeam-rs/crossbeam
+  url: https://docs.rs/crossbeam-utils
+- name: crossbeam-epoch
+  repo: crossbeam-rs/crossbeam
+  url: https://docs.rs/crossbeam-epoch
+- name: crossbeam-deque
+  repo: crossbeam-rs/crossbeam
+  url: https://docs.rs/crossbeam-deque
+- name: crossbeam-channel
+  repo: crossbeam-rs/crossbeam
+  url: https://docs.rs/crossbeam-channel
+- name: parking_lot
+  repo: Amanieu/parking_lot
+  url: https://docs.rs/parking_lot
+- name: parking_lot_core
+  repo: Amanieu/parking_lot
+  url: https://docs.rs/parking_lot_core
+- name: lock_api
+  repo: Amanieu/parking_lot
+  url: https://docs.rs/lock_api
+- name: spin
+  repo: zesterer/spin
+  url: https://docs.rs/spin
+- name: sync_wrapper
+  repo: Actyx/sync_wrapper
+  url: https://docs.rs/sync_wrapper
+- name: thread_local
+  repo: Amanieu/thread_local-rs
+  url: https://docs.rs/thread_local
+- name: event-listener
+  repo: smol-rs/event-listener
+  url: https://docs.rs/event-listener
+- name: hashbrown
+  repo: rust-lang/hashbrown
+  url: https://docs.rs/hashbrown
+- name: indexmap
+  repo: indexmap-rs/indexmap
+  url: https://docs.rs/indexmap
+- name: bytes
+  repo: tokio-rs/bytes
+  url: https://docs.rs/bytes
+- name: slab
+  repo: tokio-rs/slab
+  url: https://docs.rs/slab
+- name: smallvec
+  repo: servo/rust-smallvec
+  url: https://docs.rs/smallvec
+- name: tinyvec
+  repo: Lokathor/tinyvec
+  url: https://docs.rs/tinyvec
+- name: tinyvec_macros
+  repo: Soveu/tinyvec_macros
+  url: https://docs.rs/tinyvec_macros
+- name: arrayvec
+  repo: bluss/arrayvec
+  url: https://docs.rs/arrayvec
+- name: bitflags
+  repo: bitflags/bitflags
+  url: https://docs.rs/bitflags
+- name: equivalent
+  repo: indexmap-rs/equivalent
+  url: https://docs.rs/equivalent
+- name: generic-array
+  repo: fizyk20/generic-array.git
+  url: https://docs.rs/generic-array
+- name: rand
+  repo: rust-random/rand
+  url: https://docs.rs/rand
+- name: rand_core
+  repo: rust-random/rand_core
+  url: https://docs.rs/rand_core
+- name: getrandom
+  repo: rust-random/getrandom
+  url: https://docs.rs/getrandom
+- name: rand_chacha
+  repo: rust-random/rand
+  url: https://docs.rs/rand_chacha
+- name: fastrand
+  repo: smol-rs/fastrand
+  url: https://docs.rs/fastrand
+- name: base64
+  repo: marshallpierce/rust-base64
+  url: https://docs.rs/base64
+- name: url
+  repo: servo/rust-url
+  url: https://docs.rs/url
+- name: form_urlencoded
+  repo: servo/rust-url
+  url: https://docs.rs/form_urlencoded
+- name: idna
+  repo: servo/rust-url/
+  url: https://docs.rs/idna
+- name: percent-encoding
+  repo: servo/rust-url/
+  url: https://docs.rs/percent-encoding
+- name: hex
+  repo: KokaKiwi/rust-hex
+  url: https://docs.rs/hex
+- name: utf8parse
+  repo: alacritty/vte
+  url: https://docs.rs/utf8parse
+- name: itertools
+  repo: rust-itertools/itertools
+  url: https://docs.rs/itertools
+- name: chrono
+  repo: chronotope/chrono
+  url: https://docs.rs/chrono
+- name: uuid
+  repo: uuid-rs/uuid
+  url: https://docs.rs/uuid
+- name: time
+  repo: time-rs/time
+  url: https://docs.rs/time
+- name: time-core
+  repo: time-rs/time
+  url: https://docs.rs/time-core
+- name: time-macros
+  repo: time-rs/time
+  url: https://docs.rs/time-macros
+- name: iana-time-zone
+  repo: strawlab/iana-time-zone
+  url: https://docs.rs/iana-time-zone
+- name: num-traits
+  repo: rust-num/num-traits
+  url: https://docs.rs/num-traits
+- name: num-integer
+  repo: rust-num/num-integer
+  url: https://docs.rs/num-integer
+- name: num-bigint
+  repo: rust-num/num-bigint
+  url: https://docs.rs/num-bigint
+- name: num_cpus
+  repo: seanmonstar/num_cpus
+  url: https://docs.rs/num_cpus
+- name: luminS
+  repo: wchang22/LuminS
+  url: null
+- name: strsim
+  repo: rapidfuzz/strsim-rs
+  url: https://docs.rs/strsim
+- name: scopeguard
+  repo: bluss/scopeguard
+  url: https://docs.rs/scopeguard
+- name: lazy_static
+  repo: rust-lang-nursery/lazy-static.rs
+  url: https://docs.rs/lazy_static
+- name: once_cell
+  repo: matklad/once_cell
+  url: https://docs.rs/once_cell
+- name: prost
+  repo: tokio-rs/prost
+  url: https://docs.rs/prost
+- name: prost-derive
+  repo: tokio-rs/prost
+  url: https://docs.rs/prost-derive
+- name: octocode
+  repo: Muvon/octocode
+  url: null
+- name: graphrag-rs
+  repo: automataIA/graphrag-rs
+  url: null
+- name: candle
+  repo: huggingface/candle
+  url: null
+- name: burn
+  repo: tracel-ai/burn
+  url: null
+- name: rig
+  repo: 0xPlaygrounds/rig
+  url: null
+- name: yolo-rs
+  repo: pan93412/yolo-rs
+  url: null
+- name: object-detection-opencv-rust
+  repo: LdDl/object-detection-opencv-rust
+  url: null
+- name: wgpu
+  repo: gfx-rs/wgpu
+  url: null
+- name: rust-rasterizer
+  repo: tchauffi/rust-rasterizer
+  url: null
+- name: wasmtime
+  repo: bytecodealliance/wasmtime
+  url: null
+- name: druid
+  repo: linebender/druid
+  url: null
+- name: unicode-ident
+  repo: dtolnay/unicode-ident
+  url: https://docs.rs/unicode-ident
+- name: unicode-xid
+  repo: unicode-rs/unicode-xid
+  url: https://docs.rs/unicode-xid
+- name: unicode-width
+  repo: unicode-rs/unicode-width
+  url: https://docs.rs/unicode-width
+- name: unicode-normalization
+  repo: unicode-rs/unicode-normalization
+  url: https://docs.rs/unicode-normalization
+- name: unicode-bidi
+  repo: servo/unicode-bidi
+  url: https://docs.rs/unicode-bidi
+- name: heck
+  repo: withoutboats/heck
+  url: https://docs.rs/heck
+- name: shlex
+  repo: comex/rust-shlex
+  url: https://docs.rs/shlex
+- name: flate2
+  repo: rust-lang/flate2-rs
+  url: https://docs.rs/flate2
+- name: miniz_oxide
+  repo: Frommi/miniz_oxide
+  url: https://docs.rs/miniz_oxide
+- name: itoa
+  repo: dtolnay/itoa
+  url: https://docs.rs/itoa
+- name: ryu
+  repo: dtolnay/ryu
+  url: https://docs.rs/ryu
+- name: walkdir
+  repo: BurntSushi/walkdir
+  url: https://docs.rs/walkdir
+- name: tempfile
+  repo: Stebalien/tempfile
+  url: https://docs.rs/tempfile
+- name: glob
+  repo: rust-lang/glob
+  url: https://docs.rs/glob
+- name: same-file
+  repo: BurntSushi/same-file
+  url: https://docs.rs/same-file
+- name: space
+  repo: emilevr/space
+  url: null
+- name: cc
+  repo: rust-lang/cc-rs
+  url: https://docs.rs/cc
+- name: pkg-config
+  repo: rust-lang/pkg-config-rs
+  url: https://docs.rs/pkg-config
+- name: autocfg
+  repo: cuviper/autocfg
+  url: https://docs.rs/autocfg
+- name: version_check
+  repo: SergioBenitez/version_check
+  url: https://docs.rs/version_check
+- name: rustc_version
+  repo: djc/rustc-version-rs
+  url: https://docs.rs/rustc_version
+- name: rustc-demangle
+  repo: rust-lang/rustc-demangle
+  url: https://docs.rs/rustc-demangle
+- name: rustversion
+  repo: dtolnay/rustversion
+  url: https://docs.rs/rustversion
+- name: byteorder
+  repo: BurntSushi/byteorder
+  url: https://docs.rs/byteorder
+- name: bytes
+  repo: tokio-rs/bytes
+  url: https://docs.rs/bytes
+- name: memoffset
+  repo: Gilnaa/memoffset
+  url: https://docs.rs/memoffset
+- name: memchr
+  repo: BurntSushi/memchr
+  url: https://docs.rs/memchr
+- name: zerocopy
+  repo: google/zerocopy
+  url: https://docs.rs/zerocopy
+- name: socket2
+  repo: rust-lang/socket2
+  url: https://docs.rs/socket2
+- name: mio
+  repo: tokio-rs/mio
+  url: https://docs.rs/mio
+- name: ipnet
+  repo: krisprice/ipnet
+  url: https://docs.rs/ipnet
+- name: suppaftp
+  repo: veeso/suppaftp
+  url: null
+- name: ahash
+  repo: tkaitchuck/ahash
+  url: https://docs.rs/ahash
+- name: fnv
+  repo: servo/rust-fnv
+  url: https://docs.rs/fnv
+- name: rustc-hash
+  repo: rust-lang/rustc-hash
+  url: https://docs.rs/rustc-hash
+- name: backtrace
+  repo: rust-lang/backtrace-rs
+  url: https://docs.rs/backtrace
+- name: object
+  repo: gimli-rs/object
+  url: https://docs.rs/object
+- name: gimli
+  repo: gimli-rs/gimli
+  url: https://docs.rs/gimli
+- name: addr2line
+  repo: gimli-rs/addr2line
+  url: https://docs.rs/addr2line
+- name: typenum
+  repo: paholg/typenum
+  url: https://docs.rs/typenum
+- name: deranged
+  repo: jhpratt/deranged
+  url: https://docs.rs/deranged
+- name: subtle
+  repo: dalek-cryptography/subtle
+  url: https://docs.rs/subtle
+- name: untrusted
+  repo: briansmith/untrusted
+  url: https://docs.rs/untrusted
+- name: block-buffer
+  repo: RustCrypto/utils
+  url: https://docs.rs/block-buffer
+- name: pin-utils
+  repo: rust-lang-nursery/pin-utils
+  url: https://docs.rs/pin-utils
+- name: pin-project-lite
+  repo: taiki-e/pin-project-lite
+  url: https://docs.rs/pin-project-lite
+- name: pin-project
+  repo: taiki-e/pin-project
+  url: https://docs.rs/pin-project
+- name: pin-project-internal
+  repo: taiki-e/pin-project
+  url: https://docs.rs/pin-project-internal
+- name: try-lock
+  repo: seanmonstar/try-lock
+  url: https://docs.rs/try-lock
+- name: want
+  repo: seanmonstar/want
+  url: https://docs.rs/want
+- name: stable_deref_trait
+  repo: storyyeller/stable_deref_trait
+  url: https://docs.rs/stable_deref_trait
+- name: errno
+  repo: lambda-fairy/rust-errno
+  url: https://docs.rs/errno
+- name: cpufeatures
+  repo: RustCrypto/utils
+  url: https://docs.rs/cpufeatures
+- name: ppv-lite86
+  repo: cryptocorrosion/cryptocorrosion
+  url: https://docs.rs/ppv-lite86
+- name: cfg-if
+  repo: rust-lang/cfg-if
+  url: https://docs.rs/cfg-if
+- name: semver
+  repo: dtolnay/semver
+  url: https://docs.rs/semver
+- name: either
+  repo: rayon-rs/either
+  url: https://docs.rs/either
+- name: mime
+  repo: hyperium/mime
+  url: https://docs.rs/mime
+- name: mdbook
+  repo: rust-lang/mdbook
+  url: null
+- name: navi
+  repo: denisidoro/navi
+  url: null
+- name: zola
+  repo: getzola/zola
+  url: null
+- name: dust
+  repo: bootandy/dust
+  url: null
+- name: presenterm
+  repo: mfontanini/presenterm
+  url: null
+- name: deno
+  repo: denoland/deno
+  url: null
+- name: lapce
+  repo: lapce/lapce
+  url: null
+- name: delta
+  repo: dandavison/delta
+  url: null
+- name: fnm
+  repo: schniz/fnm
+  url: null
+- name: ruffle
+  repo: ruffle-rs/ruffle
+  url: null

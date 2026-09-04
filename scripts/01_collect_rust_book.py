@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import hashlib
 import json
+import logging
 import re
 import sys
 from datetime import datetime
@@ -9,8 +10,16 @@ from urllib.parse import urldefrag, urljoin, urlparse
 
 import html2text
 import requests
+import yaml
 from bs4 import BeautifulSoup
 from cache_utils import CachedSession
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
+)
+logger = logging.getLogger("rust_lora.rust_book")
 
 BASE_DIR = Path(__file__).parent.parent
 RAW_DIR = BASE_DIR / "data" / "raw"
@@ -27,6 +36,11 @@ class RustDocCollector:
         self.h2t.ignore_images = True
         self.h2t.body_width = 0
         self.visited = set()
+        
+        # Load official documentation and blog sources
+        with open(CONFIG_DIR / "sources.yaml") as f:
+            config = yaml.safe_load(f)
+        self.sources = config.get("sources", []) + config.get("blogs", [])
 
     def _save(self, source, url, title, content, metadata, out_dir):
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -36,6 +50,7 @@ class RustDocCollector:
             json.dump(
                 {
                     "source": source,
+                    "source_type": "official_docs",
                     "url": url,
                     "title": title,
                     "content": content,
@@ -65,7 +80,7 @@ class RustDocCollector:
                 return
             s = BeautifulSoup(r.text, "lxml")
             main = s.find("main") or s.find("div", class_="content")
-            if main and len(main.text) > 100:
+            if main and len(main.text) > 200:
                 title = s.find("h1").text.strip() if s.find("h1") else "Untitled"
                 md = self.h2t.handle(str(main))
                 self._save(source_name, normalized_url, title, md, {"book": source_name}, out_dir)
@@ -84,8 +99,10 @@ class RustDocCollector:
                     self.collect_site_recursive(
                         next_url, source_name, out_dir, base_domain, base_path
                     )
-        except Exception:
-            pass
+        except requests.Timeout as e:
+            logger.warning(f"Timeout collecting {normalized_url}: {e}")
+        except Exception as e:
+            logger.warning(f"Error collecting {normalized_url}: {type(e).__name__}: {e}")
 
     def collect_site(self, base_url, source_name, out_dir):
         output_dir = self.output_base / out_dir
@@ -96,45 +113,34 @@ class RustDocCollector:
 
     def run_all(self):
         print("Collecting official Rust documentation...")
+        
+        # Get all source directories before collection
+        source_dirs = [s["output_dir"].replace("raw/", "") for s in self.sources]
         total_before = sum(
-            self.count_output_files(RAW_DIR / part)
-            for part in [
-                "rust_book",
-                "rust_by_example",
-                "rust_reference",
-                "rustonomicon",
-                "cargo_book",
-            ]
+            self.count_output_files(RAW_DIR / part) for part in source_dirs
         )
-        self.visited.clear()
-        self.collect_site("https://doc.rust-lang.org/book/", "rust_book", "rust_book")
-        self.visited.clear()
-        self.collect_site(
-            "https://doc.rust-lang.org/rust-by-example/", "rust_by_example", "rust_by_example"
-        )
-        self.visited.clear()
-        self.collect_site(
-            "https://doc.rust-lang.org/reference/", "rust_reference", "rust_reference"
-        )
-        self.visited.clear()
-        self.collect_site("https://doc.rust-lang.org/nomicon/", "rustonomicon", "rustonomicon")
-        self.visited.clear()
-        self.collect_site("https://doc.rust-lang.org/cargo/", "cargo_book", "cargo_book")
+        
+        # Collect from each source
+        for source in self.sources:
+            url = source["url"]
+            output_dir = source["output_dir"].replace("raw/", "")
+            source_name = source["name"]
+            
+            logger.info(f"Collecting {source_name} from {url}")
+            self.visited.clear()
+            self.collect_site(url, source_name, output_dir)
+        
         total_after = sum(
-            self.count_output_files(RAW_DIR / part)
-            for part in [
-                "rust_book",
-                "rust_by_example",
-                "rust_reference",
-                "rustonomicon",
-                "cargo_book",
-            ]
+            self.count_output_files(RAW_DIR / part) for part in source_dirs
         )
         stats = self.session.get_stats()
         print(f"\nCollected {total_after - total_before} new raw documents, {total_after} total.")
         print(
-            f"Cache stats: {stats['fetched']} fetched, {stats['skipped']} skipped (out of {stats['total_checked']} total)"
+            f"Cache stats: {stats['fetched']} fetched, {stats['skipped']} skipped, {stats.get('errors', 0)} errors"
         )
+        if self.session.get_errors():
+            print(f"\nCollection warnings: {len(self.session.get_errors())} URLs had issues.")
+            logger.info(f"See logs for details on failed URLs.")
 
 
 if __name__ == "__main__":

@@ -1,17 +1,28 @@
 #!/usr/bin/env python3
 import hashlib
 import json
+import logging
 import sys
+from datetime import datetime
 from pathlib import Path
 from urllib.parse import urldefrag, urljoin, urlparse
 
 import html2text
 import requests
+import yaml
 from bs4 import BeautifulSoup
 from cache_utils import CachedSession
 
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
+)
+logger = logging.getLogger("rust_lora.esp_rs")
+
 BASE_DIR = Path(__file__).parent.parent
 RAW_DIR = BASE_DIR / "data" / "raw"
+CONFIG_DIR = BASE_DIR / "config"
 
 
 class ESPCollector:
@@ -22,12 +33,17 @@ class ESPCollector:
         self.session = CachedSession(session)
         self.h2t = html2text.HTML2Text()
         self.h2t.ignore_images = True
-        self.sites = [
-            ("https://docs.esp-rs.org/book/", "esp_rs/book"),
-            ("https://docs.esp-rs.org/no-std-training/", "esp_rs/no_std"),
-            ("https://docs.espressif.com/projects/rust/esp-rust/latest/", "esp_rs/espressif"),
-        ]
         self.visited = set()
+        
+        # Load embedded documentation sources
+        with open(CONFIG_DIR / "sources.yaml") as f:
+            config = yaml.safe_load(f)
+        
+        embedded = config.get("embedded", [])
+        self.sites = [
+            (source["url"], source["output_dir"].replace("raw/", ""), source["name"])
+            for source in embedded
+        ]
 
     def count_files(self, out_dir):
         if not out_dir.exists():
@@ -47,14 +63,28 @@ class ESPCollector:
             if not r:
                 return
             s = BeautifulSoup(r.text, "lxml")
-            main = s.find("main") or s.find("article")
-            if main and len(main.text) > 100:
+            main = s.find("main") or s.find("article") or s.find("div", id="content") or s.find("body")
+            if main and len(main.text) > 200:
+                title = s.find("h1")
+                title_text = title.text.strip() if title else "esp-rs documentation"
                 md = self.h2t.handle(str(main))
                 h = hashlib.sha256(md.encode()).hexdigest()[:16]
                 out_dir = self.output_base / out_rel
                 out_dir.mkdir(parents=True, exist_ok=True)
                 with open(out_dir / f"{h}.json", "w") as f:
-                    json.dump({"source": "esp_rs", "url": normalized_url, "content": md}, f)
+                    json.dump(
+                        {
+                            "source": "esp_rs",
+                            "source_type": "official_docs",
+                            "url": normalized_url,
+                            "title": title_text,
+                            "content": md,
+                            "metadata": {"section": out_rel},
+                            "collected_at": datetime.now().isoformat(),
+                        },
+                        f,
+                        indent=2,
+                    )
             # Find and queue all linked pages
             for link in s.find_all("a", href=True):
                 href = link.get("href", "")
@@ -68,8 +98,10 @@ class ESPCollector:
                     continue
                 if parsed.path.endswith(".html") or parsed.path.endswith("/"):
                     self.collect_page_recursive(next_url, base_domain, base_path, out_rel)
-        except Exception:
-            pass
+        except requests.Timeout as e:
+            logger.warning(f"Timeout collecting {normalized_url}: {e}")
+        except Exception as e:
+            logger.warning(f"Error collecting {normalized_url}: {type(e).__name__}: {e}")
 
     def collect_site(self, base_url, out_rel):
         parsed_base = urlparse(base_url)
@@ -78,16 +110,20 @@ class ESPCollector:
         self.collect_page_recursive(base_url, base_domain, base_path, out_rel)
 
     def run_all(self):
-        print("Collecting ESP-RS...")
-        before_count = sum(self.count_files(self.output_base / rel) for _, rel in self.sites)
-        for url, rel in self.sites:
+        print("Collecting ESP-RS and embedded documentation...")
+        before_count = sum(self.count_files(self.output_base / rel) for _, rel, _ in self.sites)
+        for url, rel, name in self.sites:
+            logger.info(f"Collecting {name} from {url}")
             self.collect_site(url, rel)
-        after_count = sum(self.count_files(self.output_base / rel) for _, rel in self.sites)
+        after_count = sum(self.count_files(self.output_base / rel) for _, rel, _ in self.sites)
         stats = self.session.get_stats()
         print(f"Collected {after_count - before_count} new documents, {after_count} total.")
         print(
-            f"Cache stats: {stats['fetched']} fetched, {stats['skipped']} skipped (out of {stats['total_checked']} total)"
+            f"Cache stats: {stats['fetched']} fetched, {stats['skipped']} skipped, {stats.get('errors', 0)} errors"
         )
+        if self.session.get_errors():
+            print(f"\nCollection warnings: {len(self.session.get_errors())} URLs had issues.")
+            logger.info(f"See logs for details on failed URLs.")
 
 
 if __name__ == "__main__":
