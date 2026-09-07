@@ -35,17 +35,17 @@ class BlogsCollector:
         self.session = CachedSession(session)
         self.h2t = html2text.HTML2Text()
         self.h2t.ignore_images = True
-        
+
         # Load blogs and best_practices sources
         with open(CONFIG_DIR / "sources.yaml") as f:
             config = yaml.safe_load(f)
-        
+
         # Feeds are RSS feeds, sites are web pages
         self.feeds = [
             (source["url"], source["output_dir"].replace("raw/", ""), source["name"])
             for source in config.get("blogs", [])
         ]
-        
+
         self.sites = [
             (source["url"], source["output_dir"].replace("raw/", ""), source["name"])
             for source in config.get("best_practices", [])
@@ -57,12 +57,11 @@ class BlogsCollector:
         return sum(1 for _ in out_dir.rglob("*.json") if _.is_file())
 
     def collect_feed(self, url, rel, name=None):
-        from datetime import datetime
-        
+
         out_dir = self.output_base / rel
         out_dir.mkdir(parents=True, exist_ok=True)
         feed = feedparser.parse(url)
-        
+
         for entry in tqdm(feed.entries, desc=name or rel.split("/")[-1], leave=False):
             try:
                 sys.stdout.write(".")
@@ -95,58 +94,75 @@ class BlogsCollector:
             except Exception as e:
                 logger.warning(f"Error processing {entry.link}: {type(e).__name__}: {e}")
 
+    def _extract_site_links(self, soup, base_url):
+        """Extract all HTML links from site index."""
+        links = set()
+        for link in soup.find_all("a", href=True):
+            href = link.get("href", "")
+            if href.endswith(".html") and not href.startswith("http"):
+                full_url = base_url + href if href.startswith("/") else href
+                links.add(full_url)
+        return links
+
+    def _process_site_link(self, link, out_dir, base_url, rel):
+        """Process a single site link and save if valid."""
+        sys.stdout.write(".")
+        sys.stdout.flush()
+        r = self.session.get(link, timeout=30)
+        if not r:
+            return
+        s = BeautifulSoup(r.text, "lxml")
+        main = s.find("main")
+        if not main:
+            return
+        title = s.find("h1")
+        title_text = title.text.strip() if title else rel.split("/")[-1]
+        md = self.h2t.handle(str(main))
+        if len(md) <= 200:
+            return
+        h = hashlib.sha256(md.encode()).hexdigest()[:16]
+        with open(out_dir / f"{h}.json", "w") as f:
+            json.dump(
+                {
+                    "source": "best_practices",
+                    "source_type": "best_practices",
+                    "url": link,
+                    "title": title_text,
+                    "content": md,
+                    "metadata": {"site_url": base_url},
+                    "collected_at": datetime.now().isoformat(),
+                },
+                f,
+                indent=2,
+            )
+
+    def _fetch_site_index(self, url):
+        """Fetch and parse site index page."""
+        resp = self.session.get(url, timeout=30)
+        if not resp:
+            return None
+        return BeautifulSoup(resp.text, "lxml")
+
     def collect_site(self, url, rel, name=None):
-        from datetime import datetime
-        
         out_dir = self.output_base / rel
         out_dir.mkdir(parents=True, exist_ok=True)
         visited = set()
         logger.info(f"Collecting {name or rel} from {url}")
         try:
-            resp = self.session.get(url, timeout=30)
-            if resp:
-                soup = BeautifulSoup(resp.text, "lxml")
-                links = set()
-                for link in soup.find_all("a", href=True):
-                    href = link.get("href", "")
-                    if href.endswith(".html") and not href.startswith("http"):
-                        links.add(url + href if href.startswith("/") else href)
-                for link in tqdm(links, leave=False):
-                    if link in visited:
-                        continue
-                    visited.add(link)
-                    try:
-                        sys.stdout.write(".")
-                        sys.stdout.flush()
-                        r = self.session.get(link, timeout=30)
-                        if not r:  # Content not modified
-                            continue
-                        s = BeautifulSoup(r.text, "lxml")
-                        main = s.find("main")
-                        title = s.find("h1")
-                        title_text = title.text.strip() if title else rel.split("/")[-1]
-                        if main:
-                            md = self.h2t.handle(str(main))
-                            if len(md) > 200:
-                                h = hashlib.sha256(md.encode()).hexdigest()[:16]
-                                with open(out_dir / f"{h}.json", "w") as f:
-                                    json.dump(
-                                        {
-                                            "source": "best_practices",
-                                            "source_type": "best_practices",
-                                            "url": link,
-                                            "title": title_text,
-                                            "content": md,
-                                            "metadata": {"site_url": url},
-                                            "collected_at": datetime.now().isoformat(),
-                                        },
-                                        f,
-                                        indent=2,
-                                    )
-                    except requests.Timeout as e:
-                        logger.warning(f"Timeout fetching {link}: {e}")
-                    except Exception as e:
-                        logger.warning(f"Error processing {link}: {type(e).__name__}: {e}")
+            soup = self._fetch_site_index(url)
+            if not soup:
+                return
+            links = self._extract_site_links(soup, url)
+            for link in tqdm(links, leave=False):
+                if link in visited:
+                    continue
+                visited.add(link)
+                try:
+                    self._process_site_link(link, out_dir, url, rel)
+                except requests.Timeout as e:
+                    logger.warning(f"Timeout fetching {link}: {e}")
+                except Exception as e:
+                    logger.warning(f"Error processing {link}: {type(e).__name__}: {e}")
         except requests.Timeout as e:
             logger.warning(f"Timeout fetching site index {url}: {e}")
         except Exception as e:
@@ -171,7 +187,7 @@ class BlogsCollector:
         )
         if self.session.get_errors():
             print(f"\nCollection warnings: {len(self.session.get_errors())} URLs had issues.")
-            logger.info(f"See logs for details on failed URLs.")
+            logger.info("See logs for details on failed URLs.")
 
 
 if __name__ == "__main__":

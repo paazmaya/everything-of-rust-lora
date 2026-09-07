@@ -36,7 +36,7 @@ class RustDocCollector:
         self.h2t.ignore_images = True
         self.h2t.body_width = 0
         self.visited = set()
-        
+
         # Load official documentation and blog sources
         with open(CONFIG_DIR / "sources.yaml") as f:
             config = yaml.safe_load(f)
@@ -66,6 +66,41 @@ class RustDocCollector:
             return 0
         return sum(1 for _ in out_dir.rglob("*.json") if _.is_file())
 
+    def _is_valid_link(self, href):
+        """Check if a link should be followed."""
+        return not href.startswith(("mailto:", "javascript:"))
+
+    def _is_valid_page_url(self, parsed_url, base_domain, base_path):
+        """Check if parsed URL is within boundaries."""
+        if parsed_url.netloc != base_domain:
+            return False
+        if not parsed_url.path.startswith(base_path):
+            return False
+        return parsed_url.path.endswith(".html") or parsed_url.path.endswith("/")
+
+    def _process_page_content(self, soup, normalized_url, source_name, out_dir):
+        """Extract and save page content if valid."""
+        main = soup.find("main") or soup.find("div", class_="content")
+        if not main or len(main.text) <= 200:
+            return
+        title = soup.find("h1").text.strip() if soup.find("h1") else "Untitled"
+        md = self.h2t.handle(str(main))
+        self._save(source_name, normalized_url, title, md, {"book": source_name}, out_dir)
+
+    def _queue_linked_pages(
+        self, soup, normalized_url, source_name, out_dir, base_domain, base_path
+    ):
+        """Extract and queue linked pages for collection."""
+        for link in soup.find_all("a", href=True):
+            href = link["href"]
+            if not self._is_valid_link(href):
+                continue
+            next_url = urljoin(normalized_url, href)
+            parsed = urlparse(next_url)
+            if not self._is_valid_page_url(parsed, base_domain, base_path):
+                continue
+            self.collect_site_recursive(next_url, source_name, out_dir, base_domain, base_path)
+
     def collect_site_recursive(self, url, source_name, out_dir, base_domain, base_path):
         """Recursively collect all pages from a site, staying within base_path."""
         normalized_url = urldefrag(url)[0]
@@ -79,26 +114,10 @@ class RustDocCollector:
             if not r:
                 return
             s = BeautifulSoup(r.text, "lxml")
-            main = s.find("main") or s.find("div", class_="content")
-            if main and len(main.text) > 200:
-                title = s.find("h1").text.strip() if s.find("h1") else "Untitled"
-                md = self.h2t.handle(str(main))
-                self._save(source_name, normalized_url, title, md, {"book": source_name}, out_dir)
-            # Find and queue all linked pages
-            for link in s.find_all("a", href=True):
-                href = link["href"]
-                if href.startswith("mailto:") or href.startswith("javascript:"):
-                    continue
-                next_url = urljoin(normalized_url, href)
-                parsed = urlparse(next_url)
-                if parsed.netloc != base_domain:
-                    continue
-                if not parsed.path.startswith(base_path):
-                    continue
-                if parsed.path.endswith(".html") or parsed.path.endswith("/"):
-                    self.collect_site_recursive(
-                        next_url, source_name, out_dir, base_domain, base_path
-                    )
+            self._process_page_content(s, normalized_url, source_name, out_dir)
+            self._queue_linked_pages(
+                s, normalized_url, source_name, out_dir, base_domain, base_path
+            )
         except requests.Timeout as e:
             logger.warning(f"Timeout collecting {normalized_url}: {e}")
         except Exception as e:
@@ -113,26 +132,22 @@ class RustDocCollector:
 
     def run_all(self):
         print("Collecting official Rust documentation...")
-        
+
         # Get all source directories before collection
         source_dirs = [s["output_dir"].replace("raw/", "") for s in self.sources]
-        total_before = sum(
-            self.count_output_files(RAW_DIR / part) for part in source_dirs
-        )
-        
+        total_before = sum(self.count_output_files(RAW_DIR / part) for part in source_dirs)
+
         # Collect from each source
         for source in self.sources:
             url = source["url"]
             output_dir = source["output_dir"].replace("raw/", "")
             source_name = source["name"]
-            
+
             logger.info(f"Collecting {source_name} from {url}")
             self.visited.clear()
             self.collect_site(url, source_name, output_dir)
-        
-        total_after = sum(
-            self.count_output_files(RAW_DIR / part) for part in source_dirs
-        )
+
+        total_after = sum(self.count_output_files(RAW_DIR / part) for part in source_dirs)
         stats = self.session.get_stats()
         print(f"\nCollected {total_after - total_before} new raw documents, {total_after} total.")
         print(
@@ -140,7 +155,7 @@ class RustDocCollector:
         )
         if self.session.get_errors():
             print(f"\nCollection warnings: {len(self.session.get_errors())} URLs had issues.")
-            logger.info(f"See logs for details on failed URLs.")
+            logger.info("See logs for details on failed URLs.")
 
 
 if __name__ == "__main__":

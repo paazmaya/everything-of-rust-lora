@@ -34,11 +34,11 @@ class ESPCollector:
         self.h2t = html2text.HTML2Text()
         self.h2t.ignore_images = True
         self.visited = set()
-        
+
         # Load embedded documentation sources
         with open(CONFIG_DIR / "sources.yaml") as f:
             config = yaml.safe_load(f)
-        
+
         embedded = config.get("embedded", [])
         self.sites = [
             (source["url"], source["output_dir"].replace("raw/", ""), source["name"])
@@ -49,6 +49,65 @@ class ESPCollector:
         if not out_dir.exists():
             return 0
         return sum(1 for _ in out_dir.rglob("*.json") if _.is_file())
+
+    def _is_valid_link_esp(self, href):
+        """Check if a link should be followed."""
+        return not href.startswith(("mailto:", "javascript:"))
+
+    def _is_valid_page_url_esp(self, parsed_url, base_domain, base_path):
+        """Check if parsed URL is within boundaries."""
+        if parsed_url.netloc != base_domain:
+            return False
+        if not parsed_url.path.startswith(base_path):
+            return False
+        return parsed_url.path.endswith(".html") or parsed_url.path.endswith("/")
+
+    def _extract_main_content(self, soup):
+        """Extract main content from page."""
+        return (
+            soup.find("main")
+            or soup.find("article")
+            or soup.find("div", id="content")
+            or soup.find("body")
+        )
+
+    def _save_page_content(self, soup, normalized_url, out_rel):
+        """Extract and save page content if valid."""
+        main = self._extract_main_content(soup)
+        if not main or len(main.text) <= 200:
+            return
+        title = soup.find("h1")
+        title_text = title.text.strip() if title else "esp-rs documentation"
+        md = self.h2t.handle(str(main))
+        h = hashlib.sha256(md.encode()).hexdigest()[:16]
+        out_dir = self.output_base / out_rel
+        out_dir.mkdir(parents=True, exist_ok=True)
+        with open(out_dir / f"{h}.json", "w") as f:
+            json.dump(
+                {
+                    "source": "esp_rs",
+                    "source_type": "official_docs",
+                    "url": normalized_url,
+                    "title": title_text,
+                    "content": md,
+                    "metadata": {"section": out_rel},
+                    "collected_at": datetime.now().isoformat(),
+                },
+                f,
+                indent=2,
+            )
+
+    def _queue_linked_pages_esp(self, soup, normalized_url, base_domain, base_path, out_rel):
+        """Extract and queue linked pages for collection."""
+        for link in soup.find_all("a", href=True):
+            href = link.get("href", "")
+            if not self._is_valid_link_esp(href):
+                continue
+            next_url = urljoin(normalized_url, href)
+            parsed = urlparse(next_url)
+            if not self._is_valid_page_url_esp(parsed, base_domain, base_path):
+                continue
+            self.collect_page_recursive(next_url, base_domain, base_path, out_rel)
 
     def collect_page_recursive(self, url, base_domain, base_path, out_rel):
         """Recursively collect all pages from a site, staying within base_path."""
@@ -63,41 +122,8 @@ class ESPCollector:
             if not r:
                 return
             s = BeautifulSoup(r.text, "lxml")
-            main = s.find("main") or s.find("article") or s.find("div", id="content") or s.find("body")
-            if main and len(main.text) > 200:
-                title = s.find("h1")
-                title_text = title.text.strip() if title else "esp-rs documentation"
-                md = self.h2t.handle(str(main))
-                h = hashlib.sha256(md.encode()).hexdigest()[:16]
-                out_dir = self.output_base / out_rel
-                out_dir.mkdir(parents=True, exist_ok=True)
-                with open(out_dir / f"{h}.json", "w") as f:
-                    json.dump(
-                        {
-                            "source": "esp_rs",
-                            "source_type": "official_docs",
-                            "url": normalized_url,
-                            "title": title_text,
-                            "content": md,
-                            "metadata": {"section": out_rel},
-                            "collected_at": datetime.now().isoformat(),
-                        },
-                        f,
-                        indent=2,
-                    )
-            # Find and queue all linked pages
-            for link in s.find_all("a", href=True):
-                href = link.get("href", "")
-                if href.startswith("mailto:") or href.startswith("javascript:"):
-                    continue
-                next_url = urljoin(normalized_url, href)
-                parsed = urlparse(next_url)
-                if parsed.netloc != base_domain:
-                    continue
-                if not parsed.path.startswith(base_path):
-                    continue
-                if parsed.path.endswith(".html") or parsed.path.endswith("/"):
-                    self.collect_page_recursive(next_url, base_domain, base_path, out_rel)
+            self._save_page_content(s, normalized_url, out_rel)
+            self._queue_linked_pages_esp(s, normalized_url, base_domain, base_path, out_rel)
         except requests.Timeout as e:
             logger.warning(f"Timeout collecting {normalized_url}: {e}")
         except Exception as e:
@@ -123,7 +149,7 @@ class ESPCollector:
         )
         if self.session.get_errors():
             print(f"\nCollection warnings: {len(self.session.get_errors())} URLs had issues.")
-            logger.info(f"See logs for details on failed URLs.")
+            logger.info("See logs for details on failed URLs.")
 
 
 if __name__ == "__main__":

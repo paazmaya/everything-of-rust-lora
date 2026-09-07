@@ -225,7 +225,7 @@ class CachedSession:
             "errors": self.error_count,
             "total_checked": self.fetched_count + self.skipped_count + self.error_count,
         }
-    
+
     def get_errors(self) -> list[dict[str, str]]:
         """Return list of errors for detailed reporting."""
         return self.errors

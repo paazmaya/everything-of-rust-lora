@@ -28,7 +28,7 @@ class DataTransformer:
             self.tokenizer = tiktoken.get_encoding("cl100k_base")
         except Exception:
             self.tokenizer = None
-        
+
         # Boilerplate patterns to detect and remove
         self.boilerplate_patterns = [
             r"©\s*20\d{2}",  # Copyright notices
@@ -43,7 +43,7 @@ class DataTransformer:
             r"made with.*by",
             r"powered by",
         ]
-        
+
         # Statistics tracking
         self.skipped_too_short = 0
         self.skipped_boilerplate = 0
@@ -57,7 +57,7 @@ class DataTransformer:
     def clean(self, text):
         text = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", text)
         return re.sub(r"\n{3,}", "\n\n", text).strip()
-    
+
     def has_boilerplate(self, text):
         """Check if text contains boilerplate patterns indicating low-quality content."""
         text_lower = text.lower()
@@ -65,52 +65,52 @@ class DataTransformer:
             if re.search(pattern, text_lower, re.IGNORECASE):
                 return True
         return False
-    
+
     def is_likely_nav_or_footer(self, text):
         """Detect if content is primarily navigation or footer (high link density)."""
         # Count markdown links
         links = len(re.findall(r"\[.*?\]\(.*?\)", text))
         # Count words
         words = len(text.split())
-        
+
         if words < 50:  # Too short to judge
             return False
-        
+
         # If more than 30% is links, likely navigation
         link_density = links / max(words / 5, 1)  # Rough: links count as ~5 words
         return link_density > 0.3
-    
+
     def validate_content(self, doc_data):
         """Validate content and return (is_valid, skip_reason)."""
         content = self.clean(
             doc_data.get("content", "")
             or doc_data.get("question_body", "") + doc_data.get("answer_body", "")
         )
-        
+
         # Check minimum length (stricter than before)
         if len(content) < 200:
             self.skipped_too_short += 1
             return False, "content_too_short"
-        
+
         # Check for required fields
         if "source" not in doc_data:
             self.skipped_invalid += 1
             return False, "missing_source"
-        
+
         if "url" not in doc_data:
             self.skipped_invalid += 1
             return False, "missing_url"
-        
+
         # Check for boilerplate
         if self.has_boilerplate(content):
             self.skipped_boilerplate += 1
             return False, "boilerplate_detected"
-        
+
         # Check for navigation/footer dominated content
         if self.is_likely_nav_or_footer(content):
             self.skipped_low_quality += 1
             return False, "nav_footer_content"
-        
+
         self.valid_chunks += 1
         return True, None
 
@@ -127,13 +127,13 @@ class DataTransformer:
             try:
                 with open(fp) as f:
                     doc = json.load(f)
-                
+
                 # Validate content before adding to chunks
                 is_valid, skip_reason = self.validate_content(doc)
                 if not is_valid:
                     logger.debug(f"Skipped {fp.name}: {skip_reason}")
                     continue
-                
+
                 content = self.clean(
                     doc.get("content", "")
                     or doc.get("question_body", "") + doc.get("answer_body", "")
@@ -189,20 +189,22 @@ class DataTransformer:
         total_raw = sum(raw_count for _, raw_count, _ in source_summary)
         total_chunks = len(all_chunks)
         total_unique = len(unique)
-        
-        print(f"\nValidation Summary:")
+
+        print("\nValidation Summary:")
         print(f"  Valid chunks: {self.valid_chunks}")
         print(f"  Skipped (too short): {self.skipped_too_short}")
         print(f"  Skipped (boilerplate): {self.skipped_boilerplate}")
         print(f"  Skipped (nav/footer): {self.skipped_low_quality}")
         print(f"  Skipped (invalid): {self.skipped_invalid}")
-        print(f"\nFinal result:")
+        print("\nFinal result:")
         print(
             f"  Saved {total_unique} unique chunks from {total_chunks} validated chunks ({total_raw} raw source docs)."
         )
         if total_chunks > 0:
             dedup_ratio = 100 * (total_chunks - total_unique) / total_chunks
-            print(f"  Deduplication removed {total_chunks - total_unique} duplicates ({dedup_ratio:.1f}%).")
+            print(
+                f"  Deduplication removed {total_chunks - total_unique} duplicates ({dedup_ratio:.1f}%)."
+            )
 
 
 if __name__ == "__main__":

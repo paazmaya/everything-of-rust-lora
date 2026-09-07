@@ -37,7 +37,7 @@ class GitHubCollector:
             )
         else:
             logger.info("Using authenticated GitHub API with GITHUB_TOKEN")
-        
+
         session = requests.Session()
         session.headers.update(
             {
@@ -68,13 +68,10 @@ class GitHubCollector:
         return None
 
     def collect_repo(self, repo):
-        import hashlib
-        import json
-        from datetime import datetime
-        
+
         out_dir = self.output_base / "github" / repo.replace("/", "_")
         out_dir.mkdir(parents=True, exist_ok=True)
-        
+
         files_to_collect = [
             ("README.md", "README"),
             ("CHANGELOG.md", "CHANGELOG"),
@@ -85,7 +82,7 @@ class GitHubCollector:
             ("PERFORMANCE.md", "PERFORMANCE"),
             ("docs/guide.md", "docs_guide"),
         ]
-        
+
         for fname, label in files_to_collect:
             try:
                 content = self.get_file(repo, fname)
@@ -109,7 +106,7 @@ class GitHubCollector:
                     logger.debug(f"File not found or empty: {repo}/{fname}")
             except Exception as e:
                 logger.warning(f"Error collecting {repo}/{fname}: {type(e).__name__}: {e}")
-        
+
         # Adaptive rate limiting based on token
         delay = 0.2 if self.github_token else 0.4
         time.sleep(delay)
@@ -127,7 +124,7 @@ class GitHubCollector:
         )
         if self.session.get_errors():
             print(f"\nCollection warnings: {len(self.session.get_errors())} URLs had issues.")
-            logger.info(f"See logs for details on failed URLs.")
+            logger.info("See logs for details on failed URLs.")
 
 
 if __name__ == "__main__":

@@ -45,55 +45,74 @@ class DocsRsCollector:
             return 0
         return sum(1 for _ in out_dir.rglob("*.json") if _.is_file())
 
+    def _extract_doc_links(self, soup, name):
+        """Extract all documentation links from crate index."""
+        links = set()
+        for link in soup.find_all("a", href=True):
+            href = link.get("href", "")
+            if ".html" in href and "#" not in href:
+                full_url = (
+                    f"https://docs.rs{href}"
+                    if href.startswith("/")
+                    else f"https://docs.rs/{name}/latest/{href}"
+                )
+                links.add(full_url)
+        return links
+
+    def _process_doc_link(self, link, crate, name, out_dir):
+        """Process a single documentation link and save if valid."""
+        sys.stdout.write(".")
+        sys.stdout.flush()
+        time.sleep(0.05)
+        r = self.session.get(link, timeout=30)
+        if not r:
+            return None
+        s = BeautifulSoup(r.text, "lxml")
+        main = s.find("div", class_="docblock") or s.find("main")
+        if not main or len(main.text) <= 200:
+            return None
+        title = s.find("h1").text.strip() if s.find("h1") else name
+        md = self.h2t.handle(str(main))
+        h = hashlib.sha256(md.encode()).hexdigest()[:16]
+        doc = {
+            "source": "docs_rs",
+            "source_type": "api_docs",
+            "url": link,
+            "title": title,
+            "content": md,
+            "metadata": {**crate, "crate_name": name},
+            "collected_at": datetime.now().isoformat(),
+        }
+        with open(out_dir / f"{h}.json", "w") as f:
+            json.dump(doc, f, indent=2)
+        return doc
+
+    def _fetch_crate_index(self, name):
+        """Fetch and parse crate index page."""
+        url = f"https://docs.rs/{name}/latest/{name}/"
+        resp = self.session.get(url, timeout=30)
+        if not resp or resp.status_code != 200:
+            logger.warning(
+                f"Failed to fetch crate index for {name}: status {resp.status_code if resp else 'no response'}"
+            )
+            return None
+        return BeautifulSoup(resp.text, "lxml")
+
     def collect_crate(self, crate):
         name = crate["name"]
         out_dir = self.output_base / "docs_rs" / name
         out_dir.mkdir(parents=True, exist_ok=True)
         docs = []
         try:
-            url = f"https://docs.rs/{name}/latest/{name}/"
-            resp = self.session.get(url, timeout=30)
-            if not resp or resp.status_code != 200:
-                logger.warning(f"Failed to fetch crate index for {name}: status {resp.status_code if resp else 'no response'}")
+            soup = self._fetch_crate_index(name)
+            if not soup:
                 return []
-            soup = BeautifulSoup(resp.text, "lxml")
-            links = set()
-            for link in soup.find_all("a", href=True):
-                href = link.get("href", "")
-                if ".html" in href and "#" not in href:
-                    full_url = (
-                        f"https://docs.rs{href}"
-                        if href.startswith("/")
-                        else f"https://docs.rs/{name}/latest/{href}"
-                    )
-                    if full_url not in links:
-                        links.add(full_url)
+            links = self._extract_doc_links(soup, name)
             for link in tqdm(links, desc=name, leave=False):
                 try:
-                    sys.stdout.write(".")
-                    sys.stdout.flush()
-                    time.sleep(0.05)
-                    r = self.session.get(link, timeout=30)
-                    if not r:  # Content not modified
-                        continue
-                    s = BeautifulSoup(r.text, "lxml")
-                    main = s.find("div", class_="docblock") or s.find("main")
-                    if main and len(main.text) > 200:
-                        title = s.find("h1").text.strip() if s.find("h1") else name
-                        md = self.h2t.handle(str(main))
-                        h = hashlib.sha256(md.encode()).hexdigest()[:16]
-                        doc = {
-                            "source": "docs_rs",
-                            "source_type": "api_docs",
-                            "url": link,
-                            "title": title,
-                            "content": md,
-                            "metadata": {**crate, "crate_name": name},
-                            "collected_at": datetime.now().isoformat(),
-                        }
+                    doc = self._process_doc_link(link, crate, name, out_dir)
+                    if doc:
                         docs.append(doc)
-                        with open(out_dir / f"{h}.json", "w") as f:
-                            json.dump(doc, f, indent=2)
                 except requests.Timeout as e:
                     logger.warning(f"Timeout fetching {link}: {e}")
                 except Exception as e:
@@ -117,7 +136,7 @@ class DocsRsCollector:
         )
         if self.session.get_errors():
             print(f"\nCollection warnings: {len(self.session.get_errors())} URLs had issues.")
-            logger.info(f"See logs for details on failed URLs.")
+            logger.info("See logs for details on failed URLs.")
 
 
 if __name__ == "__main__":
