@@ -99,6 +99,7 @@ Generate a token at: https://github.com/settings/tokens (requires `repo` and `re
    - How many chunks were accepted vs. filtered at each stage
    - Reasons for rejection (too short, boilerplate, nav/footer)
    - Deduplication statistics
+
 3. **Store in Vector Database (For Updates):**
 
    ```bash
@@ -169,9 +170,85 @@ Uses the base HuggingFace model (`ibm-granite/granite-4.1-8b`) or a local model 
    - **VRAM Requirement:** ~12-16GB.
    - **Note:** This script uses the ChatML prompt format native to Qwen.
 
+### Option C: Training NVIDIA Nemotron 3 Nano 4B
+
+The Nemotron 3 Nano training script provides production-grade features including validation, checkpointing, and hardware-aware configuration.
+
+1. **Review the configuration:**
+
+   ```bash
+   cat config/nemotron_training_config.yaml
+   ```
+
+2. **Validate configuration before training (recommended):**
+
+   ```bash
+   uv run python train_nemotron3_nano.py --dry-run
+   ```
+
+3. **Run training with default settings (RTX 4070 profile):**
+
+   ```bash
+   uv run python train_nemotron3_nano.py
+   ```
+
+4. **Alternative: Use different hardware profile:**
+
+   ```bash
+   # RTX 6000 (24GB VRAM)
+   uv run python train_nemotron3_nano.py --hardware-profile rtx6000
+
+   # A100 (40GB VRAM)
+   uv run python train_nemotron3_nano.py --hardware-profile a100
+
+   # Development (minimal resources, fast iteration)
+   uv run python train_nemotron3_nano.py --hardware-profile dev
+   ```
+
+5. **Resume from checkpoint:**
+
+   ```bash
+   uv run python train_nemotron3_nano.py --resume-from-checkpoint models/nemotron3_nano_rust_lora/checkpoints/checkpoint-50
+   ```
+
+6. **Enable experiment tracking (optional W&B):**
+   ```bash
+   uv run python train_nemotron3_nano.py --wandb-project my-project --wandb-entity my-team
+   ```
+
+**Features:**
+
+- **Validation Pipeline**: Checks CUDA availability, GPU memory, dependencies (including mamba-ssm for remote code), data existence, and JSONL schema
+- **Hardware Profiles**: Predefined settings for RTX 4070 (12GB), RTX 6000 (24GB), A100 (40GB), A100 80GB, and dev profiles
+- **Checkpointing**: Automatically saves checkpoints every 50 steps, resumable training supported
+- **Experiment Tracking**: Saves training metadata to `models/nemotron3_nano_rust_lora/manifest.json` for artifact lineage
+- **Flexible Configuration**: YAML-based config with CLI overrides for custom settings
+- **Dry-Run Mode**: Validate setup without training
+
+**Training Parameters (RTX 4070 default):**
+
+- **Batch Size:** 1 per device
+- **Gradient Accumulation:** 4
+- **Sequence Length:** 1024
+- **Learning Rate:** 2e-4
+- **Warmup Steps:** 10
+- **Epochs:** 3
+- **VRAM:** ~12GB
+
+**Advanced: Custom hyperparameters:**
+
+```bash
+uv run python train_nemotron3_nano.py \
+  --batch-size 2 \
+  --max-seq-length 2048 \
+  --num-epochs 5 \
+  --learning-rate 1e-4 \
+  --verbose
+```
+
 ### Training Configuration Details
 
-The current implementation uses two separate LoRA recipes:
+The current implementation uses three separate LoRA recipes:
 
 - `train_granite.py` (Granite 4.1 8B):
   - **Rank (r):** 64
@@ -193,6 +270,18 @@ The current implementation uses two separate LoRA recipes:
   - **Sequence Length:** 1024
   - **VRAM:** ~12GB
 
+- `train_nemotron3_nano.py` (Nemotron 3 Nano 4B):
+  - **Rank (r):** 16
+  - **Alpha:** 16
+  - **Target Modules:** `q_proj`, `k_proj`, `v_proj`, `o_proj`, `gate_proj`, `up_proj`, `down_proj`
+  - **Optimizer:** AdamW 8-bit
+  - **Scheduler:** Cosine
+  - **Batch Size:** 1 per device, gradient accumulation 4 (effective 4, configurable per hardware profile)
+  - **Sequence Length:** 1024 (configurable, up to 4096 on high-end GPUs)
+  - **VRAM:** ~12GB (RTX 4070), scales with hardware profile
+  - **Prompt Format:** ChatML-compatible with Rust expert persona
+  - **Key Features:** Hardware profiles, checkpointing, validation pipeline, W&B integration, dry-run mode
+
 ## Phase 4: Exporting to Ollama
 
 Once training is complete (either locally or downloaded from Unsloth Studio):
@@ -203,8 +292,10 @@ Once training is complete (either locally or downloaded from Unsloth Studio):
 
    ```bash
    uv run python scripts/09_create_modelfile.py --model models/granite_rust_lora --name rust-granite --base granite
-   
+
    uv run python scripts/09_create_modelfile.py --model models/qwen3_5_4b_rust_lora --name rust-qwen --base qwen
+
+   uv run python scripts/09_create_modelfile.py --model models/nemotron3_nano_rust_lora --name rust-nemotron --base nemotron
    ```
 
    Optionally, provide `--base-model` to override the base model ID or local path used in the generated `Modelfile`.
@@ -221,6 +312,9 @@ Once training is complete (either locally or downloaded from Unsloth Studio):
 
    # For Qwen 3.5 4B
    uv run python scripts/10_export_ollama.py --model models/qwen3_5_4b_rust_lora --name rust-qwen --base Qwen/Qwen3.5-4B
+
+   # For Nemotron 3 Nano 4B
+   uv run python scripts/10_export_ollama.py --model models/nemotron3_nano_rust_lora --name rust-nemotron --base NVIDIA/Nemotron-3-Nano-4B
    ```
 
    **Option 2: Use local GGUF or model file**
@@ -234,7 +328,6 @@ Once training is complete (either locally or downloaded from Unsloth Studio):
    _Script 10 merges the LoRA weights with the specified base model and quantizes the merged model to Q4_K_M._
 
 3. **Import into Ollama:**
-   
 
    ```bash
    ollama create rust-granite -f models/rust-granite_gguf/Modelfile
@@ -287,6 +380,18 @@ Because we stored the raw data in ChromaDB (a local vector database), you do not
 - **HuggingFace Blog (Granite 4.1):** https://huggingface.co/blog/ibm-granite/granite-4-1
 - **IBM Granite Documentation:** https://www.ibm.com/granite/docs/models/granite4-1
 
+## References: Qwen 3.5 4B
+
+- **Unsloth Documentation:** https://unsloth.ai/docs/models/qwen
+- **HuggingFace Model Card:** https://huggingface.co/Qwen/Qwen3.5-4B
+- **Qwen Documentation:** https://qwenlm.github.io/
+
+## References: NVIDIA Nemotron 3 Nano 4B
+
+- **Unsloth Documentation:** https://unsloth.ai/docs/models/nemotron-3
+- **HuggingFace Model Card:** https://huggingface.co/NVIDIA/Nemotron-3-Nano-4B
+- **Nemotron 3.5 Lightning Recipe:** https://github.com/NVIDIA-NeMo/Nemotron/blob/main/docs/nemotron/lightning35/README.md
+- **NVIDIA NeMo Documentation:** https://github.com/NVIDIA-NeMo/Nemotron
 
 ## License
 

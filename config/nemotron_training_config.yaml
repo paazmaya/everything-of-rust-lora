@@ -1,0 +1,122 @@
+# Nemotron 3 Nano LoRA Training Configuration
+# This file defines hardware profiles and training hyperparameters for reproducible runs.
+# See train_nemotron3_nano.py for CLI argument overrides.
+
+# Model Configuration
+model:
+  # HuggingFace model ID or local path
+  # Supports: NVIDIA/Nemotron-3-Nano-4B (default), NVIDIA/Nemotron-3-Nano-4B-Instruct, or local paths
+  name: "NVIDIA/Nemotron-3-Nano-4B"
+  # Enable trust_remote_code for local models with custom config/modeling files
+  trust_remote_code: false
+
+# Training Hyperparameters
+training:
+  max_seq_length: 1024
+  num_epochs: 3
+  learning_rate: 2e-4
+  warmup_steps: 10
+  weight_decay: 0.01
+  lr_scheduler_type: "cosine"
+  logging_steps: 10
+  seed: 3407
+
+# LoRA Configuration
+lora:
+  r: 16
+  lora_alpha: 16
+  lora_dropout: 0.0
+  bias: "none"
+  target_modules:
+    - "q_proj"
+    - "k_proj"
+    - "v_proj"
+    - "o_proj"
+    - "gate_proj"
+    - "up_proj"
+    - "down_proj"
+
+# Hardware Profiles
+# Select a profile via CLI: --hardware-profile rtx4070
+hardware_profiles:
+  # RTX 4070 (12GB VRAM) - consumer GPU, most common
+  rtx4070:
+    batch_size: 1
+    gradient_accumulation_steps: 4
+    max_seq_length: 1024
+    description: "NVIDIA RTX 4070 (12GB VRAM) - recommended default"
+
+  # RTX 6000 (24GB VRAM)
+  rtx6000:
+    batch_size: 2
+    gradient_accumulation_steps: 2
+    max_seq_length: 2048
+    description: "NVIDIA RTX 6000 (24GB VRAM) - larger batches"
+
+  # A100 (40GB VRAM)
+  a100:
+    batch_size: 4
+    gradient_accumulation_steps: 1
+    max_seq_length: 4096
+    description: "NVIDIA A100 (40GB VRAM) - high-end"
+
+  # A100 80GB
+  a100_80gb:
+    batch_size: 8
+    gradient_accumulation_steps: 1
+    max_seq_length: 4096
+    description: "NVIDIA A100 80GB - flagship"
+
+  # Development/Testing - minimal resources
+  dev:
+    batch_size: 1
+    gradient_accumulation_steps: 1
+    max_seq_length: 512
+    description: "Development profile - minimal VRAM, fast iteration"
+
+# Default hardware profile
+default_hardware_profile: "rtx4070"
+
+# Data Configuration
+data:
+  # Path to training data (JSONL format with instruction, input, output fields)
+  train_file: "data/datasets/train.jsonl"
+  # Validation data (optional)
+  validation_file: null
+  # Expected fields in JSONL records
+  required_fields:
+    - "instruction"
+    - "input"
+    - "output"
+
+# Output Configuration
+output:
+  # Directory to save LoRA adapter
+  model_dir: "models/nemotron3_nano_rust_lora"
+  # Directory to save training checkpoints
+  checkpoint_dir: "models/nemotron3_nano_rust_lora/checkpoints"
+  # Save strategy: "steps", "epoch", or "no"
+  save_strategy: "steps"
+  # Save every N steps (only used if save_strategy is "steps")
+  save_steps: 50
+  # Keep only the last N checkpoints
+  keep_checkpoint_max: 3
+
+# Experiment Tracking (optional)
+tracking:
+  # Weights & Biases project (optional, set to null to disable)
+  wandb_project: null
+  wandb_entity: null
+  # Local artifact manifest (always enabled)
+  artifact_manifest: "models/nemotron3_nano_rust_lora/manifest.json"
+
+# Validation
+validation:
+  # Check for data file existence before training
+  check_data_exists: true
+  # Validate data format (check required fields on first record)
+  validate_data_schema: true
+  # Check GPU memory availability
+  check_gpu_memory: true
+  # Minimum VRAM required (GB) - defaults based on hardware profile
+  min_vram_gb: 12
