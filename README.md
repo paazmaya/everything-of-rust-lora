@@ -81,7 +81,9 @@ Generate a token at: https://github.com/settings/tokens (requires `repo` and `re
 
    **Error Handling**: All errors are logged to stdout. If collection is interrupted, you can resume by re-running the same script—already-collected pages are cached and skipped.
 
-2. **Transform and Chunk Data:
+   **Version Awareness**: Crate versions, GitHub release tags, changelog sections, and Rust editions are automatically extracted and partitioned under `data/raw/{source}/{version}/`. When new versions are pulled in subsequent runs, previous versions are preserved. See [VERSIONING.md](VERSIONING.md) for full details.
+
+2. **Transform and Chunk Data:**
 
    ```bash
    uv run python scripts/06_transform_data.py
@@ -92,25 +94,39 @@ Generate a token at: https://github.com/settings/tokens (requires `repo` and `re
    - **Minimum content length**: 200 characters (filters low-value snippets)
    - **Boilerplate detection**: Removes copyright notices, "Follow us on X", "Subscribe", etc. (prevents LLM degradation)
    - **Navigation/footer filtering**: Skips content with >30% link density (nav menus are not useful for training)
-   - **Deduplication**: Removes exact duplicates by content hash
+   - **Version-aware deduplication**: Deduplicates using `sha256(source_type:library:version:content)`, ensuring shared code between different versions is preserved for each version while removing identical duplicates within the same version.
    - **Token counting**: Uses tiktoken to count tokens for training efficiency
 
    The script outputs a validation summary showing:
    - How many chunks were accepted vs. filtered at each stage
    - Reasons for rejection (too short, boilerplate, nav/footer)
-   - Deduplication statistics
+   - Deduplication statistics and unique `(library, version)` pairs tracked
 
-3. **Store in Vector Database (For Updates):**
+3. **Store in Vector Database (For Updates & Version-Aware RAG):**
 
    ```bash
+   # Index all chunks into ChromaDB
    uv run python scripts/07_vector_store.py
+
+   # Query with version filtering
+   uv run python scripts/07_vector_store.py --library axum --version 0.7.5 --query "routing and state"
+
+   # Query migration guidance between versions
+   uv run python scripts/07_vector_store.py --library axum --migrate-from 0.6.20 --migrate-to 0.7.5 --query "handlers"
+
+   # List tracked libraries and versions
+   uv run python scripts/07_vector_store.py --list-versions
    ```
 
 4. **Create Training Dataset:**
    ```bash
    uv run python scripts/08_create_dataset.py
    ```
-   _Outputs `data/datasets/train.jsonl` and `val.jsonl` in Alpaca format._
+   _Outputs `data/datasets/train.jsonl` and `val.jsonl` in Alpaca format with version-grounded instructions and migration questions._
+
+## Versioning & Migration Architecture
+
+For complete architectural details on multi-version retention, changelog section extraction, RAG querying, and Alpaca prompt generation, see [VERSIONING.md](VERSIONING.md).
 
 ## Code Formatting
 
@@ -129,9 +145,9 @@ uv run ruff check . --fix
 
 ## Phase 3: Training with Unsloth Studio
 
-### Option A: Training IBM Granite 4.1 8B
+### Option A: Training IBM Granite 4.2 8B
 
-Uses the base HuggingFace model (`ibm-granite/granite-4.1-8b`) or a local model directory. The export script will later merge LoRA and create GGUF.
+Uses the base HuggingFace model (`ibm-granite/granite-4.2-8b`) or a local model directory. The export script will later merge LoRA and create GGUF.
 
 1. Upload your project folder to Unsloth Studio (or upload `data/datasets/train.jsonl` directly).
 2. Open `train_granite.py` in the studio.
@@ -147,7 +163,7 @@ Uses the base HuggingFace model (`ibm-granite/granite-4.1-8b`) or a local model 
    **Option 2: Use local model directory**
 
    ```bash
-   uv run python train_granite.py --model-path /path/to/granite-4.1-8b
+   uv run python train_granite.py --model-path /path/to/granite-4.2-8b
    ```
 
    **Advanced: override training sizing**
@@ -250,7 +266,7 @@ uv run python train_nemotron3_nano.py \
 
 The current implementation uses three separate LoRA recipes:
 
-- `train_granite.py` (Granite 4.1 8B):
+- `train_granite.py` (Granite 4.2 8B):
   - **Rank (r):** 64
   - **Alpha:** 128
   - **Target Modules:** `q_proj`, `k_proj`, `v_proj`, `o_proj`, `gate_proj`, `up_proj`, `down_proj`
@@ -307,8 +323,8 @@ Once training is complete (either locally or downloaded from Unsloth Studio):
    **Option 1: Standard export (downloads base model from HuggingFace if not cached)**
 
    ```bash
-   # For Granite 4.1 8B
-   uv run python scripts/10_export_ollama.py --model models/granite_rust_lora --name rust-granite --base ibm-granite/granite-4.1-8b
+   # For Granite 4.2 8B
+   uv run python scripts/10_export_ollama.py --model models/granite_rust_lora --name rust-granite --base ibm-granite/granite-4.2-8b
 
    # For Qwen 3.5 4B
    uv run python scripts/10_export_ollama.py --model models/qwen3_5_4b_rust_lora --name rust-qwen --base Qwen/Qwen3.5-4B
@@ -320,7 +336,7 @@ Once training is complete (either locally or downloaded from Unsloth Studio):
    **Option 2: Use local GGUF or model file**
 
    ```bash
-   uv run python scripts/10_export_ollama.py --model models/granite_rust_lora --name rust-granite --base /path/to/granite-4.1-8b-Q4_K_M.gguf
+   uv run python scripts/10_export_ollama.py --model models/granite_rust_lora --name rust-granite --base /path/to/granite-4.2-8b-Q4_K_M.gguf
    ```
 
    _(This skips downloading from HuggingFace and uses your local file directly.)_
@@ -373,10 +389,10 @@ Because we stored the raw data in ChromaDB (a local vector database), you do not
    # Re-run train_granite.py in Unsloth Studio
    ```
 
-## References: IBM Granite 4.1 8B
+## References: IBM Granite 4.2 8B
 
 - **Unsloth Documentation:** https://unsloth.ai/docs/models/ibm-granite-4.1
-- **HuggingFace Model Card (GGUF):** https://huggingface.co/unsloth/granite-4.1-8b-GGUF?show_file_info=granite-4.1-8b-Q4_K_M.gguf
+- **HuggingFace Model Card (GGUF):** https://huggingface.co/ibm-granite/granite-4.2-8b-GGUF
 - **HuggingFace Blog (Granite 4.1):** https://huggingface.co/blog/ibm-granite/granite-4-1
 - **IBM Granite Documentation:** https://www.ibm.com/granite/docs/models/granite4-1
 

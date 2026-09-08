@@ -53,6 +53,7 @@ import json
 import logging
 import os
 import sys
+from collections.abc import Sized
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -178,7 +179,7 @@ def check_dependencies(trust_remote_code: bool = False) -> bool:
 
     if trust_remote_code:
         try:
-            import mamba_ssm  # noqa: F401
+            import mamba_ssm  # pyright: ignore[reportMissingImports] # noqa: F401
         except ImportError:
             logger.warning(
                 "The model requires `mamba-ssm` package when trust_remote_code=True.\n"
@@ -195,7 +196,7 @@ def check_dependencies(trust_remote_code: bool = False) -> bool:
     return True
 
 
-def validate_data_file(data_path: str, required_fields: list | None = None) -> bool:
+def validate_data_file(data_path: str, required_fields: list[str] | None = None) -> bool:
     """Validate training data file exists and has correct schema."""
     if not os.path.exists(data_path):
         logger.error(f"Training data not found at: {data_path}")
@@ -391,11 +392,11 @@ You are an expert Rust programmer, specializing in systems programming, async Ru
 <|im_start|>assistant
 {}"""
 
-    def formatting_prompts_func(examples):
+    def formatting_prompts_func(examples: dict[str, list[str]]) -> dict[str, list[str]]:
         instructions = examples["instruction"]
         inputs = examples["input"]
         outputs = examples["output"]
-        texts = []
+        texts: list[str] = []
         for instruction, input_text, output in zip(instructions, inputs, outputs, strict=False):
             user_msg = instruction + "\n" + input_text if input_text else instruction
             text = nemotron_prompt.format(user_msg, "", output) + "<|im_end|>"
@@ -405,7 +406,8 @@ You are an expert Rust programmer, specializing in systems programming, async Ru
     # Load dataset
     logger.info(f"Loading training data from: {data_file}")
     dataset = load_dataset("json", data_files=data_file, split="train")
-    logger.info(f"Dataset size: {len(dataset)} samples")
+    if isinstance(dataset, Sized):
+        logger.info(f"Dataset size: {len(dataset)} samples")
 
     # Format dataset
     dataset = dataset.map(formatting_prompts_func, batched=True)
@@ -423,7 +425,7 @@ You are an expert Rust programmer, specializing in systems programming, async Ru
         logging_steps=logging_steps,
         output_dir=checkpoint_dir,
         save_strategy=save_strategy,
-        save_steps=save_steps if save_strategy == "steps" else None,
+        save_steps=save_steps if save_strategy == "steps" else 500,
         optim="adamw_8bit",
         weight_decay=weight_decay,
         lr_scheduler_type=lr_scheduler_type,
@@ -435,10 +437,10 @@ You are an expert Rust programmer, specializing in systems programming, async Ru
     # Initialize trainer
     trainer = SFTTrainer(
         model=model,
-        tokenizer=tokenizer,
+        tokenizer=tokenizer,  # pyright: ignore[reportCallIssue]
         train_dataset=dataset,
-        dataset_text_field="text",
-        max_seq_length=max_seq_length,
+        dataset_text_field="text",  # pyright: ignore[reportCallIssue]
+        max_seq_length=max_seq_length,  # pyright: ignore[reportCallIssue]
         args=training_args,
     )
 

@@ -17,13 +17,14 @@ import argparse
 import datetime
 import json
 from pathlib import Path
+from typing import Any
 
 BASE_MODEL_METADATA: dict[str, dict[str, str]] = {
     "granite": {
-        "name": "IBM Granite 4.1 8B",
-        "reference": "ibm-granite/granite-4.1-8b",
-        "gguf": "unsloth/granite-4.1-8b-GGUF",
-        "source_url": "https://huggingface.co/unsloth/granite-4.1-8b-GGUF",
+        "name": "IBM Granite 4.2 8B",
+        "reference": "ibm-granite/granite-4.2-8b",
+        "gguf": "ibm-granite/granite-4.2-8b-GGUF",
+        "source_url": "https://huggingface.co/ibm-granite/granite-4.2-8b-GGUF",
         "training_economics": (
             "LoRA rank=64, alpha=128, optimizer=AdamW 8-bit, scheduler=cosine, "
             "batch_size=1, gradient_accumulation_steps=8 (effective=8), epochs=3, "
@@ -76,7 +77,7 @@ def get_base_metadata(base_key: str) -> dict[str, str]:
     return BASE_MODEL_METADATA[base_key]
 
 
-def safe_yaml_scalar(raw: str) -> str:
+def safe_yaml_scalar(raw: Any) -> str:
     text = str(raw)
     if "\n" in text:
         escaped = text.replace("'", "''")
@@ -139,8 +140,8 @@ def build_modelfile_content(
     base_override: str | None = None,
 ) -> str:
     base_reference = base_override or base_metadata["reference"]
-    created_at = datetime.datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
-    adapter_id = adapter_config.get("adapter_id", "unknown")
+    created_at = datetime.datetime.now(datetime.UTC).replace(microsecond=0).isoformat()
+    adapter_id = str(adapter_config.get("adapter_id", "unknown"))
     adapter_files = inventory_files(adapter_dir)
     merge_command = (
         f"python scripts/10_export_ollama.py --model {adapter_dir.as_posix()} "

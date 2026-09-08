@@ -81,11 +81,11 @@ You are an expert Rust programmer, specializing in systems programming, async Ru
 <|im_start|>assistant
 {}"""
 
-    def formatting_prompts_func(examples):
+    def formatting_prompts_func(examples: dict[str, list[str]]) -> dict[str, list[str]]:
         instructions = examples["instruction"]
         inputs = examples["input"]
         outputs = examples["output"]
-        texts = []
+        texts: list[str] = []
         for instruction, input, output in zip(instructions, inputs, outputs, strict=False):
             user_msg = instruction + "\n" + input if input else instruction
             text = qwen_prompt.format(user_msg, "", output) + "<|im_end|>"
@@ -97,10 +97,10 @@ You are an expert Rust programmer, specializing in systems programming, async Ru
 
     trainer = SFTTrainer(
         model=model,
-        tokenizer=tokenizer,
+        tokenizer=tokenizer,  # pyright: ignore[reportCallIssue]
         train_dataset=dataset,
-        dataset_text_field="text",
-        max_seq_length=max_seq_length,
+        dataset_text_field="text",  # pyright: ignore[reportCallIssue]
+        max_seq_length=max_seq_length,  # pyright: ignore[reportCallIssue]
         args=TrainingArguments(
             per_device_train_batch_size=batch_size,
             gradient_accumulation_steps=gradient_accumulation_steps,

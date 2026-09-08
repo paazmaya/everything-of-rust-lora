@@ -133,11 +133,11 @@ def train_granite(
 ### Response:
 {}"""
 
-    def formatting_prompts_func(examples):
+    def formatting_prompts_func(examples: dict[str, list[str]]) -> dict[str, list[str]]:
         instructions = examples["instruction"]
         inputs = examples["input"]
         outputs = examples["output"]
-        texts = []
+        texts: list[str] = []
         for instruction, input, output in zip(instructions, inputs, outputs, strict=False):
             text = alpaca_prompt.format(instruction, input, output) + tokenizer.eos_token
             texts.append(text)

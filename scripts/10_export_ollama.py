@@ -3,34 +3,39 @@
 Export trained LoRA to Ollama GGUF format with Q4_K_M quantization.
 Run this AFTER training is complete.
 
-Quantization: Q4_K_M (4-bit K_M) - recommended for Granite 4.1 8B
-See: https://huggingface.co/unsloth/granite-4.1-8b-GGUF?show_file_info=granite-4.1-8b-Q4_K_M.gguf
+Quantization: Q4_K_M (4-bit K_M) - recommended for Granite 4.2 8B
+See: https://huggingface.co/ibm-granite/granite-4.2-8b-GGUF?show_file_info=granite-4.2-8b-Q4_K_M.gguf
 
 Documentation References:
 - Unsloth: https://unsloth.ai/docs/models/ibm-granite-4.1
-- HF Model Card: https://huggingface.co/unsloth/granite-4.1-8b-GGUF?show_file_info=granite-4.1-8b-Q4_K_M.gguf
+- HF Model Card: https://huggingface.co/ibm-granite/granite-4.2-8b-GGUF
 - HF Blog: https://huggingface.co/blog/ibm-granite/granite-4-1
 - IBM Docs: https://www.ibm.com/granite/docs/models/granite4-1
 """
 
 import os
+from typing import Any
 
 from peft import PeftModel
 from unsloth import FastLanguageModel
 
 
-def export_to_ollama(model_path: str, model_name: str, base_model: str, quant: str = "q4_k_m"):
+def export_to_ollama(
+    model_path: str, model_name: str, base_model: str, quant: str = "q4_k_m"
+) -> None:
     """
     Export trained LoRA to GGUF format and create Ollama Modelfile.
 
     Args:
-        model: Path to trained LoRA weights (e.g., models/granite_rust_lora)
-        name: Name for the exported model (e.g., rust-granite)
-        base: Base model identifier or local path. Can be:
-            - HuggingFace model ID: "unsloth/granite-4.1-8b-GGUF" (downloads if not cached)
-            - Local file path: "/path/to/granite-4.1-8b-Q4_K_M.gguf" (no download needed)
+        model_path: Path to trained LoRA weights (e.g., models/granite_rust_lora)
+        model_name: Name for the exported model (e.g., rust-granite)
+        base_model: Base model identifier or local path. Can be:
+            - HuggingFace model ID: "ibm-granite/granite-4.2-8b-GGUF" (downloads if not cached)
+            - Local file path: "/path/to/granite-4.2-8b-Q4_K_M.gguf" (no download needed)
         quant: Quantization method (default: q4_k_m = Q4_K_M, 4-bit K_M)
     """
+    model: Any
+    tokenizer: Any
     if os.path.isdir(model_path) and os.path.exists(
         os.path.join(model_path, "adapter_config.json")
     ):
@@ -116,8 +121,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--base",
         type=str,
-        default="unsloth/granite-4.1-8b-GGUF",
-        help="Base model (HF model ID or local GGUF file path). Examples: 'unsloth/granite-4.1-8b-GGUF' or '/path/to/granite-4.1-8b-Q4_K_M.gguf'",
+        default="ibm-granite/granite-4.2-8b-GGUF",
+        help="Base model (HF model ID or local GGUF file path). Examples: 'ibm-granite/granite-4.2-8b-GGUF' or '/path/to/granite-4.2-8b-Q4_K_M.gguf'",
     )
     parser.add_argument(
         "--quant",

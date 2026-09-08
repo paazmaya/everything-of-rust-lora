@@ -8,6 +8,7 @@ Supports checkpoint/resume for resilient collection.
 
 import json
 import logging
+from collections.abc import Mapping
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -21,13 +22,13 @@ logger = logging.getLogger("rust_lora.cache")
 class CacheMetadata:
     """Manages cache metadata for fetched URLs."""
 
-    def __init__(self, cache_dir: Path = None):
+    def __init__(self, cache_dir: Path | None = None) -> None:
         if cache_dir is None:
             cache_dir = Path(__file__).parent.parent / "data" / ".cache"
-        self.cache_dir = cache_dir
+        self.cache_dir: Path = cache_dir
         self.cache_dir.mkdir(parents=True, exist_ok=True)
-        self.cache_file = self.cache_dir / "fetch_metadata.json"
-        self.metadata = self._load()
+        self.cache_file: Path = self.cache_dir / "fetch_metadata.json"
+        self.metadata: dict[str, dict[str, Any]] = self._load()
 
     def _load(self) -> dict[str, dict[str, Any]]:
         """Load existing cache metadata."""
@@ -39,7 +40,7 @@ class CacheMetadata:
                 return {}
         return {}
 
-    def _save(self):
+    def _save(self) -> None:
         """Save cache metadata to disk."""
         with open(self.cache_file, "w") as f:
             json.dump(self.metadata, f, indent=2)
@@ -48,7 +49,7 @@ class CacheMetadata:
         """Get cached metadata for a URL."""
         return self.metadata.get(url)
 
-    def should_fetch(self, url: str, response_headers: dict) -> bool:
+    def should_fetch(self, url: str, response_headers: Mapping[str, str]) -> bool:
         """
         Check if URL should be fetched based on cache.
         Returns True if:
@@ -72,9 +73,9 @@ class CacheMetadata:
 
         return True
 
-    def update(self, url: str, response_headers: dict):
+    def update(self, url: str, response_headers: Mapping[str, str]) -> None:
         """Update cache metadata after a successful fetch."""
-        headers_to_cache = {}
+        headers_to_cache: dict[str, str] = {}
         if "etag" in response_headers:
             headers_to_cache["etag"] = response_headers["etag"]
         if "last-modified" in response_headers:
@@ -90,15 +91,17 @@ class CacheMetadata:
 class CollectionCheckpoint:
     """Tracks collection progress for resumable collection."""
 
-    def __init__(self, cache_dir: Path = None, checkpoint_name: str = "collection_checkpoint"):
+    def __init__(
+        self, cache_dir: Path | None = None, checkpoint_name: str = "collection_checkpoint"
+    ) -> None:
         if cache_dir is None:
             cache_dir = Path(__file__).parent.parent / "data" / ".cache"
-        self.cache_dir = cache_dir
+        self.cache_dir: Path = cache_dir
         self.cache_dir.mkdir(parents=True, exist_ok=True)
-        self.checkpoint_file = self.cache_dir / f"{checkpoint_name}.json"
-        self.checkpoint = self._load()
+        self.checkpoint_file: Path = self.cache_dir / f"{checkpoint_name}.json"
+        self.checkpoint: dict[str, Any] = self._load()
 
-    def _load(self) -> dict:
+    def _load(self) -> dict[str, Any]:
         """Load existing checkpoint."""
         if self.checkpoint_file.exists():
             try:
@@ -108,10 +111,11 @@ class CollectionCheckpoint:
                 return {"processed_urls": set(), "last_run": None}
         return {"processed_urls": set(), "last_run": None}
 
-    def _save(self):
+    def _save(self) -> None:
         """Save checkpoint, converting sets to lists for JSON."""
-        data = {
-            "processed_urls": list(self.checkpoint.get("processed_urls", [])),
+        processed_list: list[str] = list(self.checkpoint.get("processed_urls", []))
+        data: dict[str, Any] = {
+            "processed_urls": processed_list,
             "last_run": self.checkpoint.get("last_run"),
             "checkpoint_time": datetime.now().isoformat(),
         }
@@ -120,27 +124,22 @@ class CollectionCheckpoint:
 
     def is_processed(self, url: str) -> bool:
         """Check if URL has been processed."""
-        processed = self.checkpoint.get("processed_urls", [])
-        if isinstance(processed, list):
-            return url in processed
+        processed: list[str] = list(self.checkpoint.get("processed_urls", []))
         return url in processed
 
-    def mark_processed(self, url: str):
+    def mark_processed(self, url: str) -> None:
         """Mark URL as processed."""
-        if "processed_urls" not in self.checkpoint:
-            self.checkpoint["processed_urls"] = set()
-        elif isinstance(self.checkpoint["processed_urls"], list):
-            self.checkpoint["processed_urls"] = set(self.checkpoint["processed_urls"])
+        if "processed_urls" not in self.checkpoint or not isinstance(
+            self.checkpoint["processed_urls"], set
+        ):
+            self.checkpoint["processed_urls"] = set(self.checkpoint.get("processed_urls", []))
         self.checkpoint["processed_urls"].add(url)
         self._save()
 
-    def get_stats(self) -> dict:
+    def get_stats(self) -> dict[str, Any]:
         """Get checkpoint statistics."""
         processed = self.checkpoint.get("processed_urls", [])
-        if isinstance(processed, list):
-            count = len(processed)
-        else:
-            count = len(processed)
+        count = len(processed)
         return {
             "processed_count": count,
             "last_run": self.checkpoint.get("last_run"),
@@ -150,15 +149,15 @@ class CollectionCheckpoint:
 class CachedSession:
     """Session wrapper that handles conditional requests with error tracking."""
 
-    def __init__(self, session: requests.Session, cache_dir: Path = None):
-        self.session = session
-        self.cache = CacheMetadata(cache_dir)
-        self.skipped_count = 0
-        self.fetched_count = 0
-        self.error_count = 0
+    def __init__(self, session: requests.Session, cache_dir: Path | None = None) -> None:
+        self.session: requests.Session = session
+        self.cache: CacheMetadata = CacheMetadata(cache_dir)
+        self.skipped_count: int = 0
+        self.fetched_count: int = 0
+        self.error_count: int = 0
         self.errors: list[dict[str, str]] = []  # Track errors for reporting
 
-    def get(self, url: str, **kwargs) -> requests.Response | None:
+    def get(self, url: str, **kwargs: Any) -> requests.Response | None:
         """
         Fetch URL with conditional request support.
         Returns None if content hasn't changed (304 Not Modified).
