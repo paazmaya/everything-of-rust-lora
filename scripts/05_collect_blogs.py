@@ -5,9 +5,11 @@ import logging
 import re
 import sys
 import time
+from collections import deque
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+from urllib.parse import urldefrag, urljoin, urlparse
 
 import feedparser
 import html2text
@@ -70,7 +72,7 @@ class BlogsCollector:
         self.h2t = html2text.HTML2Text()
         self.h2t.ignore_images = True
 
-        # Load blogs and best_practices sources
+        # Load blogs, best_practices, security, and web_frameworks sources
         with open(CONFIG_DIR / "sources.yaml") as f:
             config = yaml.safe_load(f)
 
@@ -82,7 +84,8 @@ class BlogsCollector:
 
         self.sites: list[tuple[str, str, str]] = [
             (source["url"], source["output_dir"].replace("raw/", ""), source["name"])
-            for source in config.get("best_practices", [])
+            for section in ["best_practices", "security", "web_frameworks"]
+            for source in config.get(section, [])
         ]
 
     def count_files(self, out_dir: Path) -> int:
@@ -103,7 +106,9 @@ class BlogsCollector:
                 if not r:  # Content not modified
                     continue
                 s = BeautifulSoup(r.text, "lxml")
-                article = s.find("article") or s.find("main")
+                article = (
+                    s.find("article") or s.find("main") or s.find("div", class_="content") or s.body
+                )
                 content = self.h2t.handle(str(article)) if article else ""
                 if len(content) > 300:
                     version, version_type = extract_feed_version(entry)
@@ -142,37 +147,112 @@ class BlogsCollector:
             except Exception as e:
                 logger.warning(f"Error processing {entry.link}: {type(e).__name__}: {e}")
 
-    def _extract_site_links(self, soup: BeautifulSoup, base_url: str) -> set[str]:
-        """Extract all HTML links from site index."""
-        links: set[str] = set()
-        for link in soup.find_all("a", href=True):
-            href = str(link.get("href", ""))
-            if href.endswith(".html") and not href.startswith("http"):
-                full_url = base_url + href if href.startswith("/") else href
-                links.add(full_url)
-        return links
+    def collect_github_repo(self, url: str, rel: str, name: str | None = None) -> None:
+        source_name = name or rel.split("/")[-1]
+        out_dir = self.output_base / rel
+        logger.info(f"Collecting GitHub repo {source_name} from {url}")
+        parsed = urlparse(url)
+        parts = [p for p in parsed.path.split("/") if p]
+        if len(parts) < 2:
+            return
+        repo = f"{parts[0]}/{parts[1]}"
+        for branch in ["main", "master"]:
+            raw_url = f"https://raw.githubusercontent.com/{repo}/{branch}/README.md"
+            try:
+                r = self.session.get(raw_url, timeout=30)
+                if not r:
+                    continue
+                content = r.text
+                if len(content) > 200:
+                    target_dir = out_dir / "current"
+                    target_dir.mkdir(parents=True, exist_ok=True)
+                    h = hashlib.sha256(
+                        f"best_practices:{source_name}:current:{raw_url}:{content}".encode()
+                    ).hexdigest()[:16]
+                    with open(target_dir / f"{h}.json", "w") as f:
+                        json.dump(
+                            {
+                                "source": "best_practices",
+                                "source_type": "best_practices",
+                                "library": source_name,
+                                "version": "current",
+                                "version_type": "git_branch",
+                                "is_latest": True,
+                                "url": url,
+                                "title": source_name.replace("_", " ").title(),
+                                "content": content,
+                                "metadata": {
+                                    "site_url": url,
+                                    "source": source_name,
+                                    "repo": repo,
+                                    "branch": branch,
+                                    "version": "current",
+                                },
+                                "collected_at": datetime.now().isoformat(),
+                            },
+                            f,
+                            indent=2,
+                        )
+                    break
+            except Exception as e:
+                logger.warning(f"Error fetching repo {repo}: {e}")
+
+    def _is_valid_site_url(self, url: str, base_domain: str, base_path: str) -> bool:
+        parsed = urlparse(url)
+        if parsed.netloc != base_domain:
+            return False
+        if not parsed.path.startswith(base_path):
+            return False
+        lower = parsed.path.lower()
+        if any(
+            lower.endswith(ext)
+            for ext in [
+                ".png",
+                ".jpg",
+                ".jpeg",
+                ".gif",
+                ".svg",
+                ".webp",
+                ".ico",
+                ".css",
+                ".js",
+                ".pdf",
+                ".zip",
+                ".tar.gz",
+                ".xml",
+            ]
+        ):
+            return False
+        return True
+
+    def _extract_site_content(self, soup: BeautifulSoup) -> Any:
+        return (
+            soup.find("main")
+            or soup.find("article")
+            or soup.find("div", class_="content")
+            or soup.find("div", class_="page")
+            or soup.find("div", class_="theme-doc-markdown")
+            or soup.find("div", id="content")
+            or soup.body
+        )
 
     def _process_site_link(
         self,
+        soup: BeautifulSoup,
         link: str,
         out_dir: Path,
         base_url: str,
         rel: str,
         source_name: str,
     ) -> None:
-        """Process a single site link and save if valid."""
-        sys.stdout.write(".")
-        sys.stdout.flush()
-        r = self.session.get(link, timeout=30)
-        if not r:
-            return
-        s = BeautifulSoup(r.text, "lxml")
-        main = s.find("main")
+        main = self._extract_site_content(soup)
         if not main:
             return
-        title_tag = s.find("h1")
+        title_tag = soup.find("h1")
         if title_tag:
             title_text = title_tag.get_text(strip=True)
+        elif soup.title and soup.title.string:
+            title_text = soup.title.string.strip()
         else:
             title_text = rel.split("/")[-1]
         md = self.h2t.handle(str(main))
@@ -208,37 +288,81 @@ class BlogsCollector:
                 indent=2,
             )
 
-    def _fetch_site_index(self, url: str) -> BeautifulSoup | None:
-        """Fetch and parse site index page."""
-        resp = self.session.get(url, timeout=30)
-        if not resp:
-            return None
-        return BeautifulSoup(resp.text, "lxml")
+    def _compute_base_path(self, parsed_path: str) -> str:
+        parts = [p for p in parsed_path.split("/") if p]
+        if parts and parts[-1].endswith((".html", ".htm")):
+            parts = parts[:-1]
+        return "/" + "/".join(parts) + "/" if parts else "/"
+
+    def _crawl_page(
+        self,
+        current_url: str,
+        out_dir: Path,
+        base_url: str,
+        rel: str,
+        source_name: str,
+        base_domain: str,
+        base_path: str,
+        visited: set[str],
+        queue: deque[str],
+    ) -> None:
+        r = self.session.get(current_url, timeout=30)
+        if not r:
+            return
+        soup = BeautifulSoup(r.text, "lxml")
+        self._process_site_link(soup, current_url, out_dir, base_url, rel, source_name)
+        for a in soup.find_all("a", href=True):
+            href = str(a.get("href", "")).strip()
+            if not href or href.startswith(("mailto:", "javascript:", "#")):
+                continue
+            next_url = urldefrag(urljoin(current_url, href))[0]
+            if next_url not in visited and self._is_valid_site_url(
+                next_url, base_domain, base_path
+            ):
+                queue.append(next_url)
 
     def collect_site(self, url: str, rel: str, name: str | None = None) -> None:
         out_dir = self.output_base / rel
         source_name = name or rel.split("/")[-1]
+
+        parsed = urlparse(url)
+        if parsed.netloc == "github.com":
+            self.collect_github_repo(url, rel, name)
+            return
+
+        base_url = urldefrag(url)[0]
+        base_domain = parsed.netloc
+        base_path = self._compute_base_path(parsed.path)
+
         visited: set[str] = set()
+        queue: deque[str] = deque([base_url])
+        max_pages = 500
+
         logger.info(f"Collecting {source_name} from {url}")
-        try:
-            soup = self._fetch_site_index(url)
-            if not soup:
-                return
-            links = self._extract_site_links(soup, url)
-            for link in tqdm(links, leave=False):
-                if link in visited:
-                    continue
-                visited.add(link)
-                try:
-                    self._process_site_link(link, out_dir, url, rel, source_name)
-                except requests.Timeout as e:
-                    logger.warning(f"Timeout fetching {link}: {e}")
-                except Exception as e:
-                    logger.warning(f"Error processing {link}: {type(e).__name__}: {e}")
-        except requests.Timeout as e:
-            logger.warning(f"Timeout fetching site index {url}: {e}")
-        except Exception as e:
-            logger.warning(f"Error collecting from {url}: {type(e).__name__}: {e}")
+        while queue and len(visited) < max_pages:
+            current_url = queue.popleft()
+            if current_url in visited:
+                continue
+            visited.add(current_url)
+            sys.stdout.write(".")
+            sys.stdout.flush()
+
+            try:
+                self._crawl_page(
+                    current_url,
+                    out_dir,
+                    base_url,
+                    rel,
+                    source_name,
+                    base_domain,
+                    base_path,
+                    visited,
+                    queue,
+                )
+            except requests.Timeout as e:
+                logger.warning(f"Timeout fetching {current_url}: {e}")
+            except Exception as e:
+                logger.warning(f"Error processing {current_url}: {type(e).__name__}: {e}")
 
     def run_all(self) -> None:
         print("Collecting Blogs & Best Practices...")

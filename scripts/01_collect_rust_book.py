@@ -58,10 +58,10 @@ class RustDocCollector:
         self.h2t.body_width = 0
         self.visited: set[str] = set()
 
-        # Load official documentation and blog sources
+        # Load official documentation sources
         with open(CONFIG_DIR / "sources.yaml") as f:
             config = yaml.safe_load(f)
-        self.sources: list[dict[str, Any]] = config.get("sources", []) + config.get("blogs", [])
+        self.sources: list[dict[str, Any]] = config.get("sources", [])
 
     def _save(
         self,
@@ -112,10 +112,20 @@ class RustDocCollector:
         return not href.startswith(("mailto:", "javascript:"))
 
     def _is_valid_page_url(self, parsed_url: ParseResult, base_domain: str, base_path: str) -> bool:
-        """Check if parsed URL is within boundaries."""
+        """Check if parsed URL is within boundaries and is a documentation page."""
         if parsed_url.netloc != base_domain:
             return False
         if not parsed_url.path.startswith(base_path):
+            return False
+        # Do not crawl source views, UI pages, or print.html
+        if "/src/" in parsed_url.path or any(
+            parsed_url.path.endswith(b)
+            for b in ["print.html", "all.html", "help.html", "settings.html"]
+        ):
+            return False
+        # Skip trivial single-item declaration subpages
+        filename = parsed_url.path.rsplit("/", 1)[-1]
+        if any(filename.startswith(p) for p in ["constant.", "type."]):
             return False
         return parsed_url.path.endswith((".html", "/"))
 
@@ -126,8 +136,13 @@ class RustDocCollector:
         main = soup.find("main") or soup.find("div", class_="content")
         if not main or len(main.text) <= 200:
             return
-        h1_tag = soup.find("h1")
-        title = h1_tag.get_text(strip=True) if h1_tag is not None else "Untitled"
+        h1_tag = main.find("h1") or soup.find("h1")
+        if h1_tag is not None:
+            for btn in h1_tag.find_all(class_=lambda c: c and "copy" in c):
+                btn.decompose()
+            title = h1_tag.get_text(strip=True) or "Untitled"
+        else:
+            title = "Untitled"
         version, version_type = extract_doc_version(normalized_url, soup)
         md = self.h2t.handle(str(main))
         self._save(
@@ -194,7 +209,10 @@ class RustDocCollector:
         output_dir = self.output_base / out_dir
         parsed_base = urlparse(base_url)
         base_domain = parsed_base.netloc
-        base_path = parsed_base.path if parsed_base.path.endswith("/") else parsed_base.path + "/"
+        path = parsed_base.path
+        if path.endswith((".html", ".htm")):
+            path = path.rsplit("/", 1)[0]
+        base_path = path if path.endswith("/") else path + "/"
         self.collect_site_recursive(base_url, source_name, output_dir, base_domain, base_path)
 
     def run_all(self) -> None:

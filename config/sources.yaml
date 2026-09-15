@@ -82,7 +82,7 @@ best_practices:
     output_dir: raw/best_practices/cheats_rs
 
   - name: rust_guidelines
-    url: https://github.com/microsoft/rust-guidelines
+    url: https://microsoft.github.io/rust-guidelines/
     output_dir: raw/best_practices/rust_guidelines
 
   - name: rust_incubator
@@ -96,20 +96,28 @@ best_practices:
 # ESP-RS and embedded
 embedded:
   - name: esp_rs_book
-    url: https://docs.esp-rs.org/book/
+    url: https://docs.espressif.com/projects/rust/book/
     output_dir: raw/esp_rs/book
 
   - name: esp_rs_no_std
-    url: https://docs.esp-rs.org/no-std-training/
+    url: https://docs.espressif.com/projects/rust/no_std-training/
     output_dir: raw/esp_rs/no_std
 
-  - name: esp_rust_latest
-    url: https://docs.espressif.com/projects/rust/esp-rust/latest/
-    output_dir: raw/esp_rs/espressif
+  - name: esp_rs_std
+    url: https://esp-rs.github.io/std-training/
+    output_dir: raw/esp_rs/std_training
 
-  - name: embedded_hal
-    url: https://rust-embedded.github.io/
-    output_dir: raw/embedded/embedded_hal
+  - name: embedded_rust_book
+    url: https://docs.rust-embedded.org/book/
+    output_dir: raw/embedded/embedded_book
+
+  - name: embedonomicon
+    url: https://docs.rust-embedded.org/embedonomicon/
+    output_dir: raw/embedded/embedonomicon
+
+  - name: discovery_microbit
+    url: https://docs.rust-embedded.org/discovery-mb2/
+    output_dir: raw/embedded/discovery
 
 # Security resources
 security:

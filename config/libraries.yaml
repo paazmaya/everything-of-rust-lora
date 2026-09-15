@@ -26,9 +26,9 @@ libraries:
   - name: fastly
     repo: fastly/fastly-rs
     url: https://docs.rs/fastly/latest/fastly/
-  - name: cloudflare-workers-rs
+  - name: worker
     repo: cloudflare/workers-rs
-    url: null
+    url: https://docs.rs/worker
   - name: leptos
     repo: leptos-rs/leptos
     url: https://book.leptos.dev/
@@ -359,9 +359,9 @@ libraries:
   - name: libc
     repo: rust-lang/libc
     url: https://docs.rs/libc
-  - name: napi-rs
+  - name: napi
     repo: napi-rs/napi-rs
-    url: null
+    url: https://docs.rs/napi
   - name: windows-sys
     repo: microsoft/windows-rs
     url: https://docs.rs/windows-sys
@@ -569,9 +569,9 @@ libraries:
   - name: octocode
     repo: Muvon/octocode
     url: null
-  - name: graphrag-rs
+  - name: graphrag
     repo: automataIA/graphrag-rs
-    url: null
+    url: https://docs.rs/graphrag
   - name: candle
     repo: huggingface/candle
     url: null

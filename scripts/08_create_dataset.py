@@ -81,9 +81,9 @@ def format_alpaca(chunk: dict[str, Any]) -> dict[str, str] | None:
 
     if is_changelog:
         instruction, input_text = _format_changelog(library, version, title)
-    elif source == "docs_rs":
+    elif source in ["docs_rs", "api_docs"]:
         instruction, input_text = _format_docs_rs(library, version, title)
-    elif source == "github":
+    elif source in ["github", "github_repo"]:
         instruction, input_text = _format_github(library, version, title, meta)
     elif source in ["rust_book", "official_docs"]:
         instruction, input_text = _format_official_docs(version, title)

@@ -176,15 +176,16 @@ class DataTransformer:
                     doc.get("content", "")
                     or doc.get("question_body", "") + doc.get("answer_body", "")
                 )
+                effective_source_type = str(doc.get("source_type") or source_type)
                 library, version, version_type, is_latest, title, url, meta = (
-                    self._extract_chunk_identity(doc, source_type, fp)
+                    self._extract_chunk_identity(doc, effective_source_type, fp)
                 )
-                composite_key = f"{source_type}:{library}:{version}:{content}"
+                composite_key = f"{effective_source_type}:{library}:{version}:{content}"
                 chunk_hash = hashlib.sha256(composite_key.encode()).hexdigest()[:20]
 
                 chunks.append(
                     {
-                        "source_type": source_type,
+                        "source_type": effective_source_type,
                         "library": library,
                         "version": version,
                         "version_type": version_type,
@@ -216,26 +217,49 @@ class DataTransformer:
 
     def run_all(self) -> None:
         print("Transforming data...")
-        sources = [
-            ("rust_book", "rust_book"),
-            ("docs_rs", "docs_rs"),
-            ("github", "github"),
-            ("esp_rs", "esp_rs"),
-            ("blogs", "blogs"),
-            ("best_practices", "best_practices"),
-        ]
+
+        def _resolve_source_type(dir_name: str) -> str:
+            if dir_name in {
+                "rust_book",
+                "rust_reference",
+                "rust_edition_guide",
+                "rustdoc",
+                "rustc",
+                "cargo",
+                "std",
+                "core",
+                "rust_by_example",
+                "rust_cookbook",
+                "rust_error_index",
+                "rustonomicon",
+            }:
+                return "official_docs"
+            if dir_name in {"esp_rs", "embedded"}:
+                return "esp_rs"
+            if dir_name in {"best_practices", "security", "web_frameworks"}:
+                return "best_practices"
+            return dir_name
+
+        raw_dirs = sorted(
+            [p for p in RAW_DIR.iterdir() if p.is_dir() and not p.name.startswith(".")]
+        )
+        sources = [(p.name, _resolve_source_type(p.name)) for p in raw_dirs]
         all_chunks = []
         source_summary = []
         for raw_subdir, source_type in sources:
             raw_path = RAW_DIR / raw_subdir
             raw_count = self.count_json_files(raw_path)
+            if raw_count == 0:
+                continue
             chunks = self.process_dir(raw_path, source_type)
             all_chunks.extend(chunks)
-            source_summary.append((source_type, raw_count, len(chunks)))
+            source_summary.append((raw_subdir, source_type, raw_count, len(chunks)))
 
         print("\nTransformation results by source:")
-        for source_type, raw_count, chunk_count in source_summary:
-            print(f"  {source_type}: {raw_count} raw docs -> {chunk_count} valid chunks")
+        for raw_subdir, source_type, raw_count, chunk_count in source_summary:
+            print(
+                f"  {raw_subdir} ({source_type}): {raw_count} raw docs -> {chunk_count} valid chunks"
+            )
 
         # Deduplicate using composite version-aware hash
         seen = set()
@@ -245,7 +269,7 @@ class DataTransformer:
             for c in unique:
                 f.write(json.dumps(c) + "\n")
 
-        total_raw = sum(raw_count for _, raw_count, _ in source_summary)
+        total_raw = sum(raw_count for _, _, raw_count, _ in source_summary)
         total_chunks = len(all_chunks)
         total_unique = len(unique)
 

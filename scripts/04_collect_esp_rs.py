@@ -88,7 +88,10 @@ class ESPCollector:
         if not main or len(main.text) <= 200:
             return
         title = soup.find("h1")
-        title_text = title.get_text(strip=True) if title is not None else "esp-rs documentation"
+        if title is not None:
+            title_text = title.get_text(strip=True)
+        else:
+            title_text = "esp-rs documentation"
         version = self._extract_version(normalized_url)
         md = self.h2t.handle(str(main))
         h = hashlib.sha256(
@@ -160,7 +163,108 @@ class ESPCollector:
         except Exception as e:
             logger.warning(f"Error collecting {normalized_url}: {type(e).__name__}: {e}")
 
+    def _save_chapter_doc(
+        self,
+        title: str,
+        elements: list[Any],
+        print_url: str,
+        out_rel: str,
+        version: str,
+        out_dir: Path,
+    ) -> str | None:
+        """Render and save a single chapter if it meets length requirements."""
+        chunk = "".join(str(e) for e in elements)
+        md = self.h2t.handle(chunk).strip()
+        if len(md) <= 200:
+            return None
+        h = hashlib.sha256(f"esp_rs:{out_rel}:{version}:{title}:{md}".encode()).hexdigest()[:16]
+        file_path = out_dir / f"{h}.json"
+        with open(file_path, "w") as f:
+            json.dump(
+                {
+                    "source": "esp_rs",
+                    "source_type": "official_docs",
+                    "library": "esp-rs",
+                    "version": version,
+                    "version_type": "doc_version",
+                    "is_latest": (version == "current"),
+                    "url": print_url,
+                    "title": title,
+                    "content": md,
+                    "metadata": {
+                        "section": out_rel,
+                        "library": "esp-rs",
+                        "version": version,
+                        "chapter": title,
+                    },
+                    "collected_at": datetime.now().isoformat(),
+                },
+                f,
+                indent=2,
+            )
+        return str(file_path)
+
+    def _group_chapters_by_h1(self, main: Any) -> list[tuple[str, list[Any]]]:
+        """Group top-level main children into (title, elements) per h1 chapter."""
+        chapters: list[tuple[str, list[Any]]] = []
+        current_title: str | None = None
+        current_elements: list[Any] = []
+
+        for child in main.children:
+            if not getattr(child, "name", None):
+                continue
+            if child.name == "h1":
+                if current_title and current_elements:
+                    chapters.append((current_title, current_elements))
+                current_title = child.get_text(strip=True)
+                current_elements = [child]
+            elif current_title:
+                current_elements.append(child)
+
+        if current_title and current_elements:
+            chapters.append((current_title, current_elements))
+
+        return chapters
+
+    def _split_and_save_print_html(self, html_text: str, print_url: str, out_rel: str) -> list[str]:
+        """Extract individual chapters from a single mdBook print.html page."""
+        soup = BeautifulSoup(html_text, "lxml")
+        main = soup.find("main") or soup.find("div", class_="content")
+        if not main:
+            return []
+
+        saved_files: list[str] = []
+        version = self._extract_version(print_url)
+        out_dir = self.output_base / out_rel / version
+        out_dir.mkdir(parents=True, exist_ok=True)
+
+        for title, elements in self._group_chapters_by_h1(main):
+            saved = self._save_chapter_doc(title, elements, print_url, out_rel, version, out_dir)
+            if saved:
+                saved_files.append(saved)
+
+        return saved_files
+
+    def _collect_via_print_html(self, base_url: str, out_rel: str) -> bool:
+        """Attempt to fetch all chapters from print.html in a single request."""
+        print_url = urljoin(base_url if base_url.endswith("/") else base_url + "/", "print.html")
+        try:
+            r = self.session.get(print_url, timeout=30)
+            if r and r.status_code == 200:
+                saved = self._split_and_save_print_html(r.text, print_url, out_rel)
+                if saved:
+                    logger.info(f"Extracted {len(saved)} chapters from print.html for {out_rel}")
+                    return True
+        except Exception as e:
+            logger.debug(f"print.html extraction failed for {base_url}: {e}")
+        return False
+
     def collect_site(self, base_url: str, out_rel: str) -> None:
+        # Try fast print.html extraction first
+        if self._collect_via_print_html(base_url, out_rel):
+            return
+
+        # Fallback to recursive page crawling
         parsed_base = urlparse(base_url)
         base_domain = parsed_base.netloc
         base_path = parsed_base.path if parsed_base.path.endswith("/") else parsed_base.path + "/"
