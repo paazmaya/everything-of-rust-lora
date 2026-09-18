@@ -78,52 +78,50 @@ uv run python train_nemotron3_nano.py \
   --num-epochs 5
 ```
 
-## Configuration File
+## Inline Configuration & Hardware Profiles
 
-The training script uses `config/nemotron_training_config.yaml` for default values. You can view and customize this file:
+The training script defines all defaults and hardware profiles inline in [train_nemotron3_nano.py](train_nemotron3_nano.py), eliminating external YAML configuration files.
 
-```bash
-cat config/nemotron_training_config.yaml
-```
-
-### Key Configuration Sections
+### Key Configuration Constants
 
 **Model Configuration**
 
-- `model.name`: HuggingFace model ID or local path
-- `model.trust_remote_code`: Enable for models with custom Python code
+- `DEFAULT_MODEL_NAME`: `NVIDIA/Nemotron-3-Nano-4B`
+- `trust_remote_code`: Enabled via `--trust-remote-code` for models with custom architecture
 
 **Training Hyperparameters**
 
-- `training.max_seq_length`: Tokens per sample
-- `training.num_epochs`: Training epochs
-- `training.learning_rate`: Adam learning rate
-- `training.warmup_steps`: Linear warmup
-- `training.weight_decay`: L2 regularization
-- `training.lr_scheduler_type`: "cosine" for cosine annealing
+- `max_seq_length`: Tokens per sample (default `1024`)
+- `num_epochs`: Training epochs (default `3`)
+- `learning_rate`: Adam learning rate (default `2e-4`)
+- `warmup_steps`: Linear warmup steps (default `10`)
+- `weight_decay`: L2 regularization (default `0.01`)
+- `lr_scheduler_type`: Cosine annealing
 
-**LoRA Settings** (not recommended to change)
+**LoRA Settings**
 
-- `lora.r`: Rank (16 is optimal for Nemotron 4B)
-- `lora.lora_alpha`: LoRA scale factor
-- `lora.target_modules`: Which projection layers to fine-tune
+- `r`: Rank (`16`, optimal for Nemotron 4B)
+- `lora_alpha`: Scaling factor (`16`)
+- `target_modules`: All 7 projection layers (`q_proj`, `k_proj`, `v_proj`, `o_proj`, `gate_proj`, `up_proj`, `down_proj`)
 
 **Hardware Profiles**
 
-- Predefined for common GPUs
-- Add custom profiles as needed
+- `rtx4070`: Batch size 1, grad accum 4, max seq 1024 (**Default**)
+- `rtx6000`: Batch size 2, grad accum 2, max seq 2048
+- `a100`: Batch size 4, grad accum 1, max seq 4096
+- `a100_80gb`: Batch size 8, grad accum 1, max seq 4096
+- `dev`: Batch size 1, grad accum 1, max seq 512 (minimal VRAM)
 
 **Output Configuration**
 
-- `output.model_dir`: Final LoRA adapter directory
-- `output.checkpoint_dir`: Intermediate checkpoints
-- `output.save_strategy`: "steps", "epoch", or "no"
-- `output.save_steps`: Checkpoint frequency
+- `output_dir`: Final LoRA adapter directory (`models/nemotron3_nano_rust_lora`)
+- `checkpoint_dir`: Intermediate checkpoints (`models/nemotron3_nano_rust_lora/checkpoints`)
+- `save_strategy`: Steps (every 50 steps, keeping last 3 checkpoints)
 
 **Experiment Tracking**
 
-- `tracking.wandb_project`: Optional W&B project (set to project name to enable)
-- `tracking.artifact_manifest`: Path to training metadata JSON
+- `wandb_project`: Optional W&B project (pass via `--wandb-project`)
+- `manifest.json`: Saved automatically to output directory with full training metadata
 
 ## Training Examples
 
@@ -233,9 +231,7 @@ Tracking Arguments:
   --wandb-entity ENTITY                W&B team/entity name
 
 Utility Arguments:
-  --config PATH                        Path to configuration YAML
   --dry-run                            Validate without training
-  --verbose                            Debug logging
   --help                               Show help message
 ```
 

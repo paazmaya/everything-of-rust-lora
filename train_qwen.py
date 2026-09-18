@@ -1,161 +1,183 @@
 #!/usr/bin/env python3
 """
-Unsloth Studio Training Script for Qwen 3.5 4B Instruct
+Production-Grade Qwen 3.5 4B LoRA Training Script
 
-Training uses the base HuggingFace model (Qwen/Qwen3.5-4B) or a local model path.
-After training, the export script can merge the LoRA adapter and package the model
-for deployment.
+Trains a LoRA adapter on Qwen/Qwen3.5-4B for Rust systems and embedded development.
+Features inline configuration, hardware-aware profiles, and preflight dry-run validation.
+
+Note: Qwen 3.5 4B is best fine-tuned in 16-bit bf16 precision; 4-bit QLoRA is not recommended.
 
 Usage:
-    # Use HuggingFace model (downloads if not cached):
+    # Dry-run validation:
+    uv run python train_qwen.py --dry-run
+
+    # Train using default RTX 4070 profile:
     uv run python train_qwen.py
 
-    # Use local model directory:
-    uv run python train_qwen.py --model-path /path/to/Qwen3.5-4B
+    # Train on workstation with RTX 6000:
+    uv run python train_qwen.py --hardware-profile rtx6000
 
-Documentation References:
-- HF Model Card: https://huggingface.co/Qwen/Qwen3.5-4B
-- Unsloth GGUF: https://huggingface.co/unsloth/Qwen3.5-4B-GGUF
-- Unsloth Documentation: https://unsloth.ai/docs/models/qwen3.5
+    # Train with local model directory:
+    uv run python train_qwen.py --model-path /path/to/Qwen3.5-4B
 """
 
-# ruff: noqa: I001
-from unsloth import FastLanguageModel
+import sys
+from typing import Any
 
-import argparse
+from lib import (
+    DEFAULT_TRAIN_FILE,
+    TrainingConfig,
+    apply_args_to_config,
+    build_arg_parser,
+    load_and_prepare_dataset,
+    load_model_and_tokenizer,
+    run_preflight_checks,
+    run_sft_training,
+    setup_logging,
+)
 
-import torch
-from datasets import load_dataset
-from transformers import TrainingArguments
-from trl.trainer.sft_trainer import SFTTrainer
+# ============================================================================
+# Inline Configuration & Hardware Profiles
+# ============================================================================
 
-max_seq_length = 1024
-# Qwen3.5 4B is best trained with bf16/16-bit LoRA; 4-bit QLoRA is not recommended for this model family.
-# Default max_seq_length is reduced for 12GB VRAM GPUs like a 4070.
-dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
-load_in_4bit = False
-load_in_16bit = True
+DEFAULT_MODEL_NAME = "Qwen/Qwen3.5-4B"
+DEFAULT_OUTPUT_DIR = "models/qwen3_5_4b_rust_lora"
+DEFAULT_HARDWARE_PROFILE = "rtx4070"
 
+HARDWARE_PROFILES: dict[str, dict[str, Any]] = {
+    "rtx4070": {
+        "batch_size": 1,
+        "gradient_accumulation_steps": 4,
+        "max_seq_length": 1024,
+        "load_in_4bit": False,
+        "description": "NVIDIA RTX 4070 (12GB VRAM) - 16-bit bf16 LoRA (recommended default)",
+    },
+    "rtx3090_4090": {
+        "batch_size": 1,
+        "gradient_accumulation_steps": 4,
+        "max_seq_length": 2048,
+        "load_in_4bit": False,
+        "description": "NVIDIA RTX 3090/4090 (24GB VRAM) - 16-bit bf16 LoRA",
+    },
+    "rtx6000": {
+        "batch_size": 2,
+        "gradient_accumulation_steps": 2,
+        "max_seq_length": 4096,
+        "load_in_4bit": False,
+        "description": "NVIDIA RTX 6000 Ada (48GB VRAM) - larger context and batches",
+    },
+    "a100": {
+        "batch_size": 4,
+        "gradient_accumulation_steps": 1,
+        "max_seq_length": 4096,
+        "load_in_4bit": False,
+        "description": "NVIDIA A100 (40GB VRAM) - high-throughput",
+    },
+    "dev": {
+        "batch_size": 1,
+        "gradient_accumulation_steps": 1,
+        "max_seq_length": 512,
+        "load_in_4bit": True,
+        "description": "Development profile - fast iteration and minimal VRAM",
+    },
+}
 
-def train_qwen(
-    model_path: str = "Qwen/Qwen3.5-4B",
-    max_seq_length: int = max_seq_length,
-    batch_size: int = 1,
-    gradient_accumulation_steps: int = 4,
-):
-    """Train a LoRA adapter on Qwen 3.5 4B."""
-    print(f"Loading model from: {model_path}")
-    model, tokenizer = FastLanguageModel.from_pretrained(
-        model_name=model_path,
-        max_seq_length=max_seq_length,
-        dtype=dtype,
-        load_in_4bit=load_in_4bit,
-        load_in_16bit=load_in_16bit,
-        full_finetuning=False,
-    )
-
-    model = FastLanguageModel.get_peft_model(
-        model,
-        r=16,
-        target_modules=[
-            "q_proj",
-            "k_proj",
-            "v_proj",
-            "o_proj",
-            "gate_proj",
-            "up_proj",
-            "down_proj",
-        ],
-        lora_alpha=16,
-        lora_dropout=0.0,
-        bias="none",
-        use_gradient_checkpointing="unsloth",
-        random_state=3407,
-    )
-
-    # Qwen uses ChatML format
-    qwen_prompt = """<|im_start|>system
+QWEN_PROMPT = """<|im_start|>system
 You are an expert Rust programmer, specializing in systems programming, async Rust, ESP32 embedded development, and popular Rust libraries.<|im_end|>
 <|im_start|>user
 {}{}<|im_end|>
 <|im_start|>assistant
 {}"""
 
-    def formatting_prompts_func(examples: dict[str, list[str]]) -> dict[str, list[str]]:
-        instructions = examples["instruction"]
-        inputs = examples["input"]
-        outputs = examples["output"]
-        texts: list[str] = []
-        for instruction, input, output in zip(instructions, inputs, outputs, strict=False):
-            user_msg = instruction + "\n" + input if input else instruction
-            text = qwen_prompt.format(user_msg, "", output) + "<|im_end|>"
-            texts.append(text)
-        return {"text": texts}
 
-    dataset = load_dataset("json", data_files="data/datasets/train.jsonl", split="train")
-    dataset = dataset.map(formatting_prompts_func, batched=True)
+def format_qwen_prompts(examples: dict[str, list[str]]) -> dict[str, list[str]]:
+    """Format instruction examples into ChatML format for Qwen."""
+    instructions = examples["instruction"]
+    inputs = examples["input"]
+    outputs = examples["output"]
+    texts: list[str] = []
+    for instruction, input_text, output in zip(instructions, inputs, outputs, strict=False):
+        user_msg = f"{instruction}\n{input_text}" if input_text else instruction
+        text = QWEN_PROMPT.format(user_msg, "", output) + "<|im_end|>"
+        texts.append(text)
+    return {"text": texts}
 
-    trainer = SFTTrainer(
-        model=model,
-        tokenizer=tokenizer,  # pyright: ignore[reportCallIssue]
-        train_dataset=dataset,
-        dataset_text_field="text",  # pyright: ignore[reportCallIssue]
-        max_seq_length=max_seq_length,  # pyright: ignore[reportCallIssue]
-        args=TrainingArguments(
-            per_device_train_batch_size=batch_size,
-            gradient_accumulation_steps=gradient_accumulation_steps,
-            warmup_steps=10,
-            num_train_epochs=3,
-            learning_rate=2e-4,
-            fp16=not torch.cuda.is_bf16_supported(),
-            bf16=torch.cuda.is_bf16_supported(),
-            logging_steps=10,
-            output_dir="models/qwen3_5_4b_rust_lora",
-            optim="adamw_8bit",
-            weight_decay=0.01,
-            lr_scheduler_type="cosine",
-            seed=3407,
-        ),
+
+def train_qwen(config: TrainingConfig) -> None:
+    """Execute LoRA training workflow for Qwen 3.5."""
+    logger = setup_logging(name="rust_lora.qwen")
+    config.model_family = "Qwen"
+
+    # 1. Preflight validation
+    if not run_preflight_checks(config, min_vram_gb=12.0, logger=logger):
+        logger.warning("Preflight checks reported issues; proceeding with caution.")
+
+    # 2. Load model and tokenizer
+    model, tokenizer = load_model_and_tokenizer(config, logger=logger)
+
+    # 3. Load and format dataset
+    dataset = load_and_prepare_dataset(
+        data_file=config.data_file,
+        prompt_formatter_fn=format_qwen_prompts,
+        tokenizer=tokenizer,
+        max_seq_length=config.max_seq_length,
+        logger=logger,
     )
 
-    trainer.train()
-    model.save_pretrained("models/qwen3_5_4b_rust_lora")
-    tokenizer.save_pretrained("models/qwen3_5_4b_rust_lora")
-    print("Training complete! LoRA saved to models/qwen3_5_4b_rust_lora")
+    # 4. Train and save model
+    run_sft_training(
+        model=model,
+        tokenizer=tokenizer,
+        dataset=dataset,
+        config=config,
+        logger=logger,
+    )
+
+
+def main() -> None:
+    """CLI entry point for Qwen training."""
+    parser = build_arg_parser(
+        description="Train LoRA adapter on Qwen 3.5 4B for Rust",
+        default_model=DEFAULT_MODEL_NAME,
+        default_output_dir=DEFAULT_OUTPUT_DIR,
+        hardware_profiles=HARDWARE_PROFILES,
+        default_profile=DEFAULT_HARDWARE_PROFILE,
+        default_max_seq_length=1024,
+        default_batch_size=1,
+        default_grad_accum=4,
+        default_load_in_4bit=False,
+    )
+    args = parser.parse_args()
+    logger = setup_logging(name="rust_lora.qwen")
+
+    config = TrainingConfig(
+        model_path=args.model_path or DEFAULT_MODEL_NAME,
+        model_family="Qwen",
+        max_seq_length=1024,
+        batch_size=1,
+        gradient_accumulation_steps=4,
+        load_in_4bit=False,
+        load_in_16bit=True,
+        output_dir=args.output_dir or DEFAULT_OUTPUT_DIR,
+        data_file=args.data_file or DEFAULT_TRAIN_FILE,
+        trust_remote_code=args.trust_remote_code,
+    )
+    config = apply_args_to_config(config, args, hardware_profiles=HARDWARE_PROFILES)
+
+    if args.dry_run:
+        logger.info("Executing dry-run validation for Qwen 3.5...")
+        passed = run_preflight_checks(config, min_vram_gb=12.0, logger=logger)
+        sys.exit(0 if passed else 1)
+
+    try:
+        train_qwen(config)
+    except KeyboardInterrupt:
+        logger.info("Training interrupted by user.")
+        sys.exit(130)
+    except Exception:
+        logger.exception("Training failed with unexpected exception")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Train LoRA on Qwen 3.5 4B")
-    parser.add_argument(
-        "--model-path",
-        type=str,
-        default="Qwen/Qwen3.5-4B",
-        help="Model path (HuggingFace ID or local directory). "
-        "Examples: 'Qwen/Qwen3.5-4B' or '/path/to/Qwen3.5-4B'",
-    )
-    parser.add_argument(
-        "--max-seq-length",
-        type=int,
-        default=max_seq_length,
-        help="Maximum sequence length for training. Lower values reduce VRAM use.",
-    )
-    parser.add_argument(
-        "--batch-size",
-        type=int,
-        default=1,
-        help="Per-device batch size for training.",
-    )
-    parser.add_argument(
-        "--gradient-accumulation-steps",
-        type=int,
-        default=4,
-        help="Gradient accumulation steps to simulate a larger batch size.",
-    )
-    args = parser.parse_args()
-
-    train_qwen(
-        model_path=args.model_path,
-        max_seq_length=args.max_seq_length,
-        batch_size=args.batch_size,
-        gradient_accumulation_steps=args.gradient_accumulation_steps,
-    )
+    main()

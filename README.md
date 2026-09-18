@@ -271,16 +271,19 @@ uv run python train_nemotron3_nano.py \
 IFM K2-Horizon-3.7B is a 3.7B dense model purpose-built for agentic execution, reasoning, and coding (512K native context). See [K2_HORIZON.md](K2_HORIZON.md) for complete details.
 
 1. **Validate setup before training:**
+
    ```bash
    uv run python train_k2_horizon.py --dry-run
    ```
 
 2. **Run training with default RTX 3090/4090 profile (bfloat16):**
+
    ```bash
    uv run python train_k2_horizon.py
    ```
 
 3. **Or run with 12GB GPU profile (RTX 4070 4-bit QLoRA):**
+
    ```bash
    uv run python train_k2_horizon.py --hardware-profile rtx4070
    ```
@@ -292,9 +295,9 @@ IFM K2-Horizon-3.7B is a 3.7B dense model purpose-built for agentic execution, r
 
 ### Training Configuration Details
 
-The current implementation provides four separate LoRA recipes:
+All model recipes share a common core engine in [lib/](lib/) with standardized preflight checks, dual-backend model loading (Unsloth with automatic Hugging Face PEFT fallback), and inline hardware profiles:
 
-- `train_k2_horizon.py` (IFM K2-Horizon 3.7B):
+- [train_k2_horizon.py](train_k2_horizon.py) (IFM K2-Horizon 3.7B) — See [K2_HORIZON.md](K2_HORIZON.md):
   - **Rank (r):** 16
   - **Alpha:** 16
   - **Target Modules:** `q_proj`, `k_proj`, `v_proj`, `o_proj`, `gate_proj`, `up_proj`, `down_proj`
@@ -306,27 +309,31 @@ The current implementation provides four separate LoRA recipes:
   - **Prompt Format:** Native K2-Horizon delimiters (`<|ifm|im_start|>`, `<|ifm|im_end|>`, `<ifm|think>`)
   - **Key Features:** Tailored for coding agents and tool-calling, dual-engine (Unsloth + Transformers/PEFT), dry-run mode, manifest tracking
 
-- `train_granite.py` (Granite 4.2 8B):
+- [train_granite.py](train_granite.py) (Granite 4.2 8B / 3B) — See [GRANITE.md](GRANITE.md):
   - **Rank (r):** 64
   - **Alpha:** 128
   - **Target Modules:** `q_proj`, `k_proj`, `v_proj`, `o_proj`, `gate_proj`, `up_proj`, `down_proj`
   - **Optimizer:** AdamW 8-bit
   - **Scheduler:** Cosine
-  - **Batch Size:** 1 per device, gradient accumulation 8 (effective 8)
+  - **Batch Size:** 1 per device, gradient accumulation 8 (effective 8, configurable via hardware profiles)
   - **Sequence Length:** 4096
-  - **VRAM:** ~16GB
+  - **VRAM:** ~16GB (4-bit QLoRA default)
+  - **Prompt Format:** Alpaca instruction template
+  - **Key Features:** Automatic 8B/3B variant detection, GGUF export via [scripts/10_export_ollama.py](scripts/10_export_ollama.py)
 
-- `train_qwen.py` (Qwen 3.5 4B):
+- [train_qwen.py](train_qwen.py) (Qwen 3.5 4B) — See [QWEN.md](QWEN.md):
   - **Rank (r):** 16
   - **Alpha:** 16
   - **Target Modules:** `q_proj`, `k_proj`, `v_proj`, `o_proj`, `gate_proj`, `up_proj`, `down_proj`
   - **Optimizer:** AdamW 8-bit
   - **Scheduler:** Cosine
-  - **Batch Size:** 1 per device, gradient accumulation 4 (effective 4)
+  - **Batch Size:** 1 per device, gradient accumulation 4 (effective 4, configurable via hardware profiles)
   - **Sequence Length:** 1024
-  - **VRAM:** ~12GB
+  - **VRAM:** ~12GB (16-bit bf16 recommended)
+  - **Prompt Format:** ChatML instruction template
+  - **Key Features:** Full 16-bit precision training, hardware profiles, preflight checks
 
-- `train_nemotron3_nano.py` (Nemotron 3 Nano 4B):
+- [train_nemotron3_nano.py](train_nemotron3_nano.py) (Nemotron 3 Nano 4B) — See [NEMOTRON.md](NEMOTRON.md):
   - **Rank (r):** 16
   - **Alpha:** 16
   - **Target Modules:** `q_proj`, `k_proj`, `v_proj`, `o_proj`, `gate_proj`, `up_proj`, `down_proj`
@@ -336,7 +343,7 @@ The current implementation provides four separate LoRA recipes:
   - **Sequence Length:** 1024 (configurable, up to 4096 on high-end GPUs)
   - **VRAM:** ~12GB (RTX 4070), scales with hardware profile
   - **Prompt Format:** ChatML-compatible with Rust expert persona
-  - **Key Features:** Hardware profiles, checkpointing, validation pipeline, W&B integration, dry-run mode
+  - **Key Features:** Inline hardware profiles, checkpointing, validation pipeline, W&B integration, dry-run mode
 
 ## Phase 4: Serving with AI Coding Agents
 
@@ -351,6 +358,7 @@ uv run python serve_coding_agent.py \
 ```
 
 In your coding agent settings:
+
 - **Base URL:** `http://localhost:8000/v1`
 - **Model ID:** `k2-horizon-3.7b-rust-lora`
 - **API Key:** `EMPTY`

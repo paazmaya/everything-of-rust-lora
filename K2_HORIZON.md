@@ -27,6 +27,7 @@ uv run python train_k2_horizon.py --dry-run
 ```
 
 This verifies:
+
 - GPU availability and VRAM capacity
 - Core dependencies (`transformers`, `peft`, `trl`, `torch`)
 - Data format (`data/datasets/train.jsonl` with `instruction`, `input`, `output`)
@@ -48,14 +49,14 @@ Outputs the trained adapter to `models/k2_horizon_rust_lora`.
 
 Select a profile matching your available GPU hardware using `--hardware-profile`:
 
-| Profile | GPU | VRAM | Batch Size | Grad Accum | Max Seq Len | Mode |
-|---|---|---|---|---|---|---|
-| `rtx4070` | RTX 4070 / 3060 | 12GB | 1 | 4 | 1024 | 4-bit QLoRA |
-| `rtx3090_4090` | RTX 3090 / 4090 | 24GB | 1 | 4 | 2048 | 16-bit bf16 (**Default**) |
-| `rtx6000` | RTX 6000 Ada | 48GB | 2 | 2 | 4096 | 16-bit bf16 |
-| `a100` | NVIDIA A100 | 40GB | 2 | 2 | 4096 | 16-bit bf16 |
-| `a100_80gb` | A100 / H100 | 80GB | 4 | 2 | 8192 | 16-bit bf16 |
-| `dev` | Any GPU | Variable | 1 | 1 | 512 | Minimal test profile |
+| Profile        | GPU             | VRAM     | Batch Size | Grad Accum | Max Seq Len | Mode                      |
+| -------------- | --------------- | -------- | ---------- | ---------- | ----------- | ------------------------- |
+| `rtx4070`      | RTX 4070 / 3060 | 12GB     | 1          | 4          | 1024        | 4-bit QLoRA               |
+| `rtx3090_4090` | RTX 3090 / 4090 | 24GB     | 1          | 4          | 2048        | 16-bit bf16 (**Default**) |
+| `rtx6000`      | RTX 6000 Ada    | 48GB     | 2          | 2          | 4096        | 16-bit bf16               |
+| `a100`         | NVIDIA A100     | 40GB     | 2          | 2          | 4096        | 16-bit bf16               |
+| `a100_80gb`    | A100 / H100     | 80GB     | 4          | 2          | 8192        | 16-bit bf16               |
+| `dev`          | Any GPU         | Variable | 1          | 1          | 512         | Minimal test profile      |
 
 ### Examples
 
@@ -102,6 +103,7 @@ uv run python serve_coding_agent.py --test "How do I implement an async WebSocke
 ```
 
 The server provides:
+
 - `/v1/chat/completions` (streaming SSE & non-streaming)
 - `/v1/models`
 - Native tool/function calling extraction (`<ifm|tool_calls>`)
@@ -149,6 +151,7 @@ sglang serve \
 To package and run in Ollama:
 
 1. **Create metadata manifest:**
+
    ```bash
    uv run python scripts/09_create_modelfile.py \
      --model models/k2_horizon_rust_lora \
@@ -157,6 +160,7 @@ To package and run in Ollama:
    ```
 
 2. **Merge LoRA and create GGUF:**
+
    ```bash
    uv run python scripts/10_export_ollama.py \
      --model models/k2_horizon_rust_lora \
