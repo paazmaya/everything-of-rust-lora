@@ -45,6 +45,7 @@ def export_to_ollama(
             max_seq_length=4096,
             dtype=None,
             load_in_4bit=True,
+            trust_remote_code=True,
         )
     else:
         if not base_model:
@@ -57,6 +58,7 @@ def export_to_ollama(
             max_seq_length=4096,
             dtype=None,
             load_in_4bit=True,
+            trust_remote_code=True,
         )
         print(f"Applying LoRA adapter from {model_path}...")
         model = PeftModel.from_pretrained(model, model_path, is_trainable=False)
@@ -85,7 +87,31 @@ def export_to_ollama(
     if gguf_filename is None:
         raise RuntimeError(f"Could not determine GGUF filename in {gguf_dir}.")
     from_path = gguf_filename
-    modelfile_content = f"""FROM {from_path}
+
+    # Detect if target is K2-Horizon to configure proper delimiters and stop tokens
+    is_k2 = (
+        "k2" in (base_model or "").lower()
+        or "k2" in model_path.lower()
+        or "k2" in model_name.lower()
+    )
+
+    if is_k2:
+        modelfile_content = f"""FROM {from_path}
+PARAMETER stop "<|ifm|im_end|>"
+PARAMETER stop "<|ifm|endoftext|>"
+PARAMETER stop "<|im_end|>"
+PARAMETER temperature 0.2
+TEMPLATE \"\"\"{{{{ if .System }}}}<|ifm|im_start|>system
+{{{{ .System }}}}<|ifm|im_end|>
+{{{{ end }}}}{{{{ if .Prompt }}}}<|ifm|im_start|>user
+{{{{ .Prompt }}}}<|ifm|im_end|>
+{{{{ end }}}}<|ifm|im_start|>assistant
+<ifm|think>
+</ifm|think>{{{{ .Response }}}}<|ifm|im_end|>\"\"\"
+SYSTEM You are an expert Rust programmer specializing in systems programming, async Rust, ESP32 embedded development, and the Rust ecosystem.
+"""
+    else:
+        modelfile_content = f"""FROM {from_path}
 PARAMETER stop "<|im_start|>"
 PARAMETER stop "<|im_end|>"
 PARAMETER temperature 0.2

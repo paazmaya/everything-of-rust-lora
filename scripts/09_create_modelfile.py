@@ -66,15 +66,35 @@ BASE_MODEL_METADATA: dict[str, dict[str, str]] = {
             "the corresponding base model before deployment."
         ),
     },
+    "k2_horizon": {
+        "name": "IFM K2-Horizon 3.7B",
+        "reference": "IFM/K2-Horizon-3.7B",
+        "gguf": "IFM/K2-Horizon-3.7B-GGUF",
+        "source_url": "https://huggingface.co/IFM/K2-Horizon-3.7B",
+        "training_economics": (
+            "LoRA rank=16, alpha=16, optimizer=AdamW 8-bit, scheduler=cosine, "
+            "batch_size=1, gradient_accumulation_steps=4 (effective=4), epochs=3, "
+            "VRAM≈12-24GB, dense 3.7B model with native 512K context."
+        ),
+        "notes": (
+            "This adapter targets IFM/K2-Horizon-3.7B using the K2-Horizon delimiter "
+            "format (<|ifm|im_start|>, <|ifm|im_end|>, <ifm|think>) and supports agentic "
+            "tool-calling workflows. Merge with the base model before deployment or "
+            "load directly with serve_coding_agent.py / vLLM."
+        ),
+    },
 }
 
 
 def get_base_metadata(base_key: str) -> dict[str, str]:
-    if base_key not in BASE_MODEL_METADATA:
+    normalized_key = (
+        "k2_horizon" if base_key.lower() in ("k2", "k2-horizon", "k2_horizon") else base_key.lower()
+    )
+    if normalized_key not in BASE_MODEL_METADATA:
         raise ValueError(
             f"Base model key must be one of: {', '.join(BASE_MODEL_METADATA)}. Got '{base_key}'."
         )
-    return BASE_MODEL_METADATA[base_key]
+    return BASE_MODEL_METADATA[normalized_key]
 
 
 def safe_yaml_scalar(raw: Any) -> str:
@@ -254,7 +274,7 @@ if __name__ == "__main__":
         choices=list(BASE_MODEL_METADATA.keys()),
         default="granite",
         help=(
-            "Base model family for this adapter. Choices: granite, qwen, nemotron. "
+            f"Base model family for this adapter. Choices: {', '.join(BASE_MODEL_METADATA.keys())}. "
             "Used to populate base model metadata and training economics."
         ),
     )

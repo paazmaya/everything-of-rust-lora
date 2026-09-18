@@ -48,5 +48,9 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Write-Host "`n========================================" -ForegroundColor Cyan
 Write-Host " Data Pipeline Complete!" -ForegroundColor Cyan
-Write-Host " Next: Upload 'data/datasets/train.jsonl' to Unsloth Studio and run train_granite.py" -ForegroundColor Cyan
+Write-Host " Next: Train LoRA with:" -ForegroundColor Cyan
+Write-Host "   - train_k2_horizon.py (IFM K2-Horizon 3.7B - recommended for coding agents)" -ForegroundColor Cyan
+Write-Host "   - train_granite.py (IBM Granite 4.2 8B)" -ForegroundColor Cyan
+Write-Host "   - train_qwen.py (Qwen 3.5 4B)" -ForegroundColor Cyan
+Write-Host "   - train_nemotron3_nano.py (Nemotron 3 Nano 4B)" -ForegroundColor Cyan
 Write-Host "========================================`n" -ForegroundColor Cyan

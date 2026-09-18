@@ -40,5 +40,9 @@ uv run python scripts/08_create_dataset.py
 
 echo "========================================"
 echo " Data Pipeline Complete!"
-echo " Next: Upload 'data/datasets/train.jsonl' to Unsloth Studio and run train_granite.py"
+echo " Next: Train LoRA with:"
+echo "   - train_k2_horizon.py (IFM K2-Horizon 3.7B - recommended for coding agents)"
+echo "   - train_granite.py (IBM Granite 4.2 8B)"
+echo "   - train_qwen.py (Qwen 3.5 4B)"
+echo "   - train_nemotron3_nano.py (Nemotron 3 Nano 4B)"
 echo "========================================"

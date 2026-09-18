@@ -8,9 +8,10 @@ This project contains the complete pipeline to train a specialized LoRA adapter 
 2. **Transformation** (Script 06): Cleans, chunks, and deduplicates the data.
 3. **Vector/Graph Storage** (Script 07): Stores data in ChromaDB for easy 6-month incremental updates.
 4. **Dataset Creation** (Script 08): Converts chunks into Alpaca instruction-response format.
-5. **Training** (`train_granite.py`, `train_qwen.py`): Trains LoRA using Unsloth.
-6. **Export** (Script 09): Packages the trained LoRA adapter with metadata and a `Modelfile`.
-7. **Merge + GGUF** (Script 10): Merges the adapter with the base model and exports a runnable GGUF bundle for Ollama.
+5. **Training** (`train_k2_horizon.py`, `train_granite.py`, `train_qwen.py`, `train_nemotron3_nano.py`): Trains LoRA using Unsloth or Transformers/PEFT.
+6. **Agent Serving** (`serve_coding_agent.py`): Serves base model + LoRA over an OpenAI-compatible API for coding agents.
+7. **Export** (Script 09): Packages the trained LoRA adapter with metadata and a `Modelfile`.
+8. **Merge + GGUF** (Script 10): Merges the adapter with the base model and exports a runnable GGUF bundle for Ollama.
 
 ## Phase 1: Environment Setup
 
@@ -265,9 +266,45 @@ uv run python train_nemotron3_nano.py \
   --verbose
 ```
 
+### Option D: Training IFM K2-Horizon 3.7B (Recommended for Coding Agents)
+
+IFM K2-Horizon-3.7B is a 3.7B dense model purpose-built for agentic execution, reasoning, and coding (512K native context). See [K2_HORIZON.md](K2_HORIZON.md) for complete details.
+
+1. **Validate setup before training:**
+   ```bash
+   uv run python train_k2_horizon.py --dry-run
+   ```
+
+2. **Run training with default RTX 3090/4090 profile (bfloat16):**
+   ```bash
+   uv run python train_k2_horizon.py
+   ```
+
+3. **Or run with 12GB GPU profile (RTX 4070 4-bit QLoRA):**
+   ```bash
+   uv run python train_k2_horizon.py --hardware-profile rtx4070
+   ```
+
+4. **Serve base model + LoRA for AI coding agents:**
+   ```bash
+   uv run python serve_coding_agent.py --port 8000
+   ```
+
 ### Training Configuration Details
 
-The current implementation uses three separate LoRA recipes:
+The current implementation provides four separate LoRA recipes:
+
+- `train_k2_horizon.py` (IFM K2-Horizon 3.7B):
+  - **Rank (r):** 16
+  - **Alpha:** 16
+  - **Target Modules:** `q_proj`, `k_proj`, `v_proj`, `o_proj`, `gate_proj`, `up_proj`, `down_proj`
+  - **Optimizer:** AdamW 8-bit
+  - **Scheduler:** Cosine
+  - **Batch Size:** 1 per device, gradient accumulation 4 (effective 4, configurable via hardware profiles)
+  - **Sequence Length:** 2048 (up to 8192 on A100/H100)
+  - **VRAM:** ~12GB (4-bit QLoRA) to 24GB (bfloat16)
+  - **Prompt Format:** Native K2-Horizon delimiters (`<|ifm|im_start|>`, `<|ifm|im_end|>`, `<ifm|think>`)
+  - **Key Features:** Tailored for coding agents and tool-calling, dual-engine (Unsloth + Transformers/PEFT), dry-run mode, manifest tracking
 
 - `train_granite.py` (Granite 4.2 8B):
   - **Rank (r):** 64
@@ -301,15 +338,36 @@ The current implementation uses three separate LoRA recipes:
   - **Prompt Format:** ChatML-compatible with Rust expert persona
   - **Key Features:** Hardware profiles, checkpointing, validation pipeline, W&B integration, dry-run mode
 
-## Phase 4: Exporting to Ollama
+## Phase 4: Serving with AI Coding Agents
 
-Once training is complete (either locally or downloaded from Unsloth Studio):
+Load the trained LoRA adapter directly alongside the base model to use with AI coding agents like Cline, Roo Code, Continue.dev, Aider, and Cursor:
+
+```bash
+# Start OpenAI-compatible agent server on port 8000
+uv run python serve_coding_agent.py \
+  --model-path IFM/K2-Horizon-3.7B \
+  --lora-path models/k2_horizon_rust_lora \
+  --port 8000
+```
+
+In your coding agent settings:
+- **Base URL:** `http://localhost:8000/v1`
+- **Model ID:** `k2-horizon-3.7b-rust-lora`
+- **API Key:** `EMPTY`
+
+See [K2_HORIZON.md](K2_HORIZON.md) for full configuration details and vLLM / SGLang deployment commands.
+
+## Phase 5: Exporting to Ollama
+
+Once training is complete:
 
 1. **Package the trained adapter with Script 09:**
 
-   Script `scripts/09_create_modelfile.py` now exports the trained LoRA adapter as an adapter-only package and writes a `Modelfile` with base model metadata and training economics.
+   Script `scripts/09_create_modelfile.py` exports the trained LoRA adapter as an adapter-only package and writes a `Modelfile` with base model metadata and training economics.
 
    ```bash
+   uv run python scripts/09_create_modelfile.py --model models/k2_horizon_rust_lora --name rust-k2-horizon --base k2_horizon
+
    uv run python scripts/09_create_modelfile.py --model models/granite_rust_lora --name rust-granite --base granite
 
    uv run python scripts/09_create_modelfile.py --model models/qwen3_5_4b_rust_lora --name rust-qwen --base qwen
@@ -326,6 +384,9 @@ Once training is complete (either locally or downloaded from Unsloth Studio):
    **Option 1: Standard export (downloads base model from HuggingFace if not cached)**
 
    ```bash
+   # For IFM K2-Horizon 3.7B
+   uv run python scripts/10_export_ollama.py --model models/k2_horizon_rust_lora --name rust-k2-horizon --base IFM/K2-Horizon-3.7B
+
    # For Granite 4.2 8B
    uv run python scripts/10_export_ollama.py --model models/granite_rust_lora --name rust-granite --base ibm-granite/granite-4.2-8b
 
@@ -411,6 +472,13 @@ Because we stored the raw data in ChromaDB (a local vector database), you do not
 - **HuggingFace Model Card:** https://huggingface.co/NVIDIA/Nemotron-3-Nano-4B
 - **Nemotron 3.5 Lightning Recipe:** https://github.com/NVIDIA-NeMo/Nemotron/blob/main/docs/nemotron/lightning35/README.md
 - **NVIDIA NeMo Documentation:** https://github.com/NVIDIA-NeMo/Nemotron
+
+## References: IFM K2-Horizon 3.7B
+
+- **HuggingFace Model Card:** https://huggingface.co/IFM/K2-Horizon-3.7B
+- **Institute of Foundation Models (IFM):** https://ifm.ai/
+- **SGLang Cookbook Recipe:** https://docs.sglang.io/cookbook/autoregressive/IFM/K2-Horizon
+- **Detailed K2-Horizon Guide:** [K2_HORIZON.md](K2_HORIZON.md)
 
 ## License
 
