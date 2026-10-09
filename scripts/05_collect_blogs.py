@@ -54,8 +54,8 @@ def extract_feed_version(entry: Any) -> tuple[str, str]:
 
 def extract_site_version(link: str) -> tuple[str, str]:
     """Extract edition or version from URL."""
-    m = re.search(r"(?:edition-guide/|rust-|edition/)?(2018|2021|2024)", link)
-    if m and any(e in link for e in ["2018", "2021", "2024"]):
+    m = re.search(r"(?:edition-guide/|rust-|edition/)?(2015|2018|2021|2024)", link)
+    if m and any(e in link for e in ["2015", "2018", "2021", "2024"]):
         return m.group(1), "edition"
     m_ver = re.search(r"/v?(\d+\.\d+(?:\.\d+)?)/", link)
     if m_ver:

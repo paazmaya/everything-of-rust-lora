@@ -49,6 +49,15 @@ sources:
     url: https://doc.rust-lang.org/nomicon/
     output_dir: raw/rustonomicon
 
+# Official Rust compiler releases and changelogs
+rustc_releases:
+  - name: rustc_releases_md
+    url: https://raw.githubusercontent.com/rust-lang/rust/master/RELEASES.md
+    output_dir: raw/rustc_releases
+  - name: rust_release_blogs
+    url: https://api.github.com/repos/rust-lang/blog.rust-lang.org/git/trees/main
+    output_dir: raw/rustc_releases
+
 # Rust blogs and news
 blogs:
   - name: rust_blog

@@ -65,6 +65,7 @@ Generate a token at: https://github.com/settings/tokens (requires `repo` and `re
 
    ```bash
    uv run python scripts/01_collect_rust_book.py
+   uv run python scripts/01b_collect_rust_releases.py
    uv run python scripts/02_collect_docs_rs.py
    uv run python scripts/03_collect_github.py
    uv run python scripts/04_collect_esp_rs.py
@@ -72,12 +73,12 @@ Generate a token at: https://github.com/settings/tokens (requires `repo` and `re
    ```
 
    Collection output appears in `data/raw/` organized by source. Each item is saved as JSON with:
-   - `source`: Collection origin (rust_book, docs_rs, github, esp_rs, blogs, best_practices)
-   - `source_type`: Category (official_docs, api_docs, github_repo, blogs, best_practices)
+   - `source`: Collection origin (rust_book, rustc_releases, docs_rs, github, esp_rs, blogs, best_practices)
+   - `source_type`: Category (official_docs, official_releases, api_docs, github_repo, blogs, best_practices)
    - `url`: Original URL
    - `title`: Page/file title
    - `content`: Markdown-formatted content
-   - `metadata`: Additional context (crate name, repo name, etc.)
+   - `metadata`: Additional context (crate name, edition, version, diffs, etc.)
    - `collected_at`: ISO timestamp
 
    **Error Handling**: All errors are logged to stdout. If collection is interrupted, you can resume by re-running the same script—already-collected pages are cached and skipped.
@@ -123,10 +124,21 @@ Generate a token at: https://github.com/settings/tokens (requires `repo` and `re
    ```
 
 4. **Create Training Dataset:**
+
    ```bash
    uv run python scripts/08_create_dataset.py
    ```
-   _Outputs `data/datasets/train.jsonl` and `val.jsonl` in Alpaca format with version-grounded instructions and migration questions._
+
+   _Outputs `data/datasets/train.jsonl` and `val.jsonl` in Alpaca format with version-grounded instructions, consecutive minor version diffs, edition guides, and 10-15% stratified boost._
+
+5. **Evaluate Version & Edition Knowledge:**
+   ```bash
+   # Inspect benchmark questions:
+   uv run python scripts/eval_version_knowledge.py --benchmark-only
+
+   # Run benchmark evaluation on base model or trained LoRA adapter:
+   uv run python scripts/eval_version_knowledge.py --model-path Qwen/Qwen3.5-4B --adapter-path models/qwen3_5_4b_rust_lora
+   ```
 
 ## Versioning & Migration Architecture
 

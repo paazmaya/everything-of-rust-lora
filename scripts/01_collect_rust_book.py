@@ -29,8 +29,8 @@ CONFIG_DIR = BASE_DIR / "config"
 
 def extract_doc_version(url: str, soup: BeautifulSoup | None = None) -> tuple[str, str]:
     """Extract version or edition from URL/HTML. Returns (version_str, version_type)."""
-    m = re.search(r"(?:edition-guide/|rust-|edition/)?(2018|2021|2024)", url)
-    if m and any(e in url for e in ["2018", "2021", "2024"]):
+    m = re.search(r"(?:edition-guide/|rust-|edition/)?(2015|2018|2021|2024)", url)
+    if m and any(e in url for e in ["2015", "2018", "2021", "2024"]):
         return m.group(1), "edition"
 
     m_ver = re.search(r"/(\d+\.\d+(?:\.\d+)?)/", url)

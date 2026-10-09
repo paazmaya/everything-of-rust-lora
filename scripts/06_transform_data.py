@@ -22,6 +22,31 @@ RAW_DIR = BASE_DIR / "data" / "raw"
 PROCESSED_DIR = BASE_DIR / "data" / "processed"
 
 
+def _resolve_source_type(dir_name: str) -> str:
+    if dir_name in {
+        "rust_book",
+        "rust_reference",
+        "rust_edition_guide",
+        "rustdoc",
+        "rustc",
+        "cargo",
+        "std",
+        "core",
+        "rust_by_example",
+        "rust_cookbook",
+        "rust_error_index",
+        "rustonomicon",
+    }:
+        return "official_docs"
+    if dir_name == "rustc_releases":
+        return "official_releases"
+    if dir_name in {"esp_rs", "embedded"}:
+        return "esp_rs"
+    if dir_name in {"best_practices", "security", "web_frameworks"}:
+        return "best_practices"
+    return dir_name
+
+
 class DataTransformer:
     def __init__(self):
         self.output_dir = PROCESSED_DIR
@@ -89,8 +114,16 @@ class DataTransformer:
             or doc_data.get("question_body", "") + doc_data.get("answer_body", "")
         )
 
+        is_release_doc = (
+            doc_data.get("source_type") in ["official_releases", "rustc_releases"]
+            or doc_data.get("source") == "rustc_releases"
+            or doc_data.get("is_changelog")
+            or bool(doc_data.get("metadata", {}).get("is_changelog"))
+        )
+
         # Check minimum length (stricter than before)
-        if len(content) < 200:
+        min_len = 100 if is_release_doc else 200
+        if len(content) < min_len:
             self.skipped_too_short += 1
             return False, "content_too_short"
 
@@ -103,15 +136,17 @@ class DataTransformer:
             self.skipped_invalid += 1
             return False, "missing_url"
 
-        # Check for boilerplate
-        if self.has_boilerplate(content):
-            self.skipped_boilerplate += 1
-            return False, "boilerplate_detected"
+        # Release notes and changelogs contain many links to PRs/issues and contributor credits
+        if not is_release_doc:
+            # Check for boilerplate
+            if self.has_boilerplate(content):
+                self.skipped_boilerplate += 1
+                return False, "boilerplate_detected"
 
-        # Check for navigation/footer dominated content
-        if self.is_likely_nav_or_footer(content):
-            self.skipped_low_quality += 1
-            return False, "nav_footer_content"
+            # Check for navigation/footer dominated content
+            if self.is_likely_nav_or_footer(content):
+                self.skipped_low_quality += 1
+                return False, "nav_footer_content"
 
         self.valid_chunks += 1
         return True, None
@@ -157,6 +192,127 @@ class DataTransformer:
 
         return library, version, version_type, is_latest, title, url, meta
 
+    def _build_section_chunks(
+        self,
+        sections: dict[str, str],
+        source_type: str,
+        library: str,
+        version: str,
+        version_type: str,
+        is_latest: bool,
+        url: str,
+        meta: dict[str, Any],
+    ) -> list[dict[str, Any]]:
+        section_chunks: list[dict[str, Any]] = []
+        for sec_title, sec_content in sections.items():
+            clean_sec = self.clean(sec_content)
+            if len(clean_sec) < 80:
+                continue
+            sec_full_title = f"Rust {version} - {sec_title}"
+            comp_key = f"{source_type}:{library}:{version}:{sec_full_title}:{clean_sec}"
+            chunk_hash = hashlib.sha256(comp_key.encode()).hexdigest()[:20]
+            sec_meta = {
+                **meta,
+                "library": library,
+                "version": version,
+                "version_type": version_type,
+                "is_latest": is_latest,
+                "url": url,
+                "title": sec_full_title,
+                "section": sec_title,
+                "is_changelog": True,
+            }
+            section_chunks.append(
+                {
+                    "source_type": source_type,
+                    "library": library,
+                    "version": version,
+                    "version_type": version_type,
+                    "is_latest": is_latest,
+                    "url": url,
+                    "title": sec_full_title,
+                    "content": clean_sec,
+                    "metadata": sec_meta,
+                    "hash": chunk_hash,
+                    "tokens": self.count_tokens(clean_sec),
+                    "transformed_at": datetime.now().isoformat(),
+                }
+            )
+        return section_chunks
+
+    def _build_doc_chunk(
+        self,
+        doc: dict[str, Any],
+        source_type: str,
+        fp: Path,
+    ) -> list[dict[str, Any]]:
+        effective_source_type = str(doc.get("source_type") or source_type)
+        library, version, version_type, is_latest, title, url, meta = self._extract_chunk_identity(
+            doc, effective_source_type, fp
+        )
+
+        is_changelog = bool(
+            doc.get("is_changelog")
+            or meta.get("is_changelog")
+            or meta.get("is_changelog_section")
+            or "CHANGELOG" in title
+            or "Release Notes" in title
+            or "Upgrade Summary" in title
+        )
+
+        chunks: list[dict[str, Any]] = []
+        sections = doc.get("sections")
+        if (
+            isinstance(sections, dict)
+            and len(sections) > 1
+            and effective_source_type == "official_releases"
+        ):
+            chunks.extend(
+                self._build_section_chunks(
+                    sections,
+                    effective_source_type,
+                    library,
+                    version,
+                    version_type,
+                    is_latest,
+                    url,
+                    meta,
+                )
+            )
+
+        content = self.clean(
+            doc.get("content", "") or doc.get("question_body", "") + doc.get("answer_body", "")
+        )
+        comp_key = f"{effective_source_type}:{library}:{version}:{content}"
+        chunk_hash = hashlib.sha256(comp_key.encode()).hexdigest()[:20]
+
+        chunks.append(
+            {
+                "source_type": effective_source_type,
+                "library": library,
+                "version": version,
+                "version_type": version_type,
+                "is_latest": is_latest,
+                "url": url,
+                "title": title,
+                "content": content,
+                "metadata": {
+                    **meta,
+                    "library": library,
+                    "version": version,
+                    "version_type": version_type,
+                    "is_latest": is_latest,
+                    "url": url,
+                    "title": title,
+                    "is_changelog": is_changelog,
+                },
+                "hash": chunk_hash,
+                "tokens": self.count_tokens(content),
+                "transformed_at": datetime.now().isoformat(),
+            }
+        )
+        return chunks
+
     def process_dir(self, dir_path: Path, source_type: str) -> list[dict[str, Any]]:
         chunks: list[dict[str, Any]] = []
         if not dir_path.exists():
@@ -166,47 +322,12 @@ class DataTransformer:
                 with open(fp) as f:
                     doc: dict[str, Any] = json.load(f)
 
-                # Validate content before adding to chunks
                 is_valid, skip_reason = self.validate_content(doc)
                 if not is_valid:
                     logger.debug(f"Skipped {fp.name}: {skip_reason}")
                     continue
 
-                content = self.clean(
-                    doc.get("content", "")
-                    or doc.get("question_body", "") + doc.get("answer_body", "")
-                )
-                effective_source_type = str(doc.get("source_type") or source_type)
-                library, version, version_type, is_latest, title, url, meta = (
-                    self._extract_chunk_identity(doc, effective_source_type, fp)
-                )
-                composite_key = f"{effective_source_type}:{library}:{version}:{content}"
-                chunk_hash = hashlib.sha256(composite_key.encode()).hexdigest()[:20]
-
-                chunks.append(
-                    {
-                        "source_type": effective_source_type,
-                        "library": library,
-                        "version": version,
-                        "version_type": version_type,
-                        "is_latest": is_latest,
-                        "url": url,
-                        "title": title,
-                        "content": content,
-                        "metadata": {
-                            **meta,
-                            "library": library,
-                            "version": version,
-                            "version_type": version_type,
-                            "is_latest": is_latest,
-                            "url": url,
-                            "title": title,
-                        },
-                        "hash": chunk_hash,
-                        "tokens": self.count_tokens(content),
-                        "transformed_at": datetime.now().isoformat(),
-                    }
-                )
+                chunks.extend(self._build_doc_chunk(doc, source_type, fp))
             except json.JSONDecodeError as e:
                 logger.warning(f"Invalid JSON in {fp}: {e}")
                 self.skipped_invalid += 1
@@ -217,28 +338,6 @@ class DataTransformer:
 
     def run_all(self) -> None:
         print("Transforming data...")
-
-        def _resolve_source_type(dir_name: str) -> str:
-            if dir_name in {
-                "rust_book",
-                "rust_reference",
-                "rust_edition_guide",
-                "rustdoc",
-                "rustc",
-                "cargo",
-                "std",
-                "core",
-                "rust_by_example",
-                "rust_cookbook",
-                "rust_error_index",
-                "rustonomicon",
-            }:
-                return "official_docs"
-            if dir_name in {"esp_rs", "embedded"}:
-                return "esp_rs"
-            if dir_name in {"best_practices", "security", "web_frameworks"}:
-                return "best_practices"
-            return dir_name
 
         raw_dirs = sorted(
             [p for p in RAW_DIR.iterdir() if p.is_dir() and not p.name.startswith(".")]

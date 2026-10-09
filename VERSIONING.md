@@ -90,10 +90,15 @@ Every raw document and processed chunk carries explicit version identity:
 - **Automated Changelog Partitioning**: `split_changelog()` parses headings such as `## [0.7.0]` in `CHANGELOG.md` or `RELEASES.md`, saving each version section into its respective version directory (`github/{repo}/{section_version}/`).
 - This allows direct retrieval of breaking changes and release notes for any version.
 
-### C. Official Rust Docs & ESP-RS (`01_collect_rust_book.py`, `04_collect_esp_rs.py`)
+### C. Official Rust Docs, Edition Guides & rustc Releases
 
-- Detects Rust editions (`2018`, `2021`, `2024`) and toolchain versions from page URLs and metadata.
-- Partitions outputs into edition directories under `data/raw/`.
+- **Rust Editions (`01_collect_rust_book.py`)**: Detects Rust editions (`2015`, `2018`, `2021`, `2024`) from page URLs and metadata. Partitions outputs into dedicated edition directories under `data/raw/rust_edition_guide/{edition}/`.
+- **Compiler Releases & Diffs (`01b_collect_rust_releases.py`)**:
+  - Parses official `RELEASES.md` from `rust-lang/rust` master for all versions from 1.0.0 through current.
+  - Extracts structured technical sections: `Language`, `Compiler`, `Libraries` / `Stabilized APIs`, `Cargo`, `Rustdoc`, `Compatibility Notes`.
+  - Collects narrative release announcements with code examples from `rust-lang/blog.rust-lang.org`.
+  - Computes consecutive minor version upgrade summaries (e.g. `1.80.0 -> 1.81.0`) documenting syntax updates, stabilized APIs, and compatibility notes.
+  - Stores all records under `data/raw/rustc_releases/{version}/`.
 
 ### D. Blogs & News (`05_collect_blogs.py`)
 
@@ -110,6 +115,7 @@ $$\text{hash} = \text{sha256}(\text{source\_type} : \text{library} : \text{versi
 
 - Exact duplicates within the _same_ version are removed.
 - Equivalent content across _different_ versions is preserved so each version maintains complete documentation integrity.
+- Structured section chunks (`Language`, `Stabilized APIs`, `Compiler`, `Cargo`, `Compatibility Notes`) are generated from release documents to fit model token boundaries.
 
 ---
 
@@ -143,11 +149,32 @@ Each vector entry is stored with searchable scalar metadata:
 # Query only axum 0.7
 uv run python scripts/07_vector_store.py --library axum --version 0.7.5 --query "Router route nesting"
 
+# Query rustc version changelogs
+uv run python scripts/07_vector_store.py --library rustc --version 1.81.0 --query "core error Error"
+
 # Query only latest documentation
 uv run python scripts/07_vector_store.py --library tokio --query "select! macro"
 ```
 
 #### 2. Version Migration RAG Query
+
+```bash
+# Retrieve migration diff between consecutive Rust releases
+uv run python scripts/07_vector_store.py --library rustc --migrate-from 1.80.0 --migrate-to 1.81.0 --query "stabilized APIs"
+```
+
+---
+
+## 7. Instruction-Tuning Dataset Stratification (`08_create_dataset.py`)
+
+To ensure that the fine-tuned LoRA adapter truly internalizes version milestones and migration guidance rather than having version knowledge diluted by high-volume crate documentation:
+
+1. **Consecutive Minor Version Diffs**: "What changes, language features, compiler updates, and stabilized APIs were introduced between Rust 1.80.0 and 1.81.0?"
+2. **Reverse-Lookup Micro Q&A Pairs**: "In which Rust version was `std::sync::LazyLock` stabilized and what functionality does it provide?"
+3. **Edition Migration Directives**: "Explain the Rust 2024 Edition changes, language features, breaking modifications, and transition strategies regarding '{title}'."
+4. **MSRV Compatibility Guidance**: "Can I use `let-else` syntax if my crate targets MSRV 1.64.0?"
+5. **Stratified Boost (10-15%)**: Oversamples version-critical records to comprise 10–15% of `data/datasets/train.jsonl`.
+6. **Benchmark Validation**: Evaluated via `scripts/eval_version_knowledge.py` against `data/datasets/version_eval_benchmark.jsonl`.
 
 ```bash
 # Compare versions and fetch upgrade notes

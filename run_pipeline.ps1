@@ -14,35 +14,39 @@ if (-not $env:GITHUB_TOKEN) {
 
 Write-Host "`nGITHUB_TOKEN found. Proceeding with pipeline.`n" -ForegroundColor Green
 
-Write-Host "`n[1/5] Collecting official Rust documentation..." -ForegroundColor Green
+Write-Host "`n[1/9] Collecting official Rust documentation..." -ForegroundColor Green
 uv run python scripts/01_collect_rust_book.py
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-Write-Host "`n[2/5] Collecting docs.rs crate documentation..." -ForegroundColor Green
+Write-Host "`n[2/9] Collecting rustc releases, changelogs, and version diffs..." -ForegroundColor Green
+uv run python scripts/01b_collect_rust_releases.py
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+Write-Host "`n[3/9] Collecting docs.rs crate documentation..." -ForegroundColor Green
 uv run python scripts/02_collect_docs_rs.py
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-Write-Host "`n[3/5] Collecting GitHub READMEs and examples..." -ForegroundColor Green
+Write-Host "`n[4/9] Collecting GitHub READMEs and examples..." -ForegroundColor Green
 uv run python scripts/03_collect_github.py
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-Write-Host "`n[4/5] Collecting ESP-RS and Embedded docs..." -ForegroundColor Green
+Write-Host "`n[5/9] Collecting ESP-RS and Embedded docs..." -ForegroundColor Green
 uv run python scripts/04_collect_esp_rs.py
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-Write-Host "`n[5/5] Collecting Blogs and Best Practices..." -ForegroundColor Green
+Write-Host "`n[6/9] Collecting Blogs and Best Practices..." -ForegroundColor Green
 uv run python scripts/05_collect_blogs.py
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-Write-Host "`n[6/6] Transforming and chunking data..." -ForegroundColor Green
+Write-Host "`n[7/9] Transforming and chunking data..." -ForegroundColor Green
 uv run python scripts/06_transform_data.py
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-Write-Host "`n[7/7] Indexing into Vector Database..." -ForegroundColor Green
+Write-Host "`n[8/9] Indexing into Vector Database..." -ForegroundColor Green
 uv run python scripts/07_vector_store.py
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-Write-Host "`n[8/8] Creating Training Dataset..." -ForegroundColor Green
+Write-Host "`n[9/9] Creating Training Dataset..." -ForegroundColor Green
 uv run python scripts/08_create_dataset.py
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
