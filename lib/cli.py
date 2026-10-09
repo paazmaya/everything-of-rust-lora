@@ -108,10 +108,21 @@ def build_arg_parser(
         help="Directory to store training checkpoints (defaults to output_dir/checkpoints).",
     )
     parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Automatically resume training from the latest checkpoint found in checkpoint directory.",
+    )
+    parser.add_argument(
         "--resume-from-checkpoint",
         type=str,
         default=None,
-        help="Path to checkpoint directory to resume training from.",
+        help="Path to specific checkpoint directory (or 'latest') to resume training from.",
+    )
+    parser.add_argument(
+        "--offload-folder",
+        type=str,
+        default=None,
+        help="Directory for Accelerate CPU/disk offloading of model weights when VRAM is constrained.",
     )
     parser.add_argument(
         "--wandb-project",
@@ -154,6 +165,7 @@ def apply_args_to_config(
         "output_dir",
         "checkpoint_dir",
         "resume_from_checkpoint",
+        "offload_folder",
         "wandb_project",
         "wandb_entity",
     ]
@@ -161,6 +173,9 @@ def apply_args_to_config(
         val = getattr(args, field_name, None)
         if val is not None:
             setattr(config, field_name, val)
+
+    if getattr(args, "resume", False):
+        config.resume = True
 
     if getattr(args, "load_in_4bit", False):
         config.load_in_4bit = True

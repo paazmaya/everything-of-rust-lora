@@ -14,16 +14,36 @@ from .config import DEFAULT_REQUIRED_FIELDS, TrainingConfig
 _logger = logging.getLogger("rust_lora.validation")
 
 
-def check_cuda_available(logger: logging.Logger | None = None) -> bool:
-    """Verify CUDA availability and report active GPU."""
+def check_hardware_acceleration(logger: logging.Logger | None = None) -> tuple[str, bool]:
+    """Verify hardware acceleration availability across CUDA, Apple Silicon MPS, or CPU."""
     log = logger or _logger
-    if not torch.cuda.is_available():
-        log.error("CUDA is not available. GPU acceleration is required for training.")
-        return False
+    if torch.cuda.is_available():
+        device_name = torch.cuda.get_device_name(0)
+        log.info(f"CUDA available. Active GPU: {device_name}")
+        return "cuda", True
 
-    device_name = torch.cuda.get_device_name(0)
-    log.info(f"CUDA available. Active GPU: {device_name}")
-    return True
+    if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+        log.info("Apple Silicon Metal Performance Shaders (MPS) hardware acceleration available.")
+        return "mps", True
+
+    log.warning("No GPU hardware acceleration (CUDA or MPS) detected. Training will run on CPU.")
+    return "cpu", False
+
+
+def check_cuda_available(logger: logging.Logger | None = None, allow_mps: bool = False) -> bool:
+    """Verify CUDA (or optionally Apple Silicon MPS) availability."""
+    log = logger or _logger
+    if torch.cuda.is_available():
+        device_name = torch.cuda.get_device_name(0)
+        log.info(f"CUDA available. Active GPU: {device_name}")
+        return True
+
+    if allow_mps and hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+        log.info("Apple Silicon Metal Performance Shaders (MPS) available.")
+        return True
+
+    log.error("CUDA is not available. GPU acceleration is required for training.")
+    return False
 
 
 def check_gpu_memory(min_vram_gb: float = 12.0, logger: logging.Logger | None = None) -> bool:
@@ -43,6 +63,29 @@ def check_gpu_memory(min_vram_gb: float = 12.0, logger: logging.Logger | None = 
         return False
 
     return True
+
+
+def check_system_memory(min_ram_gb: float = 12.0, logger: logging.Logger | None = None) -> bool:
+    """Check system unified memory (macOS) or GPU VRAM (CUDA)."""
+    log = logger or _logger
+    if torch.cuda.is_available():
+        return check_gpu_memory(min_vram_gb=min_ram_gb, logger=log)
+
+    try:
+        pages = os.sysconf("SC_PHYS_PAGES")
+        page_size = os.sysconf("SC_PAGE_SIZE")
+        total_ram_gb = (pages * page_size) / 1e9
+        log.info(f"System Unified Memory: {total_ram_gb:.1f} GB")
+        if total_ram_gb < min_ram_gb:
+            log.warning(
+                f"System has {total_ram_gb:.1f} GB unified memory, but at least {min_ram_gb:.1f} GB is recommended. "
+                "Consider using gradient checkpointing, smaller batch sizes, or CPU/disk offloading."
+            )
+            return False
+        return True
+    except Exception:
+        log.info("Could not determine system unified memory capacity.")
+        return True
 
 
 def check_dependencies(
@@ -121,14 +164,17 @@ def run_preflight_checks(
     min_vram_gb: float = 12.0,
     required_packages: list[str] | None = None,
     logger: logging.Logger | None = None,
+    allow_mps: bool = True,
 ) -> bool:
     """Run all preflight environment and dataset checks."""
     log = logger or _logger
     log.info("Running preflight validation checks...")
 
-    cuda_ok = check_cuda_available(logger=log)
-    if cuda_ok:
-        check_gpu_memory(min_vram_gb=min_vram_gb, logger=log)
+    _, is_accelerated = check_hardware_acceleration(logger=log)
+    if is_accelerated:
+        check_system_memory(min_ram_gb=min_vram_gb, logger=log)
+    else:
+        log.warning("Training will execute on CPU without GPU hardware acceleration.")
 
     deps_ok = check_dependencies(
         required_packages=required_packages,
@@ -141,7 +187,7 @@ def run_preflight_checks(
         logger=log,
     )
 
-    all_passed = bool(cuda_ok and deps_ok and data_ok)
+    all_passed = bool((is_accelerated or allow_mps) and deps_ok and data_ok)
     if all_passed:
         log.info("All preflight validation checks passed successfully!")
     else:

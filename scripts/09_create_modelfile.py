@@ -51,6 +51,21 @@ BASE_MODEL_METADATA: dict[str, dict[str, str]] = {
             "the Qwen ChatML prompt style. Merge with the base model before quantization."
         ),
     },
+    "qwen3_8": {
+        "name": "Qwen 3.8 27B Instruct",
+        "reference": "Qwen/Qwen3.8-27B",
+        "gguf": "unsloth/Qwen3.8-27B-GGUF",
+        "source_url": "https://huggingface.co/Qwen/Qwen3.8-27B",
+        "training_economics": (
+            "LoRA rank=16, alpha=16, optimizer=AdamW (torch/8-bit), scheduler=cosine, "
+            "batch_size=1, gradient_accumulation_steps=16, epochs=3, "
+            "supports Apple Silicon MPS with offload and 24-80GB CUDA workstations."
+        ),
+        "notes": (
+            "This adapter targets the 64-layer hybrid architecture of Qwen 3.8 27B, "
+            "covering linear attention, self attention, and MLP projections."
+        ),
+    },
     "nemotron": {
         "name": "NVIDIA Nemotron 3 Nano 4B",
         "reference": "NVIDIA/Nemotron-3-Nano-4B",

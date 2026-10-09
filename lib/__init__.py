@@ -13,6 +13,7 @@ from .config import (
 from .dataset import load_and_prepare_dataset
 from .engine import (
     create_output_directories,
+    get_latest_checkpoint,
     get_optimal_dtype,
     load_model_and_tokenizer,
     run_sft_training,
@@ -23,6 +24,8 @@ from .validation import (
     check_cuda_available,
     check_dependencies,
     check_gpu_memory,
+    check_hardware_acceleration,
+    check_system_memory,
     run_preflight_checks,
     validate_data_file,
 )
@@ -38,7 +41,10 @@ __all__ = [
     "check_cuda_available",
     "check_dependencies",
     "check_gpu_memory",
+    "check_hardware_acceleration",
+    "check_system_memory",
     "create_output_directories",
+    "get_latest_checkpoint",
     "get_optimal_dtype",
     "load_and_prepare_dataset",
     "load_model_and_tokenizer",

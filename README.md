@@ -8,7 +8,7 @@ This project contains the complete pipeline to train a specialized LoRA adapter 
 2. **Transformation** (Script 06): Cleans, chunks, and deduplicates the data.
 3. **Vector/Graph Storage** (Script 07): Stores data in ChromaDB for easy 6-month incremental updates.
 4. **Dataset Creation** (Script 08): Converts chunks into Alpaca instruction-response format.
-5. **Training** (`train_k2_horizon.py`, `train_granite.py`, `train_qwen.py`, `train_nemotron3_nano.py`): Trains LoRA using Unsloth or Transformers/PEFT.
+5. **Training** (`train_k2_horizon.py`, `train_granite.py`, `train_qwen.py`, `train_qwen3_8.py`, `train_nemotron3_nano.py`): Trains LoRA using Unsloth or Transformers/PEFT.
 6. **Agent Serving** (`serve_coding_agent.py`): Serves base model + LoRA over an OpenAI-compatible API for coding agents.
 7. **Export** (Script 09): Packages the trained LoRA adapter with metadata and a `Modelfile`.
 8. **Merge + GGUF** (Script 10): Merges the adapter with the base model and exports a runnable GGUF bundle for Ollama.
@@ -344,6 +344,18 @@ All model recipes share a common core engine in [lib/](lib/) with standardized p
   - **VRAM:** ~12GB (16-bit bf16 recommended)
   - **Prompt Format:** ChatML instruction template
   - **Key Features:** Full 16-bit precision training, hardware profiles, preflight checks
+
+- [train_qwen3_8.py](train_qwen3_8.py) (Qwen 3.8 27B) — See [QWEN3_8.md](QWEN3_8.md):
+  - **Rank (r):** 16
+  - **Alpha:** 16
+  - **Target Modules:** All 12 hybrid attention & MLP projections (`q_proj`, `k_proj`, `v_proj`, `o_proj`, `in_proj_a`, `in_proj_b`, `in_proj_qkv`, `in_proj_z`, `out_proj`, `gate_proj`, `up_proj`, `down_proj`)
+  - **Optimizer:** Dynamic (`adamw_torch` on macOS/MPS, `adamw_8bit` on CUDA)
+  - **Scheduler:** Cosine
+  - **Batch Size:** 1 per device, gradient accumulation 16 on Mac (effective 16)
+  - **Sequence Length:** 512 (Mac memory-safe default), up to 4096 on workstation/cluster GPUs
+  - **VRAM/RAM:** ~32GB-48GB unified RAM (with offloading) or 24-80GB VRAM
+  - **Prompt Format:** Native ChatML template with reasoning `<think>` block support
+  - **Key Features:** 27B architecture compatibility, macOS Apple Silicon support, resumable training via `--resume`, automatic step checkpointing
 
 - [train_nemotron3_nano.py](train_nemotron3_nano.py) (Nemotron 3 Nano 4B) — See [NEMOTRON.md](NEMOTRON.md):
   - **Rank (r):** 16

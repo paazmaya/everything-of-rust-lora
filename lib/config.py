@@ -59,8 +59,12 @@ class TrainingConfig:
     save_strategy: str = "steps"
     save_steps: int = 50
     save_total_limit: int = 3
+    resume: bool = False
     resume_from_checkpoint: str | None = None
     dataset_num_proc: int = 2
+    offload_folder: str | None = None
+    gradient_checkpointing: bool = False
+    device: str = "auto"
 
     # Experiment tracking
     wandb_project: str | None = None
@@ -81,27 +85,34 @@ def apply_hardware_profile(
     if not profile_name:
         return config
 
-    if profile_name not in profiles:
-        available = list(profiles.keys())
+    profile = profiles.get(profile_name)
+    if profile is None:
         if logger:
             logger.warning(
-                f"Hardware profile '{profile_name}' not found. Available: {available}. Skipping."
+                f"Hardware profile '{profile_name}' not found. Available: {list(profiles.keys())}. Skipping."
             )
         return config
 
-    profile = profiles[profile_name]
     if logger:
         description = profile.get("description", "No description")
         logger.info(f"Applying hardware profile '{profile_name}': {description}")
 
-    if "batch_size" in profile:
-        config.batch_size = profile["batch_size"]
-    if "gradient_accumulation_steps" in profile:
-        config.gradient_accumulation_steps = profile["gradient_accumulation_steps"]
-    if "max_seq_length" in profile:
-        config.max_seq_length = profile["max_seq_length"]
+    direct_keys = (
+        "batch_size",
+        "gradient_accumulation_steps",
+        "max_seq_length",
+        "offload_folder",
+        "save_steps",
+        "save_total_limit",
+    )
+    for key in direct_keys:
+        if key in profile:
+            setattr(config, key, profile[key])
+
     if "load_in_4bit" in profile:
         config.load_in_4bit = bool(profile["load_in_4bit"])
         config.load_in_16bit = not config.load_in_4bit
+    if "gradient_checkpointing" in profile:
+        config.gradient_checkpointing = bool(profile["gradient_checkpointing"])
 
     return config

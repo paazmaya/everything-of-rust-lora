@@ -28,10 +28,33 @@ def setup_logging(name: str = "rust_lora", verbose: bool = False) -> logging.Log
 
 
 def get_optimal_dtype() -> torch.dtype:
-    """Determine the optimal floating point precision for the current GPU."""
+    """Determine the optimal floating point precision for current hardware (CUDA, MPS, CPU)."""
     if torch.cuda.is_available() and torch.cuda.is_bf16_supported():
         return torch.bfloat16
-    return torch.float16
+    if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+        # Apple Silicon MPS supports bfloat16 in PyTorch 2.x
+        return torch.bfloat16
+    if torch.cuda.is_available():
+        return torch.float16
+    return torch.float32
+
+
+def get_latest_checkpoint(checkpoint_dir: str) -> str | None:
+    """Find the latest checkpoint directory matching checkpoint-<step> in checkpoint_dir."""
+    if not os.path.isdir(checkpoint_dir):
+        return None
+    checkpoints: list[tuple[int, str]] = []
+    for entry in os.scandir(checkpoint_dir):
+        if entry.is_dir() and entry.name.startswith("checkpoint-"):
+            try:
+                step = int(entry.name.split("-")[1])
+                checkpoints.append((step, entry.path))
+            except (IndexError, ValueError):
+                continue
+    if not checkpoints:
+        return None
+    checkpoints.sort(key=lambda x: x[0])
+    return checkpoints[-1][1]
 
 
 def create_output_directories(
@@ -148,6 +171,11 @@ def load_model_and_tokenizer(
         "device_map": "auto",
     }
 
+    if config.offload_folder:
+        model_kwargs["offload_folder"] = config.offload_folder
+        Path(config.offload_folder).mkdir(parents=True, exist_ok=True)
+        log.info(f"Enabled model disk/CPU offloading to: {config.offload_folder}")
+
     if config.load_in_4bit:
         from transformers import BitsAndBytesConfig
 
@@ -161,6 +189,11 @@ def load_model_and_tokenizer(
     log.info(f"Loading base model via AutoModelForCausalLM from {config.model_path}...")
     model = AutoModelForCausalLM.from_pretrained(config.model_path, **model_kwargs)
 
+    if getattr(config, "gradient_checkpointing", False):
+        if hasattr(model, "gradient_checkpointing_enable"):
+            model.gradient_checkpointing_enable()
+            log.info("Enabled gradient checkpointing for memory optimization.")
+
     peft_config = LoraConfig(
         r=config.lora_r,
         lora_alpha=config.lora_alpha,
@@ -173,6 +206,67 @@ def load_model_and_tokenizer(
     model.print_trainable_parameters()
     log.info("Successfully configured LoRA with PEFT")
     return model, tokenizer
+
+
+def build_training_arguments(
+    config: TrainingConfig,
+    checkpoint_dir: str,
+    report_to: list[str],
+) -> TrainingArguments:
+    """Construct TrainingArguments with dynamic platform optimization."""
+    is_cuda = torch.cuda.is_available()
+    is_mps = hasattr(torch.backends, "mps") and torch.backends.mps.is_available()
+    use_bf16 = (is_cuda and torch.cuda.is_bf16_supported()) or is_mps
+    use_fp16 = is_cuda and not use_bf16
+    optimizer_name = "adamw_8bit" if is_cuda else "adamw_torch"
+
+    return TrainingArguments(
+        per_device_train_batch_size=config.batch_size,
+        gradient_accumulation_steps=config.gradient_accumulation_steps,
+        warmup_steps=config.warmup_steps,
+        num_train_epochs=config.num_epochs,
+        learning_rate=config.learning_rate,
+        fp16=use_fp16,
+        bf16=use_bf16,
+        logging_steps=config.logging_steps,
+        output_dir=checkpoint_dir,
+        save_strategy=config.save_strategy,
+        save_steps=config.save_steps if config.save_strategy == "steps" else 500,
+        save_total_limit=config.save_total_limit,
+        optim=optimizer_name,
+        weight_decay=config.weight_decay,
+        lr_scheduler_type=config.lr_scheduler_type,
+        gradient_checkpointing=getattr(config, "gradient_checkpointing", False),
+        seed=config.seed,
+        report_to=report_to,
+    )
+
+
+def resolve_checkpoint_resumption(
+    config: TrainingConfig,
+    checkpoint_dir: str,
+    logger: logging.Logger,
+) -> str | None:
+    """Determine the checkpoint path to resume from, if requested."""
+    if config.resume_from_checkpoint:
+        if config.resume_from_checkpoint.lower() == "latest":
+            latest = get_latest_checkpoint(checkpoint_dir)
+            if not latest:
+                logger.warning(
+                    f"No existing checkpoints found in {checkpoint_dir} to resume from. Starting from scratch."
+                )
+            return latest
+        return config.resume_from_checkpoint
+
+    if getattr(config, "resume", False):
+        latest = get_latest_checkpoint(checkpoint_dir)
+        if not latest:
+            logger.warning(
+                f"No existing checkpoints found in {checkpoint_dir} to resume from. Starting from scratch."
+            )
+        return latest
+
+    return None
 
 
 def run_sft_training(
@@ -194,24 +288,11 @@ def run_sft_training(
             os.environ["WANDB_ENTITY"] = config.wandb_entity
 
     report_to = ["wandb"] if config.wandb_project else []
+    active_checkpoint_dir = config.checkpoint_dir or f"{config.output_dir}/checkpoints"
 
-    training_args = TrainingArguments(
-        per_device_train_batch_size=config.batch_size,
-        gradient_accumulation_steps=config.gradient_accumulation_steps,
-        warmup_steps=config.warmup_steps,
-        num_train_epochs=config.num_epochs,
-        learning_rate=config.learning_rate,
-        fp16=not (torch.cuda.is_available() and torch.cuda.is_bf16_supported()),
-        bf16=torch.cuda.is_available() and torch.cuda.is_bf16_supported(),
-        logging_steps=config.logging_steps,
-        output_dir=config.checkpoint_dir or f"{config.output_dir}/checkpoints",
-        save_strategy=config.save_strategy,
-        save_steps=config.save_steps if config.save_strategy == "steps" else 500,
-        save_total_limit=config.save_total_limit,
-        optim="adamw_8bit",
-        weight_decay=config.weight_decay,
-        lr_scheduler_type=config.lr_scheduler_type,
-        seed=config.seed,
+    training_args = build_training_arguments(
+        config=config,
+        checkpoint_dir=active_checkpoint_dir,
         report_to=report_to,
     )
 
@@ -237,10 +318,16 @@ def run_sft_training(
     log.info(f"  Max sequence length: {config.max_seq_length}")
     log.info(f"  4-bit quantization: {config.load_in_4bit}")
 
+    resume_target = resolve_checkpoint_resumption(
+        config=config,
+        checkpoint_dir=active_checkpoint_dir,
+        logger=log,
+    )
+
     start_time = datetime.now()
-    if config.resume_from_checkpoint:
-        log.info(f"Resuming from checkpoint: {config.resume_from_checkpoint}")
-        trainer_stats = trainer.train(resume_from_checkpoint=config.resume_from_checkpoint)
+    if resume_target:
+        log.info(f"Resuming from checkpoint: {resume_target}")
+        trainer_stats = trainer.train(resume_from_checkpoint=resume_target)
     else:
         trainer_stats = trainer.train()
     duration = datetime.now() - start_time
