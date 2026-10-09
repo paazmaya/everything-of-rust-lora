@@ -2,8 +2,6 @@
 
 This document provides complete instructions for training a Rust expert LoRA adapter on [IFM/K2-Horizon-3.7B](https://huggingface.co/IFM/K2-Horizon-3.7B), loading the base model and adapter together, and using them with AI coding agents (Cline, Roo Code, Continue, Aider, Cursor, Copilot).
 
----
-
 ## Model Overview
 
 **IFM/K2-Horizon-3.7B** is a dense 3.7B-parameter foundation model created by the Institute of Foundation Models (IFM), purpose-built for reasoning, software engineering, and tool-augmented agentic execution.
@@ -13,8 +11,6 @@ This document provides complete instructions for training a Rust expert LoRA ada
 - **Architecture:** `K2HorizonForCausalLM` (`trust_remote_code=True`)
 - **Coding Benchmarks:** SWE-bench Verified: **68.6%**, SciCode: **25.9%**, Terminal-Bench 2.1: **25.1%**, BFCL Tool Use: **50.9%**
 - **Special Tokens:** `<|ifm|begin_of_text|>`, `<|ifm|endoftext|>`, `<|ifm|im_start|>`, `<|ifm|im_end|>`, `<ifm|think>`
-
----
 
 ## 1. Quick Start: Training
 
@@ -42,8 +38,6 @@ uv run python train_k2_horizon.py
 ```
 
 Outputs the trained adapter to `models/k2_horizon_rust_lora`.
-
----
 
 ## 2. Hardware Profiles
 
@@ -78,8 +72,6 @@ uv run python train_k2_horizon.py \
   --learning-rate 1.5e-4
 ```
 
----
-
 ## 3. Serving the Model for Coding Agents
 
 Once the LoRA adapter is trained, load it together with `IFM/K2-Horizon-3.7B` and connect to your preferred coding agent.
@@ -109,8 +101,6 @@ The server provides:
 - Native tool/function calling extraction (`<ifm|tool_calls>`)
 - Reasoning content forwarding (`<ifm|think>` $\to$ `reasoning_content`)
 
----
-
 ### Option B: High-Throughput Serving with vLLM
 
 For high-concurrency production deployments:
@@ -127,8 +117,6 @@ vllm serve IFM/K2-Horizon-3.7B \
   --port 8000
 ```
 
----
-
 ### Option C: SGLang Serving
 
 Using the validated SGLang recipe:
@@ -143,8 +131,6 @@ sglang serve \
   --host 0.0.0.0 \
   --port 30000
 ```
-
----
 
 ### Option D: Ollama Export & GGUF
 
@@ -173,8 +159,6 @@ To package and run in Ollama:
    ollama create rust-k2-horizon -f models/rust-k2-horizon_gguf/Modelfile
    ollama run rust-k2-horizon "Write an embedded Rust driver for I2C sensors using embedded-hal."
    ```
-
----
 
 ## 4. Coding Agent Configurations
 
@@ -217,8 +201,6 @@ aider --openai-api-base http://localhost:8000/v1 \
       --openai-api-key EMPTY \
       --model openai/k2-horizon-3.7b-rust-lora
 ```
-
----
 
 ## 5. Native Chat & Tool Format Reference
 

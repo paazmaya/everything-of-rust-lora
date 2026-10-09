@@ -2,8 +2,6 @@
 
 This document provides complete instructions for training a Rust expert LoRA adapter on [Qwen/Qwen3.5-4B](https://huggingface.co/Qwen/Qwen3.5-4B), with ChatML formatting, hardware-aware profiles, and deployment instructions for local and agent workflows.
 
----
-
 ## Model Overview
 
 **Qwen 3.5 4B** is a highly capable, multilingual foundation model with exceptional coding and reasoning performance for its compact parameter class.
@@ -14,8 +12,6 @@ This document provides complete instructions for training a Rust expert LoRA ada
 - **Precision Recommendation:** 16-bit `bfloat16` LoRA is strongly recommended. 4-bit QLoRA is not recommended for the Qwen 3.5 series to prevent degraded reasoning precision.
 - **LoRA Configuration:** $r=16$, $\alpha=16$, dropout $0.0$ targeting all 7 projection matrices (`q_proj`, `k_proj`, `v_proj`, `o_proj`, `gate_proj`, `up_proj`, `down_proj`)
 - **Prompt Format:** Native ChatML template with Rust systems prompt
-
----
 
 ## 1. Quick Start: Training
 
@@ -43,8 +39,6 @@ uv run python train_qwen.py
 ```
 
 Outputs the trained adapter to `models/qwen3_5_4b_rust_lora`.
-
----
 
 ## 2. Hardware Profiles
 
@@ -74,8 +68,6 @@ uv run python train_qwen.py --hardware-profile a100
 uv run python train_qwen.py --hardware-profile dev
 ```
 
----
-
 ## 3. Hyperparameters & Configuration
 
 Configurations are defined inline directly in `train_qwen.py`:
@@ -89,8 +81,6 @@ Configurations are defined inline directly in `train_qwen.py`:
   - Alpha ($\alpha$): `16`
   - Dropout: `0.0`
   - Target modules: `["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]`
-
----
 
 ## 4. CLI Reference
 
@@ -116,8 +106,6 @@ options:
   --wandb-entity        Weights & Biases team/entity name
   --trust-remote-code   Enable execution of custom remote code
 ```
-
----
 
 ## 5. Output Artifacts
 

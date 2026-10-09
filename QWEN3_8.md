@@ -2,8 +2,6 @@
 
 This document provides comprehensive instructions for training a Rust systems programming LoRA adapter on [Qwen/Qwen3.8-27B](https://huggingface.co/Qwen/Qwen3.8-27B). It covers the hybrid architectural design of the 27B model family, target module specifications for universal 27B compatibility, macOS Apple Silicon (MPS + memory offloading) configuration, and checkpoint resumption.
 
----
-
 ## Architecture Overview & Compatibility
 
 ### Why a Dedicated Pipeline is Required for Qwen 3.8 27B
@@ -38,8 +36,6 @@ To ensure the adapter can be loaded by **any** model using the Qwen 3.8 27B arch
 1. **Full-Attention Projections (16 layers):** `q_proj`, `k_proj`, `v_proj`, `o_proj`
 2. **Linear-Attention Projections (48 layers):** `in_proj_a`, `in_proj_b`, `in_proj_qkv`, `in_proj_z`, `out_proj`
 3. **MLP Feed-Forward Blocks (all 64 layers):** `gate_proj`, `up_proj`, `down_proj`
-
----
 
 ## 1. Quick Start: Training on macOS
 
@@ -90,8 +86,6 @@ To resume from a specific checkpoint:
 uv run python train_qwen3_8.py --resume-from-checkpoint models/qwen3_8_27b_rust_lora/checkpoints/checkpoint-50
 ```
 
----
-
 ## 2. Hardware Profiles
 
 `train_qwen3_8.py` provides built-in hardware profiles via `--hardware-profile`:
@@ -120,8 +114,6 @@ uv run python train_qwen3_8.py --resume
 uv run python train_qwen3_8.py --hardware-profile a100_80gb
 ```
 
----
-
 ## 3. macOS Optimization Details
 
 Training a 27B model on unified memory (32GB–48GB) requires dedicated adjustments:
@@ -136,8 +128,6 @@ Training a 27B model on unified memory (32GB–48GB) requires dedicated adjustme
    - Reduces activation memory consumption by recomputing intermediate activations during the backward pass instead of storing all 64 layers in memory.
 4. **Sequence Length:**
    - Set to 512 tokens by default on Mac to limit peak attention tensor allocations while fully accommodating Rust code functions and documentation snippets.
-
----
 
 ## 4. CLI Options Reference
 
@@ -165,8 +155,6 @@ options:
   --wandb-entity        Weights & Biases team/entity name
   --trust-remote-code   Enable custom remote code execution
 ```
-
----
 
 ## 5. Output Artifacts & Deployment
 

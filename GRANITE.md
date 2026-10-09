@@ -2,8 +2,6 @@
 
 This document provides complete instructions for training a Rust expert LoRA adapter on [IBM Granite 4.2](https://huggingface.co/collections/ibm-granite/granite-42-language-models) (8B and 3B variants), merging and quantizing with GGUF, and deploying for coding agents or local inference.
 
----
-
 ## Model Overview
 
 **IBM Granite 4.2** is a family of enterprise-ready, open foundation models built with state-of-the-art architecture for code intelligence, reasoning, and instruction following.
@@ -15,8 +13,6 @@ This document provides complete instructions for training a Rust expert LoRA ada
 - **Quantization Support:** 4-bit QLoRA default (NF4 / Unsloth kernels), 16-bit bf16 on high-memory GPUs
 - **LoRA Configuration:** $r=64$, $\alpha=128$, dropout $0.05$ targeting all 7 projection matrices (`q_proj`, `k_proj`, `v_proj`, `o_proj`, `gate_proj`, `up_proj`, `down_proj`)
 - **Prompt Format:** Standard Alpaca instruction format
-
----
 
 ## 1. Quick Start: Training
 
@@ -45,8 +41,6 @@ uv run python train_granite.py
 
 Outputs the trained adapter to `models/granite_4.2_8b_rust_lora`.
 
----
-
 ## 2. Hardware Profiles
 
 Select a profile matching your available GPU hardware using `--hardware-profile`:
@@ -72,8 +66,6 @@ uv run python train_granite.py --model-path ibm-granite/granite-4.2-3b --hardwar
 uv run python train_granite.py --hardware-profile rtx6000
 ```
 
----
-
 ## 3. Variant Auto-Detection
 
 The training script automatically detects whether an 8B or 3B model is specified from the model ID or directory path, and configures the default output directory accordingly:
@@ -89,8 +81,6 @@ uv run python train_granite.py --model-path ibm-granite/granite-4.2-3b
 uv run python train_granite.py --model-path /models/granite-4.2-3b
 ```
 
----
-
 ## 4. Hyperparameters & Configuration
 
 All configurations are defined inline directly in `train_granite.py`, eliminating external YAML dependencies:
@@ -104,8 +94,6 @@ All configurations are defined inline directly in `train_granite.py`, eliminatin
   - Alpha ($\alpha$): `128`
   - Dropout: `0.05`
   - Target modules: `["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]`
-
----
 
 ## 5. CLI Reference
 
@@ -132,8 +120,6 @@ options:
   --trust-remote-code   Enable execution of custom remote code
 ```
 
----
-
 ## 6. Exporting to Ollama / GGUF
 
 Once training is complete, export the adapter into a quantized GGUF file for local deployment:
@@ -147,8 +133,6 @@ uv run python scripts/10_export_ollama.py \
 ```
 
 This generates an Ollama Modelfile and packages the model for `ollama run rust-granite-8b`.
-
----
 
 ## 7. Output Artifacts
 

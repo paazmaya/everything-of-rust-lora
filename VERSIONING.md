@@ -2,8 +2,6 @@
 
 This document describes how library and documentation versions are collected, preserved, indexed into ChromaDB (for version-aware RAG), and formatted into instruction tuning datasets for the LoRA adapter.
 
----
-
 ## 1. Motivation
 
 When training models on programming languages and fast-evolving ecosystems like Rust:
@@ -12,8 +10,6 @@ When training models on programming languages and fast-evolving ecosystems like 
 - **Migration guidance** is one of the highest-value capabilities of an assistant (e.g. "how do I migrate my handler from axum 0.6 to 0.7?").
 - Overwriting older data with newer data leaves the model unable to differentiate version-specific syntax or assist users maintaining legacy codebases.
 - Blind deduplication across versions removes documentation sections that are identical between versions, creating gaps in historical docs.
-
----
 
 ## 2. Directory Layout & Persistence
 
@@ -50,8 +46,6 @@ When new library versions or doc updates are fetched in future runs:
 1. New version folders are created alongside existing ones.
 2. Older version files are never overwritten or deleted.
 
----
-
 ## 3. Metadata Schema
 
 Every raw document and processed chunk carries explicit version identity:
@@ -66,8 +60,6 @@ Every raw document and processed chunk carries explicit version identity:
 | `url`          | `str`  | Source URL                             | `"https://docs.rs/axum/0.7.5/axum/"`             |
 | `title`        | `str`  | Page or file title                     | `"axum::Router"`                                 |
 | `is_changelog` | `bool` | True if section is a version changelog | `true` / `false`                                 |
-
----
 
 ## 4. Collection Strategies
 
@@ -104,8 +96,6 @@ Every raw document and processed chunk carries explicit version identity:
 
 - Extracts publication timestamps and release announcement version strings (e.g., `Announcing Rust 1.75.0`).
 
----
-
 ## 5. Version-Aware Transformation & Deduplication (`06_transform_data.py`)
 
 Standard deduplication creates a content hash `sha256(content)`. If two different versions of a library share unchanged methods or documentation, content-only deduplication deletes the chunk from one of the versions, creating holes in the older or newer version's context.
@@ -116,8 +106,6 @@ $$\text{hash} = \text{sha256}(\text{source\_type} : \text{library} : \text{versi
 - Exact duplicates within the _same_ version are removed.
 - Equivalent content across _different_ versions is preserved so each version maintains complete documentation integrity.
 - Structured section chunks (`Language`, `Stabilized APIs`, `Compiler`, `Cargo`, `Compatibility Notes`) are generated from release documents to fit model token boundaries.
-
----
 
 ## 6. ChromaDB Vector Store & Version-Aware RAG (`07_vector_store.py`)
 
@@ -162,8 +150,6 @@ uv run python scripts/07_vector_store.py --library tokio --query "select! macro"
 # Retrieve migration diff between consecutive Rust releases
 uv run python scripts/07_vector_store.py --library rustc --migrate-from 1.80.0 --migrate-to 1.81.0 --query "stabilized APIs"
 ```
-
----
 
 ## 7. Instruction-Tuning Dataset Stratification (`08_create_dataset.py`)
 
@@ -210,8 +196,6 @@ diff = store.query_version_migration(
     topic="Router::nest"
 )
 ```
-
----
 
 ## 7. Dataset Generation for LoRA Training (`08_create_dataset.py`)
 
