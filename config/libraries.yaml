@@ -311,9 +311,9 @@ libraries:
   - name: cargo-crev
     repo: crev-dev/cargo-crev
     url: https://docs.rs/cargo-crev
-  - name: rusty-hog
+  - name: rusty_hogs
     repo: newrelic/rusty-hog
-    url: null
+    url: https://docs.rs/rusty_hogs
   - name: cross
     repo: cross-rs/cross
     url: null
@@ -374,9 +374,6 @@ libraries:
   - name: windows_x86_64_gnu
     repo: microsoft/windows-rs
     url: https://docs.rs/windows_x86_64_gnu
-  - name: coral-tpu
-    repo: geraldo-netto/coral-tpu
-    url: null
   - name: windows_aarch64_msvc
     repo: microsoft/windows-rs
     url: https://docs.rs/windows_aarch64_msvc
@@ -545,9 +542,9 @@ libraries:
   - name: num_cpus
     repo: seanmonstar/num_cpus
     url: https://docs.rs/num_cpus
-  - name: luminS
+  - name: lms
     repo: wchang22/LuminS
-    url: null
+    url: https://docs.rs/lms
   - name: strsim
     repo: rapidfuzz/strsim-rs
     url: https://docs.rs/strsim
@@ -590,9 +587,9 @@ libraries:
   - name: wgpu
     repo: gfx-rs/wgpu
     url: null
-  - name: rust-rasterizer
-    repo: tchauffi/rust-rasterizer
-    url: null
+  - name: tiny-skia
+    repo: RazrFalcon/tiny-skia
+    url: https://docs.rs/tiny-skia
   - name: wasmtime
     repo: bytecodealliance/wasmtime
     url: null
@@ -779,9 +776,9 @@ libraries:
   - name: navi
     repo: denisidoro/navi
     url: null
-  - name: zola
-    repo: getzola/zola
-    url: null
+  - name: bat
+    repo: sharkdp/bat
+    url: https://docs.rs/bat
   - name: dust
     repo: bootandy/dust
     url: null
@@ -791,9 +788,9 @@ libraries:
   - name: deno
     repo: denoland/deno
     url: null
-  - name: lapce
-    repo: lapce/lapce
-    url: null
+  - name: eza
+    repo: eza-community/eza
+    url: https://docs.rs/eza
   - name: delta
     repo: dandavison/delta
     url: null

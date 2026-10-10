@@ -4,6 +4,7 @@ import json
 import logging
 import re
 import sys
+from collections import deque
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -123,6 +124,9 @@ class RustDocCollector:
             for b in ["print.html", "all.html", "help.html", "settings.html"]
         ):
             return False
+        # Skip repetitive low-level architecture intrinsics (15,000+ pages)
+        if "/arch/" in parsed_url.path:
+            return False
         # Skip trivial single-item declaration subpages
         filename = parsed_url.path.rsplit("/", 1)[-1]
         if any(filename.startswith(p) for p in ["constant.", "type."]):
@@ -138,7 +142,7 @@ class RustDocCollector:
             return
         h1_tag = main.find("h1") or soup.find("h1")
         if h1_tag is not None:
-            for btn in h1_tag.find_all(class_=lambda c: c and "copy" in c):
+            for btn in h1_tag.find_all(class_=lambda c: bool(c and "copy" in c)):
                 btn.decompose()
             title = h1_tag.get_text(strip=True) or "Untitled"
         else:
@@ -156,6 +160,27 @@ class RustDocCollector:
             version_type,
         )
 
+    def _extract_linked_urls(
+        self,
+        soup: BeautifulSoup,
+        normalized_url: str,
+        base_domain: str,
+        base_path: str,
+    ) -> list[str]:
+        """Extract valid linked page URLs."""
+        linked_urls: list[str] = []
+        for link in soup.find_all("a", href=True):
+            href = str(link["href"])
+            if not self._is_valid_link(href):
+                continue
+            next_url = urljoin(normalized_url, href)
+            parsed = urlparse(next_url)
+            if not self._is_valid_page_url(parsed, base_domain, base_path):
+                continue
+            defragged = urldefrag(next_url)[0]
+            linked_urls.append(defragged)
+        return linked_urls
+
     def _queue_linked_pages(
         self,
         soup: BeautifulSoup,
@@ -165,15 +190,8 @@ class RustDocCollector:
         base_domain: str,
         base_path: str,
     ) -> None:
-        """Extract and queue linked pages for collection."""
-        for link in soup.find_all("a", href=True):
-            href = str(link["href"])
-            if not self._is_valid_link(href):
-                continue
-            next_url = urljoin(normalized_url, href)
-            parsed = urlparse(next_url)
-            if not self._is_valid_page_url(parsed, base_domain, base_path):
-                continue
+        """Deprecated compatibility helper; prefer collect_site_recursive with queue."""
+        for next_url in self._extract_linked_urls(soup, normalized_url, base_domain, base_path):
             self.collect_site_recursive(next_url, source_name, out_dir, base_domain, base_path)
 
     def collect_site_recursive(
@@ -184,26 +202,32 @@ class RustDocCollector:
         base_domain: str,
         base_path: str,
     ) -> None:
-        """Recursively collect all pages from a site, staying within base_path."""
-        normalized_url = urldefrag(url)[0]
-        if normalized_url in self.visited:
-            return
-        self.visited.add(normalized_url)
-        sys.stdout.write(".")
-        sys.stdout.flush()
-        try:
-            r = self.session.get(normalized_url, timeout=30)
-            if not r:
-                return
-            s = BeautifulSoup(r.text, "lxml")
-            self._process_page_content(s, normalized_url, source_name, out_dir)
-            self._queue_linked_pages(
-                s, normalized_url, source_name, out_dir, base_domain, base_path
-            )
-        except requests.Timeout as e:
-            logger.warning(f"Timeout collecting {normalized_url}: {e}")
-        except Exception as e:
-            logger.warning(f"Error collecting {normalized_url}: {type(e).__name__}: {e}")
+        """Collect all pages from a site iteratively using a queue, staying within base_path."""
+        initial_url = urldefrag(url)[0]
+        queue: deque[str] = deque([initial_url])
+        enqueued: set[str] = {initial_url}
+
+        while queue:
+            current_url = queue.popleft()
+            if current_url in self.visited:
+                continue
+            self.visited.add(current_url)
+            sys.stdout.write(".")
+            sys.stdout.flush()
+            try:
+                r = self.session.get(current_url, timeout=30)
+                if not r:
+                    continue
+                s = BeautifulSoup(r.text, "lxml")
+                self._process_page_content(s, current_url, source_name, out_dir)
+                for next_url in self._extract_linked_urls(s, current_url, base_domain, base_path):
+                    if next_url not in self.visited and next_url not in enqueued:
+                        enqueued.add(next_url)
+                        queue.append(next_url)
+            except requests.Timeout as e:
+                logger.warning(f"Timeout collecting {current_url}: {e}")
+            except Exception as e:
+                logger.warning(f"Error collecting {current_url}: {type(e).__name__}: {e}")
 
     def collect_site(self, base_url: str, source_name: str, out_dir: str) -> None:
         output_dir = self.output_base / out_dir
