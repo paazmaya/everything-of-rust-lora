@@ -19,6 +19,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 BASE_MODEL_METADATA: dict[str, dict[str, str]] = {
     "granite": {
         "name": "IBM Granite 4.2 8B",
@@ -167,6 +169,19 @@ def format_adapter_config(adapter_config: dict[str, object]) -> list[str]:
     return parts
 
 
+def get_cutoff_date() -> str:
+    """Read knowledge cutoff date from config/cybersec.yaml."""
+    cfg_file = Path(__file__).parent.parent / "config" / "cybersec.yaml"
+    if not cfg_file.exists():
+        raise FileNotFoundError(f"Missing required configuration file: {cfg_file}")
+    with open(cfg_file) as f:
+        cfg = yaml.safe_load(f) or {}
+    cutoff = cfg.get("metadata", {}).get("cutoff_date")
+    if not cutoff:
+        raise ValueError(f"cutoff_date not found in {cfg_file} under metadata.cutoff_date")
+    return str(cutoff)
+
+
 def build_modelfile_content(
     model_name: str,
     base_metadata: dict[str, str],
@@ -179,15 +194,18 @@ def build_modelfile_content(
     adapter_id = str(adapter_config.get("adapter_id", "unknown"))
     adapter_files = inventory_files(adapter_dir)
     merge_command = (
-        f"python scripts/10_export_ollama.py --model {adapter_dir.as_posix()} "
+        f"uv run python scripts/10_export_ollama.py --model {adapter_dir.as_posix()} "
         f"--name {model_name} --base {base_reference}"
     )
+
+    cutoff_date = get_cutoff_date()
 
     lines: list[str] = [
         "format_version: '1.0'",
         "artifact_type: loRA_adapter_metadata",
         f"name: {safe_yaml_scalar(model_name)}",
         f"created_at: {safe_yaml_scalar(created_at)}",
+        f"knowledge_cutoff_date: {safe_yaml_scalar(cutoff_date)}",
         "",
         "base_model:",
         f"  name: {safe_yaml_scalar(base_metadata['name'])}",
@@ -198,7 +216,8 @@ def build_modelfile_content(
         "training_economics:",
         f"  summary: {safe_yaml_scalar(base_metadata['training_economics'])}",
         "  dataset: data/datasets/train.jsonl",
-        "  instruction: Rust programming, systems, async Rust, embedded Rust, and library usage.",
+        "  instruction: Rust programming, systems, async Rust, embedded Rust, cybersecurity, RustSec advisories, and Kali/LOTL tooling.",
+        f"  cutoff_date: {safe_yaml_scalar(cutoff_date)}",
         "",
         "adapter:",
         f"  path: {safe_yaml_scalar(adapter_dir.as_posix())}",

@@ -14,31 +14,34 @@ fi
 
 echo "GITHUB_TOKEN found. Proceeding with pipeline."
 
-echo "[1/9] Collecting official Rust documentation..."
+echo "[1/10] Collecting official Rust documentation..."
 uv run python scripts/01_collect_rust_book.py
 
-echo "[2/9] Collecting rustc releases, changelogs, and version diffs..."
+echo "[2/10] Collecting rustc releases, changelogs, and version diffs..."
 uv run python scripts/01b_collect_rust_releases.py
 
-echo "[3/9] Collecting docs.rs crate documentation..."
+echo "[3/10] Collecting docs.rs crate documentation..."
 uv run python scripts/02_collect_docs_rs.py
 
-echo "[4/9] Collecting GitHub READMEs and examples..."
+echo "[4/10] Collecting Cybersecurity, RustSec, Kali Linux, and Living-Off-The-Land (LOTL)..."
+uv run python scripts/02b_collect_cybersec.py
+
+echo "[5/10] Collecting GitHub READMEs and examples..."
 uv run python scripts/03_collect_github.py
 
-echo "[5/9] Collecting ESP-RS and Embedded docs..."
+echo "[6/10] Collecting ESP-RS and Embedded docs..."
 uv run python scripts/04_collect_esp_rs.py
 
-echo "[6/9] Collecting Blogs and Best Practices..."
+echo "[7/10] Collecting Blogs and Best Practices..."
 uv run python scripts/05_collect_blogs.py
 
-echo "[7/9] Transforming and chunking data..."
+echo "[8/10] Transforming and chunking data..."
 uv run python scripts/06_transform_data.py
 
-echo "[8/9] Indexing into Vector Database..."
+echo "[9/10] Indexing into Vector Database..."
 uv run python scripts/07_vector_store.py
 
-echo "[9/9] Creating Training Dataset..."
+echo "[10/10] Creating Training Dataset..."
 uv run python scripts/08_create_dataset.py
 
 echo "========================================"

@@ -67,17 +67,19 @@ Generate a token at: https://github.com/settings/tokens (requires `repo` and `re
    uv run python scripts/01_collect_rust_book.py
    uv run python scripts/01b_collect_rust_releases.py
    uv run python scripts/02_collect_docs_rs.py
+   uv run python scripts/02b_collect_cybersec.py
    uv run python scripts/03_collect_github.py
    uv run python scripts/04_collect_esp_rs.py
    uv run python scripts/05_collect_blogs.py
    ```
 
    Collection output appears in `data/raw/` organized by source. Each item is saved as JSON with:
-   - `source`: Collection origin (rust_book, rustc_releases, docs_rs, github, esp_rs, blogs, best_practices)
-   - `source_type`: Category (official_docs, official_releases, api_docs, github_repo, blogs, best_practices)
+   - `source`: Collection origin (rust_book, rustc_releases, docs_rs, cybersec, github, esp_rs, blogs, best_practices)
+   - `source_type`: Category (official_docs, official_releases, api_docs, cybersec, github_repo, blogs, best_practices)
    - `url`: Original URL
    - `title`: Page/file title
    - `content`: Markdown-formatted content
+   - `cutoff_date`: Knowledge cutoff date (e.g. for vulnerability intelligence & tooling)
    - `metadata`: Additional context (crate name, edition, version, diffs, etc.)
    - `collected_at`: ISO timestamp
 
@@ -130,6 +132,17 @@ Generate a token at: https://github.com/settings/tokens (requires `repo` and `re
    ```
 
    _Outputs `data/datasets/train.jsonl` and `val.jsonl` in Alpaca format with version-grounded instructions, consecutive minor version diffs, edition guides, and 10-15% stratified boost._
+
+   ```
+   Final Dataset Summary:
+     - Total chunks processed: 37769
+     - Total samples: 43059
+     - Version & Edition representation: 11.0%
+     - Cybersecurity & LOTL representation: 8.0%
+     - Knowledge Cutoff Date: 2026-10-11
+     - Train split (98%): 42197
+     - Val split (2%): 862
+   ```
 
 5. **Evaluate Version & Edition Knowledge:**
    ```bash
@@ -459,14 +472,15 @@ Because we stored the raw data in ChromaDB (a local vector database), you do not
 1. **Collect only new data:**
 
    ```bash
-   python scripts/01_collect_rust_book.py  # Gets updated docs
-   python scripts/02_collect_docs_rs.py    # Gets new crate versions
+   uv run python scripts/01_collect_rust_book.py  # Gets updated docs
+   uv run python scripts/02_collect_docs_rs.py    # Gets new crate versions
+   uv run python scripts/02b_collect_cybersec.py  # Gets updated RustSec advisories & tools
    ```
 
 2. **Re-transform the new raw data:**
 
    ```bash
-   python scripts/06_transform_data.py
+   uv run python scripts/06_transform_data.py
    ```
 
 3. **Update the Vector Store:**

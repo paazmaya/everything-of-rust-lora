@@ -14,10 +14,25 @@ Documentation References:
 """
 
 import os
+from pathlib import Path
 from typing import Any
 
+import yaml
 from peft import PeftModel
 from unsloth import FastLanguageModel
+
+
+def get_cutoff_date() -> str:
+    """Read knowledge cutoff date from config/cybersec.yaml."""
+    cfg_file = Path(__file__).parent.parent / "config" / "cybersec.yaml"
+    if not cfg_file.exists():
+        raise FileNotFoundError(f"Missing required configuration file: {cfg_file}")
+    with open(cfg_file) as f:
+        cfg = yaml.safe_load(f) or {}
+    cutoff = cfg.get("metadata", {}).get("cutoff_date")
+    if not cutoff:
+        raise ValueError(f"cutoff_date not found in {cfg_file} under metadata.cutoff_date")
+    return str(cutoff)
 
 
 def export_to_ollama(
@@ -95,6 +110,15 @@ def export_to_ollama(
         or "k2" in model_name.lower()
     )
 
+    cutoff_date = get_cutoff_date()
+
+    system_prompt = (
+        f"You are an expert Rust programmer and cybersecurity engineer specializing in systems programming, "
+        f"async Rust, ESP32 embedded development, RustSec vulnerability analysis, Kali Linux tooling, and "
+        f"living-off-the-land (LOTL) security. Your cybersecurity, vulnerability, and tooling knowledge cutoff "
+        f"date is {cutoff_date}. For vulnerabilities discovered after this date, advise running cargo-audit."
+    )
+
     if is_k2:
         modelfile_content = f"""FROM {from_path}
 PARAMETER stop "<|ifm|im_end|>"
@@ -108,14 +132,14 @@ TEMPLATE \"\"\"{{{{ if .System }}}}<|ifm|im_start|>system
 {{{{ end }}}}<|ifm|im_start|>assistant
 <ifm|think>
 </ifm|think>{{{{ .Response }}}}<|ifm|im_end|>\"\"\"
-SYSTEM You are an expert Rust programmer specializing in systems programming, async Rust, ESP32 embedded development, and the Rust ecosystem.
+SYSTEM {system_prompt}
 """
     else:
         modelfile_content = f"""FROM {from_path}
 PARAMETER stop "<|im_start|>"
 PARAMETER stop "<|im_end|>"
 PARAMETER temperature 0.2
-SYSTEM You are an expert Rust programmer specializing in systems programming, async Rust, ESP32 embedded development, and the Rust ecosystem.
+SYSTEM {system_prompt}
 """
 
     modelfile_path = f"{gguf_dir}/Modelfile"

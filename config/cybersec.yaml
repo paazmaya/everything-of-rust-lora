@@ -1,0 +1,112 @@
+# Cybersecurity, Threat Intelligence, Kali Linux, and Living-off-the-Land (LOTL) Sources
+# Knowledge cutoff and source definitions for red teaming, blue teaming, hardening, and vulnerability intelligence.
+
+metadata:
+  cutoff_date: "2026-10-11"
+  description: "Cybersecurity, RustSec advisories, Kali Linux CLI tools, LOTL, and Rust security hardening"
+
+# Complete RustSec advisory database (RUSTSEC and CVE advisories for crates.io)
+rustsec:
+  name: rustsec_advisory_db
+  repo: rustsec/advisory-db
+  branch: main
+  api_trees_url: https://api.github.com/repos/rustsec/advisory-db/git/trees/main?recursive=1
+  raw_base_url: https://raw.githubusercontent.com/rustsec/advisory-db/main/
+  output_dir: raw/cybersec/rustsec
+
+# Kali Linux CLI tools and utility ecosystem
+kali:
+  name: kali_tools_docs
+  repo: kalilinux/documentation/kali-tools
+  branch: master
+  api_trees_url: https://api.github.com/repos/kalilinux/documentation/kali-tools/git/trees/master?recursive=1
+  raw_base_url: https://gitlab.com/kalilinux/documentation/kali-tools/-/raw/master/
+  index_url: https://www.kali.org/tools/
+  output_dir: raw/cybersec/kali
+
+# Living-off-the-Land (LOTL) binaries, scripts, and libraries across Windows, Linux, and macOS
+lotl:
+  # Windows Living Off The Land Binaries and Scripts (LOLBAS)
+  lolbas:
+    name: lolbas_project
+    repo: LOLBAS-Project/LOLBAS
+    branch: master
+    api_trees_url: https://api.github.com/repos/LOLBAS-Project/LOLBAS/git/trees/master?recursive=1
+    raw_base_url: https://raw.githubusercontent.com/LOLBAS-Project/LOLBAS/master/
+    output_dir: raw/cybersec/lotl/windows
+
+  # Linux Unix binaries for privilege escalation, file transfer, and evasion (GTFOBins)
+  gtfobins:
+    name: gtfobins_project
+    repo: GTFOBins/GTFOBins.github.io
+    branch: master
+    api_trees_url: https://api.github.com/repos/GTFOBins/GTFOBins.github.io/git/trees/master?recursive=1
+    raw_base_url: https://raw.githubusercontent.com/GTFOBins/GTFOBins.github.io/master/
+    output_dir: raw/cybersec/lotl/linux
+
+  # macOS Living Off the Orchard Binaries (LOOBins)
+  loobins:
+    name: loobins_project
+    repo: infosecb/LOOBins
+    branch: main
+    api_trees_url: https://api.github.com/repos/infosecb/LOOBins/git/trees/main?recursive=1
+    raw_base_url: https://raw.githubusercontent.com/infosecb/LOOBins/main/
+    output_dir: raw/cybersec/lotl/macos
+
+# Windows native administrative tools and PowerShell cmdlets
+windows_lotl:
+  name: windows_native_lotl
+  output_dir: raw/cybersec/lotl/powershell
+  cmdlets:
+    - name: Invoke-WebRequest
+      module: Microsoft.PowerShell.Utility
+      category: Download/C2
+      detection: "PowerShell Event ID 4104 (ScriptBlock Logging), Sysmon Event ID 1"
+    - name: Start-Process
+      module: Microsoft.PowerShell.Management
+      category: Execution
+      detection: "Process Creation Event ID 4688, Sysmon Event ID 1"
+    - name: Get-CimInstance
+      module: CimCmdlets
+      category: Reconnaissance
+      detection: "WMI/CIM activity logging, PowerShell Event ID 4104"
+    - name: Set-MpPreference
+      module: Defender
+      category: Defense Evasion
+      detection: "Defender Event ID 5007, PowerShell Event ID 4104"
+    - name: New-Service
+      module: Microsoft.PowerShell.Management
+      category: Persistence/Privilege Escalation
+      detection: "System Event ID 7045 (Service Creation), Sysmon Event ID 1"
+    - name: Invoke-Expression
+      module: Microsoft.PowerShell.Utility
+      category: Dynamic Code Execution
+      detection: "PowerShell Event ID 4104 (ScriptBlock Logging)"
+    - name: Add-MpPreference
+      module: Defender
+      category: Defense Evasion
+      detection: "Defender Event ID 5007, exclusion paths"
+
+# Rust security, hardening, verification, and unsafe code guidelines
+rust_hardening:
+  output_dir: raw/cybersec/hardening
+  sources:
+    - name: unsafe_code_guidelines
+      repo: rust-lang/unsafe-code-guidelines
+      branch: master
+      api_trees_url: https://api.github.com/repos/rust-lang/unsafe-code-guidelines/git/trees/master?recursive=1
+      raw_base_url: https://raw.githubusercontent.com/rust-lang/unsafe-code-guidelines/master/
+      output_dir: raw/cybersec/hardening/unsafe_code_guidelines
+    - name: miri_docs
+      repo: rust-lang/miri
+      branch: master
+      raw_base_url: https://raw.githubusercontent.com/rust-lang/miri/master/
+      files:
+        - README.md
+      output_dir: raw/cybersec/hardening/miri
+    - name: high_assurance_rust
+      url: https://highassurance.rs/
+      output_dir: raw/cybersec/hardening/high_assurance_rust
+    - name: rust_security_handbook
+      url: https://yevh.github.io/rust-security-handbook/
+      output_dir: raw/cybersec/hardening/rust_security_handbook

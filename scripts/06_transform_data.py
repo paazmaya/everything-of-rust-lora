@@ -44,6 +44,8 @@ def _resolve_source_type(dir_name: str) -> str:
         return "esp_rs"
     if dir_name in {"best_practices", "security", "web_frameworks"}:
         return "best_practices"
+    if dir_name == "cybersec":
+        return "cybersec"
     return dir_name
 
 
@@ -114,15 +116,25 @@ class DataTransformer:
             or doc_data.get("question_body", "") + doc_data.get("answer_body", "")
         )
 
-        is_release_doc = (
-            doc_data.get("source_type") in ["official_releases", "rustc_releases"]
-            or doc_data.get("source") == "rustc_releases"
+        is_exempt_doc = (
+            doc_data.get("source_type") in ["official_releases", "rustc_releases", "cybersec"]
+            or doc_data.get("source")
+            in [
+                "rustc_releases",
+                "rustsec",
+                "kali_tools",
+                "lolbas",
+                "gtfobins",
+                "loobins",
+                "powershell_lotl",
+                "rust_hardening",
+            ]
             or doc_data.get("is_changelog")
             or bool(doc_data.get("metadata", {}).get("is_changelog"))
         )
 
         # Check minimum length (stricter than before)
-        min_len = 100 if is_release_doc else 200
+        min_len = 80 if is_exempt_doc else 200
         if len(content) < min_len:
             self.skipped_too_short += 1
             return False, "content_too_short"
@@ -136,8 +148,8 @@ class DataTransformer:
             self.skipped_invalid += 1
             return False, "missing_url"
 
-        # Release notes and changelogs contain many links to PRs/issues and contributor credits
-        if not is_release_doc:
+        # Release notes, changelogs, and security advisories contain links to CVEs, PRs/issues, and credits
+        if not is_exempt_doc:
             # Check for boilerplate
             if self.has_boilerplate(content):
                 self.skipped_boilerplate += 1
@@ -285,6 +297,7 @@ class DataTransformer:
         )
         comp_key = f"{effective_source_type}:{library}:{version}:{content}"
         chunk_hash = hashlib.sha256(comp_key.encode()).hexdigest()[:20]
+        cutoff_date = doc.get("cutoff_date") or meta.get("cutoff_date")
 
         chunks.append(
             {
@@ -296,6 +309,7 @@ class DataTransformer:
                 "url": url,
                 "title": title,
                 "content": content,
+                "cutoff_date": cutoff_date,
                 "metadata": {
                     **meta,
                     "library": library,
@@ -305,6 +319,7 @@ class DataTransformer:
                     "url": url,
                     "title": title,
                     "is_changelog": is_changelog,
+                    **({"cutoff_date": cutoff_date} if cutoff_date else {}),
                 },
                 "hash": chunk_hash,
                 "tokens": self.count_tokens(content),
