@@ -27,7 +27,7 @@ jobs:
           fetch-depth: 0
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v10
+        uses: astral-sh/setup-uv@f64d32b1cd6cc11405a74665b3dfb7bb86fea9f0
         with:
           version: "latest"
           python-version: "3.13"
@@ -49,7 +49,7 @@ jobs:
         run: uv run pytest
 
       - name: SonarCloud Scan
-        uses: SonarSource/sonarsource-scan-action@v8
+        uses: SonarSource/sonarqube-scan-action@v8
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
