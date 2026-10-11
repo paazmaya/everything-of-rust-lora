@@ -41,6 +41,7 @@ import os
 import shutil
 import sys
 from pathlib import Path
+from typing import Any, cast
 
 import yaml
 
@@ -207,8 +208,11 @@ def get_cutoff_date() -> str:
         return "2026-10-11"
     try:
         with open(cfg_file, encoding="utf-8") as f:
-            cfg = yaml.safe_load(f) or {}
-        return str(cfg.get("metadata", {}).get("cutoff_date", "2026-10-11"))
+            cfg = cast(dict[str, Any], yaml.safe_load(f) or {})
+        raw_meta = cfg.get("metadata")
+        meta = cast(dict[str, Any], raw_meta if isinstance(raw_meta, dict) else {})
+        cutoff_val = meta.get("cutoff_date", "2026-10-11")
+        return str(cutoff_val)
     except Exception:
         return "2026-10-11"
 
@@ -395,7 +399,8 @@ def export_adapter_package(
         logger.info(f"Fetching tokenizer files from base model '{base_model}'...")
         from transformers import AutoTokenizer
 
-        tokenizer = AutoTokenizer.from_pretrained(base_model, trust_remote_code=True)
+        auto_tok: Any = AutoTokenizer
+        tokenizer: Any = auto_tok.from_pretrained(base_model, trust_remote_code=True)
         tokenizer.save_pretrained(output_dir)
 
     ensure_chat_template(output_dir, family, base_model if os.path.isdir(base_model) else None)
@@ -428,10 +433,11 @@ def export_merged_hf(
     # Attempt merge with Unsloth FastLanguageModel
     merged_successfully = False
     try:
-        from unsloth import FastLanguageModel
+        from unsloth import FastLanguageModel  # type: ignore[import-untyped]
 
         logger.info(f"Loading LoRA and base model via Unsloth from {model_path} / {base_model}...")
-        model, tokenizer = FastLanguageModel.from_pretrained(
+        fast_lm: Any = FastLanguageModel
+        model, tokenizer = fast_lm.from_pretrained(
             model_name=model_path if os.path.isdir(model_path) else base_model,
             max_seq_length=max_seq_length,
             dtype=dtype,
@@ -454,20 +460,25 @@ def export_merged_hf(
         from transformers import AutoModelForCausalLM, AutoTokenizer
 
         logger.info(f"Loading base model via Transformers: {base_model}...")
-        tokenizer = AutoTokenizer.from_pretrained(base_model, trust_remote_code=trust_remote_code)
-        model = AutoModelForCausalLM.from_pretrained(
+        auto_tok_fb: Any = AutoTokenizer
+        tokenizer_fallback: Any = auto_tok_fb.from_pretrained(
+            base_model, trust_remote_code=trust_remote_code
+        )
+        auto_model: Any = AutoModelForCausalLM
+        base_causal_model: Any = auto_model.from_pretrained(
             base_model,
             torch_dtype=dtype,
             device_map="auto",
             trust_remote_code=trust_remote_code,
         )
         logger.info(f"Applying LoRA adapter from {model_path}...")
-        model = PeftModel.from_pretrained(model, model_path)
+        peft_cls: Any = PeftModel
+        peft_model: Any = peft_cls.from_pretrained(base_causal_model, model_path)
         logger.info("Merging LoRA weights into base model...")
-        model = model.merge_and_unload()
+        merged_model: Any = peft_model.merge_and_unload()
         logger.info(f"Saving merged model weights to {output_dir}...")
-        model.save_pretrained(output_dir)
-        tokenizer.save_pretrained(output_dir)
+        merged_model.save_pretrained(output_dir)
+        tokenizer_fallback.save_pretrained(output_dir)
 
     ensure_chat_template(output_dir, family, base_model if os.path.isdir(base_model) else None)
     ensure_generation_config(output_dir, family)
@@ -512,10 +523,11 @@ def export_gguf_unsloth(
             "Ensure MTP projection layers remain at Q8_0 or FP16 to retain >55-65%% speculative acceptance rates."
         )
 
-    from unsloth import FastLanguageModel
+    from unsloth import FastLanguageModel  # type: ignore[import-untyped]
 
     logger.info(f"Loading LoRA/base for GGUF export ({quant}) via Unsloth...")
-    model, tokenizer = FastLanguageModel.from_pretrained(
+    fast_lm_gguf: Any = FastLanguageModel
+    model, tokenizer = fast_lm_gguf.from_pretrained(
         model_name=model_path if os.path.isdir(model_path) else base_model,
         max_seq_length=max_seq_length,
         dtype=None,

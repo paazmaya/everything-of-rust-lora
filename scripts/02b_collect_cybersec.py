@@ -20,7 +20,7 @@ import re
 import tarfile
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import requests
 import yaml
@@ -39,6 +39,7 @@ CONFIG_DIR = BASE_DIR / "config"
 CYBERSEC_DIR = RAW_DIR / "cybersec"
 
 USER_AGENT = "RustLoRA-Cybersec/1.0"
+LOG_SEPARATOR = "=" * 50
 
 
 def get_http_headers() -> dict[str, str]:
@@ -75,16 +76,66 @@ def parse_frontmatter(content: str) -> tuple[dict[str, Any], str]:
         try:
             import tomllib  # Python 3.11+
 
-            meta = tomllib.loads(fm_text)
+            meta: dict[str, Any] = tomllib.loads(fm_text)
             return meta, body.strip()
         except Exception:
             try:
-                meta = yaml.safe_load(fm_text)
-                return meta if isinstance(meta, dict) else {}, body.strip()
+                loaded = yaml.safe_load(fm_text)
+                meta: dict[str, Any] = loaded if isinstance(loaded, dict) else {}
+                return meta, body.strip()
             except Exception:
                 return {}, body.strip()
 
     return {}, content.strip()
+
+
+def _format_advisory_content(
+    full_title: str,
+    adv_id: str,
+    package: str,
+    date_str: str,
+    cve_text: str,
+    cat_text: str,
+    patch_text: str,
+    unaff_text: str,
+    cutoff_date: str,
+    body: str,
+) -> str:
+    return (
+        f"# {full_title}\n\n"
+        f"- Advisory ID: {adv_id}\n"
+        f"- Package: {package}\n"
+        f"- Date: {date_str}\n"
+        f"- CVE Aliases: {cve_text}\n"
+        f"- Categories: {cat_text}\n"
+        f"- Patched Versions: {patch_text}\n"
+        f"- Unaffected Versions: {unaff_text}\n"
+        f"- Knowledge Cutoff Date: {cutoff_date}\n\n"
+        f"## Advisory Details & Vulnerability Description\n\n{body}"
+    )
+
+
+def _join_or_default(items: list[str], default: str) -> str:
+    return ", ".join(items) if items else default
+
+
+def _to_list_of_strings(raw: Any) -> list[str]:
+    if not raw:
+        return []
+    if isinstance(raw, str):
+        return [raw]
+    return [str(item) for item in raw]
+
+
+def _extract_version(patched_vers: list[str]) -> str:
+    if patched_vers:
+        return patched_vers[0].lstrip(">= ").strip()
+    return "current"
+
+
+def _get_dict(data: dict[str, Any], key: str) -> dict[str, Any]:
+    val = data.get(key)
+    return val if isinstance(val, dict) else {}
 
 
 class CybersecCollector:
@@ -99,13 +150,14 @@ class CybersecCollector:
         config_path = CONFIG_DIR / "cybersec.yaml"
         if config_path.exists():
             with open(config_path) as f:
-                self.config = yaml.safe_load(f) or {}
+                loaded_cfg = yaml.safe_load(f)
+                self.config: dict[str, Any] = loaded_cfg if isinstance(loaded_cfg, dict) else {}
         else:
-            self.config = {}
+            self.config: dict[str, Any] = {}
 
-        self.cutoff_date = self.config.get("metadata", {}).get(
-            "cutoff_date", datetime.now().strftime("%Y-%m-%d")
-        )
+        meta = self.config.get("metadata", {})
+        cutoff = meta.get("cutoff_date") if isinstance(meta, dict) else None
+        self.cutoff_date: str = str(cutoff or datetime.now().strftime("%Y-%m-%d"))
         logger.info(f"Initialized CybersecCollector with knowledge cutoff date: {self.cutoff_date}")
 
     def _fetch_repo_archive(self, repo: str, branch: str = "main") -> tarfile.TarFile | None:
@@ -165,6 +217,98 @@ class CybersecCollector:
         with open(target_file, "w") as f:
             json.dump(data, f, indent=2)
 
+    def _parse_rustsec_fields(self, member_name: str, meta: dict[str, Any]) -> dict[str, Any]:
+        adv_dict = _get_dict(meta, "advisory") or meta
+        ver_dict = _get_dict(meta, "versions")
+
+        adv_id = str(adv_dict.get("id") or Path(member_name).stem)
+        package = str(adv_dict.get("package") or Path(member_name).parent.name)
+        adv_title = str(adv_dict.get("title") or f"Vulnerability in {package}")
+
+        cve_aliases = _to_list_of_strings(adv_dict.get("aliases"))
+        patched_vers = _to_list_of_strings(ver_dict.get("patched"))
+        unaffected_vers = _to_list_of_strings(ver_dict.get("unaffected"))
+        categories = _to_list_of_strings(adv_dict.get("categories"))
+        date_str = str(adv_dict.get("date") or "unknown")
+
+        return {
+            "adv_id": adv_id,
+            "package": package,
+            "adv_title": adv_title,
+            "cve_aliases": cve_aliases,
+            "patched_vers": patched_vers,
+            "unaffected_vers": unaffected_vers,
+            "categories": categories,
+            "date_str": date_str,
+            "version_val": _extract_version(patched_vers),
+            "cve_text": _join_or_default(cve_aliases, "None"),
+            "cat_text": _join_or_default(categories, "Unspecified"),
+            "patch_text": _join_or_default(patched_vers, "None"),
+            "unaff_text": _join_or_default(unaffected_vers, "None"),
+        }
+
+    def _save_rustsec_advisory(
+        self, member_name: str, meta: dict[str, Any], body: str, out_dir: Path
+    ) -> None:
+        fields = self._parse_rustsec_fields(member_name, meta)
+        adv_id: str = fields["adv_id"]
+        package: str = fields["package"]
+        full_title = f"{adv_id}: {fields['adv_title']} ({package})"
+        url = f"https://rustsec.org/advisories/{adv_id}.html"
+
+        structured_content = _format_advisory_content(
+            full_title,
+            adv_id,
+            package,
+            fields["date_str"],
+            fields["cve_text"],
+            fields["cat_text"],
+            fields["patch_text"],
+            fields["unaff_text"],
+            self.cutoff_date,
+            body,
+        )
+
+        self._save_raw_json(
+            subdir=out_dir / package,
+            source="rustsec",
+            library=package,
+            version=fields["version_val"],
+            title=full_title,
+            url=url,
+            content=structured_content,
+            metadata={
+                "advisory_id": adv_id,
+                "cve_aliases": fields["cve_aliases"],
+                "package": package,
+                "patched_versions": fields["patched_vers"],
+                "unaffected_versions": fields["unaffected_vers"],
+                "categories": fields["categories"],
+                "advisory_date": fields["date_str"],
+                "security_topic": "rustsec_advisory",
+            },
+            fname_prefix=f"{package}_{adv_id}",
+        )
+
+    def _process_rustsec_member(
+        self, member: tarfile.TarInfo, archive: tarfile.TarFile, out_dir: Path
+    ) -> bool:
+        if not member.isfile() or "/crates/" not in member.name or not member.name.endswith(".md"):
+            return False
+
+        f = archive.extractfile(member)
+        if not f:
+            return False
+        raw_bytes = f.read()
+        try:
+            text = raw_bytes.decode("utf-8")
+        except UnicodeDecodeError:
+            return False
+
+        meta, body = parse_frontmatter(text)
+        self._save_rustsec_advisory(member.name, meta, body, out_dir)
+        return True
+
     def collect_rustsec(self) -> int:
         """Collect all advisories from rustsec/advisory-db."""
         rustsec_cfg = self.config.get("rustsec", {})
@@ -179,79 +323,8 @@ class CybersecCollector:
 
         if archive:
             for member in archive.getmembers():
-                if not member.isfile():
-                    continue
-                # Advisories are located in crates/<crate_name>/RUSTSEC-YYYY-NNNN.md
-                # or crates/<crate_name>/CVE-YYYY-NNNN.md
-                if "/crates/" not in member.name or not member.name.endswith(".md"):
-                    continue
-
-                f = archive.extractfile(member)
-                if not f:
-                    continue
-                raw_bytes = f.read()
-                try:
-                    text = raw_bytes.decode("utf-8")
-                except UnicodeDecodeError:
-                    continue
-
-                meta, body = parse_frontmatter(text)
-                adv_info = (
-                    meta.get("advisory", {}) if isinstance(meta.get("advisory"), dict) else meta
-                )
-                ver_info = (
-                    meta.get("versions", {}) if isinstance(meta.get("versions"), dict) else {}
-                )
-
-                adv_id = adv_info.get("id") or Path(member.name).stem
-                package = adv_info.get("package") or Path(member.name).parent.name
-                adv_title = adv_info.get("title") or f"Vulnerability in {package}"
-                cve_aliases = adv_info.get("aliases") or []
-                if isinstance(cve_aliases, str):
-                    cve_aliases = [cve_aliases]
-                patched_vers = ver_info.get("patched") or []
-                unaffected_vers = ver_info.get("unaffected") or []
-                categories = adv_info.get("categories") or []
-                date_str = adv_info.get("date") or "unknown"
-
-                pkg_dir = out_dir / package
-                full_title = f"{adv_id}: {adv_title} ({package})"
-                url = f"https://rustsec.org/advisories/{adv_id}.html"
-
-                structured_content = (
-                    f"# {full_title}\n\n"
-                    f"- Advisory ID: {adv_id}\n"
-                    f"- Package: {package}\n"
-                    f"- Date: {date_str}\n"
-                    f"- CVE Aliases: {', '.join(cve_aliases) if cve_aliases else 'None'}\n"
-                    f"- Categories: {', '.join(categories) if categories else 'Unspecified'}\n"
-                    f"- Patched Versions: {', '.join(patched_vers) if patched_vers else 'None'}\n"
-                    f"- Unaffected Versions: {', '.join(unaffected_vers) if unaffected_vers else 'None'}\n"
-                    f"- Knowledge Cutoff Date: {self.cutoff_date}\n\n"
-                    f"## Advisory Details & Vulnerability Description\n\n{body}"
-                )
-
-                self._save_raw_json(
-                    subdir=pkg_dir,
-                    source="rustsec",
-                    library=package,
-                    version=patched_vers[0].lstrip(">= ").strip() if patched_vers else "current",
-                    title=full_title,
-                    url=url,
-                    content=structured_content,
-                    metadata={
-                        "advisory_id": adv_id,
-                        "cve_aliases": cve_aliases,
-                        "package": package,
-                        "patched_versions": patched_vers,
-                        "unaffected_versions": unaffected_vers,
-                        "categories": categories,
-                        "advisory_date": str(date_str),
-                        "security_topic": "rustsec_advisory",
-                    },
-                    fname_prefix=f"{package}_{adv_id}",
-                )
-                count += 1
+                if self._process_rustsec_member(member, archive, out_dir):
+                    count += 1
             archive.close()
         else:
             logger.warning(
@@ -264,7 +337,7 @@ class CybersecCollector:
 
     def _seed_core_rustsec_advisories(self, out_dir: Path) -> int:
         """Seed high-profile historic RustSec advisories if remote network is unavailable."""
-        core_advisories = [
+        core_advisories: list[dict[str, Any]] = [
             {
                 "id": "RUSTSEC-2020-0071",
                 "package": "crossbeam-channel",
@@ -319,238 +392,260 @@ class CybersecCollector:
             },
         ]
         for adv in core_advisories:
-            pkg_dir = out_dir / adv["package"]
-            full_title = f"{adv['id']}: {adv['title']} ({adv['package']})"
+            package_name = str(adv["package"])
+            pkg_dir = out_dir / package_name
+            full_title = f"{adv['id']}: {adv['title']} ({package_name})"
+            cves: list[str] = list(adv["cve"])
+            patched_list: list[str] = list(adv["patched"])
             content = (
                 f"# {full_title}\n\n"
                 f"- Advisory ID: {adv['id']}\n"
-                f"- Package: {adv['package']}\n"
-                f"- CVE Aliases: {', '.join(adv['cve'])}\n"
-                f"- Patched Versions: {', '.join(adv['patched'])}\n"
+                f"- Package: {package_name}\n"
+                f"- CVE Aliases: {', '.join(cves)}\n"
+                f"- Patched Versions: {', '.join(patched_list)}\n"
                 f"- Knowledge Cutoff Date: {self.cutoff_date}\n\n"
                 f"## Vulnerability Details\n{adv['body']}"
             )
             self._save_raw_json(
                 subdir=pkg_dir,
                 source="rustsec",
-                library=adv["package"],
+                library=package_name,
                 version="current",
                 title=full_title,
                 url=f"https://rustsec.org/advisories/{adv['id']}.html",
                 content=content,
                 metadata={
                     "advisory_id": adv["id"],
-                    "cve_aliases": adv["cve"],
-                    "package": adv["package"],
-                    "patched_versions": adv["patched"],
+                    "cve_aliases": cves,
+                    "package": package_name,
+                    "patched_versions": patched_list,
                     "security_topic": "rustsec_advisory",
                 },
-                fname_prefix=f"{adv['package']}_{adv['id']}",
+                fname_prefix=f"{package_name}_{adv['id']}",
             )
         return len(core_advisories)
 
+    def _save_lolbas_entry(self, doc: dict[str, Any], member_name: str, win_dir: Path) -> None:
+        name = str(doc.get("Name") or Path(member_name).stem)
+        desc = str(doc.get("Description", ""))
+        commands = doc.get("Commands", [])
+        detection = doc.get("Detection", [])
+        full_commands_text = ""
+        for cmd_entry in commands:
+            if isinstance(cmd_entry, dict):
+                cat = str(cmd_entry.get("Category", "Execution"))
+                cmd_str = str(cmd_entry.get("Command", ""))
+                use_case = str(cmd_entry.get("UseCase", ""))
+                mitre = str(cmd_entry.get("MitreID", ""))
+                full_commands_text += f"\n### Function: {cat} (MITRE: {mitre})\n- **Command**: `{cmd_str}`\n- **UseCase**: {use_case}\n"
+
+        detection_text = ""
+        for det in detection:
+            if isinstance(det, dict):
+                detection_text += f"- {det.get('IOC', '')}\n"
+            elif isinstance(det, str):
+                detection_text += f"- {det}\n"
+
+        content = (
+            f"# Windows LOLBAS: {name}\n\n"
+            f"**Description**: {desc}\n"
+            f"**Platform**: Windows Native / Living-off-the-land\n"
+            f"**Knowledge Cutoff Date**: {self.cutoff_date}\n\n"
+            f"## Offensive Functions & Command Line Invocations\n{full_commands_text}\n"
+            f"## Defensive Telemetry, Detection & Event IDs\n{detection_text or '- Monitor process creation (Event ID 4688, Sysmon Event ID 1) with command-line arguments.\n- Enable PowerShell ScriptBlock Logging (Event ID 4104).'}\n"
+        )
+
+        self._save_raw_json(
+            subdir=win_dir,
+            source="lolbas",
+            library=name.lower(),
+            version="current",
+            title=f"Windows LOLBAS: {name}",
+            url=f"https://lolbas-project.github.io/#/executable/{name}",
+            content=content,
+            metadata={
+                "platform": "windows",
+                "binary_name": name,
+                "lotl_type": "lolbas",
+                "detection_event_ids": [1, 4688, 4104],
+            },
+            fname_prefix=f"lolbas_{name}",
+        )
+
+    def _collect_lolbas(self, lolbas_cfg: dict[str, Any]) -> int:
+        count = 0
+        win_dir = self.output_base / "lotl" / "windows"
+        repo = str(lolbas_cfg.get("repo", "LOLBAS-Project/LOLBAS"))
+        branch = str(lolbas_cfg.get("branch", "master"))
+        archive = self._fetch_repo_archive(repo, branch)
+        if not archive:
+            return self._seed_core_windows_lotl(win_dir)
+
+        for member in archive.getmembers():
+            if not member.isfile():
+                continue
+            if not member.name.endswith((".yml", ".yaml")):
+                continue
+            if not any(k in member.name for k in ["/OSBinaries/", "/OSLibraries/", "/OSScripts/"]):
+                continue
+
+            f = archive.extractfile(member)
+            if not f:
+                continue
+            try:
+                loaded = yaml.safe_load(f.read().decode("utf-8"))
+            except Exception:
+                continue
+
+            if not isinstance(loaded, dict):
+                continue
+
+            doc: dict[str, Any] = loaded
+            self._save_lolbas_entry(doc, member.name, win_dir)
+            count += 1
+        archive.close()
+        return count
+
+    def _save_gtfobins_entry(self, member_name: str, text: str, linux_dir: Path) -> None:
+        meta, _ = parse_frontmatter(text)
+        bin_name = Path(member_name).stem
+        functions: dict[str, Any] = (
+            meta.get("functions", {}) if isinstance(meta.get("functions"), dict) else {}
+        )
+
+        fn_text = ""
+        for fn_name, fn_list in functions.items():
+            fn_text += f"\n### Function: {fn_name}\n"
+            if isinstance(fn_list, list):
+                for item in fn_list:
+                    if isinstance(item, dict):
+                        desc_item = str(item.get("description", ""))
+                        code_item = str(item.get("code", ""))
+                        fn_text += f"- **Usage**: {desc_item}\n```bash\n{code_item}\n```\n"
+
+        content = (
+            f"# Linux GTFOBins: {bin_name}\n\n"
+            f"**Platform**: Linux / Debian / Coreutils\n"
+            f"**Binary**: `/bin/{bin_name}` or `/usr/bin/{bin_name}`\n"
+            f"**Knowledge Cutoff Date**: {self.cutoff_date}\n\n"
+            f"## Bypass Capabilities & Execution Patterns\n{fn_text}\n"
+            f"## Defensive Telemetry & Hardening\n"
+            f"- Configure `auditd` rules on binary execution: `-w /usr/bin/{bin_name} -p x -k gtfobins_exec`\n"
+            f"- Enforce sudoers restrictions: avoid wildcard NOPASSWD for {bin_name}\n"
+            f"- Remove unnecessary SUID permissions (`chmod u-s /usr/bin/{bin_name}`)\n"
+        )
+
+        self._save_raw_json(
+            subdir=linux_dir,
+            source="gtfobins",
+            library=bin_name,
+            version="current",
+            title=f"Linux GTFOBins: {bin_name}",
+            url=f"https://gtfobins.github.io/gtfobins/{bin_name}/",
+            content=content,
+            metadata={
+                "platform": "linux",
+                "binary_name": bin_name,
+                "lotl_type": "gtfobins",
+                "auditd_rule": f"-w /usr/bin/{bin_name} -p x -k gtfobins_{bin_name}",
+            },
+            fname_prefix=f"gtfobins_{bin_name}",
+        )
+
+    def _collect_gtfobins(self, gtfo_cfg: dict[str, Any]) -> int:
+        count = 0
+        linux_dir = self.output_base / "lotl" / "linux"
+        repo = str(gtfo_cfg.get("repo", "GTFOBins/GTFOBins.github.io"))
+        branch = str(gtfo_cfg.get("branch", "master"))
+        archive = self._fetch_repo_archive(repo, branch)
+        if not archive:
+            return self._seed_core_linux_lotl(linux_dir)
+
+        for member in archive.getmembers():
+            if (
+                not member.isfile()
+                or "/_gtfobins/" not in member.name
+                or not member.name.endswith(".md")
+            ):
+                continue
+            f = archive.extractfile(member)
+            if not f:
+                continue
+            try:
+                text = f.read().decode("utf-8")
+            except UnicodeDecodeError:
+                continue
+            self._save_gtfobins_entry(member.name, text, linux_dir)
+            count += 1
+        archive.close()
+        return count
+
+    def _save_loobins_entry(self, member_name: str, body: str, macos_dir: Path) -> None:
+        name = Path(member_name).stem
+        content = (
+            f"# macOS LOOBins: {name}\n\n"
+            f"**Platform**: macOS / Darwin native living-off-the-land\n"
+            f"**Knowledge Cutoff Date**: {self.cutoff_date}\n\n"
+            f"## Capability & Usage Details\n{body}\n\n"
+            f"## Detection & Telemetry\n"
+            f"- Endpoint Security Framework (ESF) events: ES_EVENT_TYPE_NOTIFY_EXEC\n"
+            f'- Unified Logging predicate: `process == "{name}"`\n'
+        )
+        self._save_raw_json(
+            subdir=macos_dir,
+            source="loobins",
+            library=name,
+            version="current",
+            title=f"macOS LOOBins: {name}",
+            url=f"https://loobins.io/binaries/{name}/",
+            content=content,
+            metadata={
+                "platform": "macos",
+                "binary_name": name,
+                "lotl_type": "loobins",
+            },
+            fname_prefix=f"loobins_{name}",
+        )
+
+    def _collect_loobins(self, loobins_cfg: dict[str, Any]) -> int:
+        count = 0
+        macos_dir = self.output_base / "lotl" / "macos"
+        repo = str(loobins_cfg.get("repo", "infosecb/LOOBins"))
+        branch = str(loobins_cfg.get("branch", "main"))
+        archive = self._fetch_repo_archive(repo, branch)
+        if not archive:
+            return self._seed_core_macos_lotl(macos_dir)
+
+        for member in archive.getmembers():
+            if not member.isfile() or not member.name.endswith(".md"):
+                continue
+            if not any(k in member.name for k in ["/loobins/", "/_loobins/"]):
+                continue
+            f = archive.extractfile(member)
+            if not f:
+                continue
+            try:
+                text = f.read().decode("utf-8")
+            except UnicodeDecodeError:
+                continue
+            _, body = parse_frontmatter(text)
+            self._save_loobins_entry(member.name, body, macos_dir)
+            count += 1
+        archive.close()
+        return count
+
     def collect_lotl(self) -> int:
         """Collect Living-Off-The-Land utilities across Windows (LOLBAS), Linux (GTFOBins), and macOS (LOOBins)."""
-        count = 0
         lotl_cfg = self.config.get("lotl", {})
 
         # 1. LOLBAS (Windows)
-        lolbas_cfg = lotl_cfg.get("lolbas", {})
-        win_dir = self.output_base / "lotl" / "windows"
-        archive = self._fetch_repo_archive(
-            lolbas_cfg.get("repo", "LOLBAS-Project/LOLBAS"), lolbas_cfg.get("branch", "master")
-        )
-        if archive:
-            for member in archive.getmembers():
-                if not member.isfile():
-                    continue
-                if not (member.name.endswith(".yml") or member.name.endswith(".yaml")):
-                    continue
-                if not any(
-                    k in member.name for k in ["/OSBinaries/", "/OSLibraries/", "/OSScripts/"]
-                ):
-                    continue
-
-                f = archive.extractfile(member)
-                if not f:
-                    continue
-                try:
-                    doc = yaml.safe_load(f.read().decode("utf-8"))
-                except Exception:
-                    continue
-
-                if not isinstance(doc, dict):
-                    continue
-
-                name = doc.get("Name") or Path(member.name).stem
-                desc = doc.get("Description", "")
-                commands = doc.get("Commands", [])
-                detection = doc.get("Detection", [])
-                full_commands_text = ""
-                for cmd_entry in commands:
-                    if isinstance(cmd_entry, dict):
-                        cat = cmd_entry.get("Category", "Execution")
-                        cmd_str = cmd_entry.get("Command", "")
-                        use_case = cmd_entry.get("UseCase", "")
-                        mitre = cmd_entry.get("MitreID", "")
-                        full_commands_text += f"\n### Function: {cat} (MITRE: {mitre})\n- **Command**: `{cmd_str}`\n- **UseCase**: {use_case}\n"
-
-                detection_text = ""
-                for det in detection:
-                    if isinstance(det, dict):
-                        detection_text += f"- {det.get('IOC', '')}\n"
-                    elif isinstance(det, str):
-                        detection_text += f"- {det}\n"
-
-                content = (
-                    f"# Windows LOLBAS: {name}\n\n"
-                    f"**Description**: {desc}\n"
-                    f"**Platform**: Windows Native / Living-off-the-land\n"
-                    f"**Knowledge Cutoff Date**: {self.cutoff_date}\n\n"
-                    f"## Offensive Functions & Command Line Invocations\n{full_commands_text}\n"
-                    f"## Defensive Telemetry, Detection & Event IDs\n{detection_text or '- Monitor process creation (Event ID 4688, Sysmon Event ID 1) with command-line arguments.\n- Enable PowerShell ScriptBlock Logging (Event ID 4104).'}\n"
-                )
-
-                self._save_raw_json(
-                    subdir=win_dir,
-                    source="lolbas",
-                    library=name.lower(),
-                    version="current",
-                    title=f"Windows LOLBAS: {name}",
-                    url=f"https://lolbas-project.github.io/#/executable/{name}",
-                    content=content,
-                    metadata={
-                        "platform": "windows",
-                        "binary_name": name,
-                        "lotl_type": "lolbas",
-                        "detection_event_ids": [1, 4688, 4104],
-                    },
-                    fname_prefix=f"lolbas_{name}",
-                )
-                count += 1
-            archive.close()
-        else:
-            count += self._seed_core_windows_lotl(win_dir)
+        count = self._collect_lolbas(lotl_cfg.get("lolbas", {}))
 
         # 2. GTFOBins (Linux)
-        gtfo_cfg = lotl_cfg.get("gtfobins", {})
-        linux_dir = self.output_base / "lotl" / "linux"
-        archive = self._fetch_repo_archive(
-            gtfo_cfg.get("repo", "GTFOBins/GTFOBins.github.io"), gtfo_cfg.get("branch", "master")
-        )
-        if archive:
-            for member in archive.getmembers():
-                if (
-                    not member.isfile()
-                    or "/_gtfobins/" not in member.name
-                    or not member.name.endswith(".md")
-                ):
-                    continue
-                f = archive.extractfile(member)
-                if not f:
-                    continue
-                try:
-                    text = f.read().decode("utf-8")
-                except UnicodeDecodeError:
-                    continue
-                meta, body = parse_frontmatter(text)
-                bin_name = Path(member.name).stem
-                functions = (
-                    meta.get("functions", {}) if isinstance(meta.get("functions"), dict) else {}
-                )
-
-                fn_text = ""
-                for fn_name, fn_list in functions.items():
-                    fn_text += f"\n### Function: {fn_name}\n"
-                    if isinstance(fn_list, list):
-                        for item in fn_list:
-                            if isinstance(item, dict):
-                                desc_item = item.get("description", "")
-                                code_item = item.get("code", "")
-                                fn_text += f"- **Usage**: {desc_item}\n```bash\n{code_item}\n```\n"
-
-                content = (
-                    f"# Linux GTFOBins: {bin_name}\n\n"
-                    f"**Platform**: Linux / Debian / Coreutils\n"
-                    f"**Binary**: `/bin/{bin_name}` or `/usr/bin/{bin_name}`\n"
-                    f"**Knowledge Cutoff Date**: {self.cutoff_date}\n\n"
-                    f"## Bypass Capabilities & Execution Patterns\n{fn_text}\n"
-                    f"## Defensive Telemetry & Hardening\n"
-                    f"- Configure `auditd` rules on binary execution: `-w /usr/bin/{bin_name} -p x -k gtfobins_exec`\n"
-                    f"- Enforce sudoers restrictions: avoid wildcard NOPASSWD for {bin_name}\n"
-                    f"- Remove unnecessary SUID permissions (`chmod u-s /usr/bin/{bin_name}`)\n"
-                )
-
-                self._save_raw_json(
-                    subdir=linux_dir,
-                    source="gtfobins",
-                    library=bin_name,
-                    version="current",
-                    title=f"Linux GTFOBins: {bin_name}",
-                    url=f"https://gtfobins.github.io/gtfobins/{bin_name}/",
-                    content=content,
-                    metadata={
-                        "platform": "linux",
-                        "binary_name": bin_name,
-                        "lotl_type": "gtfobins",
-                        "auditd_rule": f"-w /usr/bin/{bin_name} -p x -k gtfobins_{bin_name}",
-                    },
-                    fname_prefix=f"gtfobins_{bin_name}",
-                )
-                count += 1
-            archive.close()
-        else:
-            count += self._seed_core_linux_lotl(linux_dir)
+        count += self._collect_gtfobins(lotl_cfg.get("gtfobins", {}))
 
         # 3. LOOBins (macOS)
-        loobins_cfg = lotl_cfg.get("loobins", {})
-        macos_dir = self.output_base / "lotl" / "macos"
-        archive = self._fetch_repo_archive(
-            loobins_cfg.get("repo", "infosecb/LOOBins"), loobins_cfg.get("branch", "main")
-        )
-        if archive:
-            for member in archive.getmembers():
-                if not member.isfile() or not member.name.endswith(".md"):
-                    continue
-                if not any(k in member.name for k in ["/loobins/", "/_loobins/"]):
-                    continue
-                f = archive.extractfile(member)
-                if not f:
-                    continue
-                try:
-                    text = f.read().decode("utf-8")
-                except UnicodeDecodeError:
-                    continue
-                meta, body = parse_frontmatter(text)
-                name = Path(member.name).stem
-                content = (
-                    f"# macOS LOOBins: {name}\n\n"
-                    f"**Platform**: macOS / Darwin native living-off-the-land\n"
-                    f"**Knowledge Cutoff Date**: {self.cutoff_date}\n\n"
-                    f"## Capability & Usage Details\n{body}\n\n"
-                    f"## Detection & Telemetry\n"
-                    f"- Endpoint Security Framework (ESF) events: ES_EVENT_TYPE_NOTIFY_EXEC\n"
-                    f'- Unified Logging predicate: `process == "{name}"`\n'
-                )
-                self._save_raw_json(
-                    subdir=macos_dir,
-                    source="loobins",
-                    library=name,
-                    version="current",
-                    title=f"macOS LOOBins: {name}",
-                    url=f"https://loobins.io/binaries/{name}/",
-                    content=content,
-                    metadata={
-                        "platform": "macos",
-                        "binary_name": name,
-                        "lotl_type": "loobins",
-                    },
-                    fname_prefix=f"loobins_{name}",
-                )
-                count += 1
-            archive.close()
-        else:
-            count += self._seed_core_macos_lotl(macos_dir)
+        count += self._collect_loobins(lotl_cfg.get("loobins", {}))
 
         # 4. Built-in Windows Admin & PowerShell tools
         ps_dir = self.output_base / "lotl" / "powershell"
@@ -808,7 +903,7 @@ class CybersecCollector:
         count = 0
 
         # High-density knowledge base of top Kali Linux CLI tools with all primary flags and options
-        tools_db = [
+        tools_db: list[dict[str, Any]] = [
             {
                 "tool": "nmap",
                 "category": "Port Scanning & Network Discovery",
@@ -1120,12 +1215,12 @@ class CybersecCollector:
         ]
 
         for t in tools_db:
-            tool_name = t["tool"]
-            cat = t["category"]
-            synopsis = t["synopsis"]
-            desc = t["description"]
-            flags = t.get("flags", [])
-            examples = t.get("examples", [])
+            tool_name = str(t["tool"])
+            cat = str(t["category"])
+            synopsis = str(t["synopsis"])
+            desc = str(t["description"])
+            flags = cast(list[tuple[str, str]], t.get("flags", []))
+            examples = cast(list[str], t.get("examples", []))
 
             flags_md = ""
             for fl, expl in flags:
@@ -1295,10 +1390,10 @@ class CybersecCollector:
         return count
 
     def run_all(self) -> None:
-        logger.info("==================================================")
+        logger.info(LOG_SEPARATOR)
         logger.info(" Starting Cybersecurity Intelligence Collection")
         logger.info(f" Knowledge Cutoff Date: {self.cutoff_date}")
-        logger.info("==================================================")
+        logger.info(LOG_SEPARATOR)
 
         rustsec_count = self.collect_rustsec()
         lotl_count = self.collect_lotl()
@@ -1306,7 +1401,7 @@ class CybersecCollector:
         hardening_count = self.collect_rust_hardening()
 
         total = rustsec_count + lotl_count + kali_count + hardening_count
-        logger.info("==================================================")
+        logger.info(LOG_SEPARATOR)
         logger.info(" Cybersec Collection Summary:")
         logger.info(f"   RustSec Advisories:        {rustsec_count}")
         logger.info(f"   Living-off-the-land:       {lotl_count}")
@@ -1314,7 +1409,7 @@ class CybersecCollector:
         logger.info(f"   Hardening & Unsoundness:   {hardening_count}")
         logger.info(f"   Total Raw Documents:       {total}")
         logger.info(f"   Knowledge Cutoff Date:     {self.cutoff_date}")
-        logger.info("==================================================")
+        logger.info(LOG_SEPARATOR)
 
 
 if __name__ == "__main__":

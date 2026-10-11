@@ -212,7 +212,7 @@ def _format_generic(library: str, version: str, title: str, source: str) -> tupl
 
 
 def _format_rustsec_advisory(
-    library: str, version: str, title: str, meta: dict[str, Any], cutoff_date: str
+    library: str, meta: dict[str, Any], cutoff_date: str
 ) -> tuple[str, str, str]:
     adv_id = str(meta.get("advisory_id") or "RUSTSEC-ADVISORY")
     cves = meta.get("cve_aliases") or []
@@ -238,9 +238,7 @@ def _format_rustsec_advisory(
     return instruction, input_text, footer
 
 
-def _format_kali_tool(
-    library: str, version: str, title: str, meta: dict[str, Any], cutoff_date: str
-) -> tuple[str, str]:
+def _format_kali_tool(library: str, meta: dict[str, Any], cutoff_date: str) -> tuple[str, str]:
     tool = str(meta.get("tool") or library)
     cat = str(meta.get("category") or "Security Testing Tool")
     synopsis = str(meta.get("synopsis") or "")
@@ -257,9 +255,7 @@ def _format_kali_tool(
     return instruction, input_text
 
 
-def _format_lotl(
-    library: str, version: str, title: str, meta: dict[str, Any], cutoff_date: str
-) -> tuple[str, str]:
+def _format_lotl(library: str, meta: dict[str, Any], cutoff_date: str) -> tuple[str, str]:
     bin_name = str(meta.get("binary_name") or meta.get("cmdlet") or library)
     platform = str(meta.get("platform") or "system")
     lotl_type = str(meta.get("lotl_type") or "living-off-the-land")
@@ -273,9 +269,7 @@ def _format_lotl(
     return instruction, input_text
 
 
-def _format_rust_hardening(
-    library: str, version: str, title: str, meta: dict[str, Any], cutoff_date: str
-) -> tuple[str, str]:
+def _format_rust_hardening(title: str, cutoff_date: str) -> tuple[str, str]:
     templates = [
         f"Explain the Rust security and hardening mechanisms regarding '{title}'.",
         f"What are the best practices for '{title}' to prevent vulnerabilities and undefined behavior in Rust?",
@@ -327,6 +321,111 @@ def extract_micro_qa_pairs(chunk: dict[str, Any]) -> list[dict[str, str]]:
     return micro_pairs[:5]  # Limit to top 5 per section to prevent skew
 
 
+def _format_cybersec_alpaca(
+    content: str,
+    source: str,
+    meta: dict[str, Any],
+    library: str,
+    title: str,
+    chunk_cutoff: str,
+) -> tuple[dict[str, str], bool, bool] | None:
+    if not (
+        source == "cybersec"
+        or meta.get("advisory_id")
+        or meta.get("lotl_type")
+        or meta.get("tool")
+        or meta.get("security_topic")
+    ):
+        return None
+
+    if meta.get("advisory_id") or source == "rustsec":
+        instruction, input_text, footer = _format_rustsec_advisory(library, meta, chunk_cutoff)
+        output_text = content + footer if footer not in content else content
+        return (
+            {"instruction": instruction, "input": input_text, "output": output_text},
+            False,
+            True,
+        )
+    if meta.get("tool") or source == "kali_tools":
+        instruction, input_text = _format_kali_tool(library, meta, chunk_cutoff)
+        return (
+            {"instruction": instruction, "input": input_text, "output": content},
+            False,
+            True,
+        )
+    if meta.get("lotl_type") or source in [
+        "lolbas",
+        "gtfobins",
+        "loobins",
+        "powershell_lotl",
+    ]:
+        instruction, input_text = _format_lotl(library, meta, chunk_cutoff)
+        return (
+            {"instruction": instruction, "input": input_text, "output": content},
+            False,
+            True,
+        )
+    if meta.get("security_topic") == "hardening" or source == "rust_hardening":
+        instruction, input_text = _format_rust_hardening(title, chunk_cutoff)
+        return (
+            {"instruction": instruction, "input": input_text, "output": content},
+            False,
+            True,
+        )
+    return None
+
+
+def _format_general_or_version_prompt(
+    source: str,
+    library: str,
+    version: str,
+    title: str,
+    meta: dict[str, Any],
+) -> tuple[str, str, bool]:
+    """Returns (instruction, input_text, is_version_sample)."""
+    from_ver = meta.get("from_version")
+    to_ver = meta.get("to_version") or version
+    section = meta.get("section")
+    post_type = meta.get("post_type")
+
+    # 1. Consecutive version diffs (e.g. 1.80.0 -> 1.81.0)
+    if meta.get("is_migration_guide") and from_ver:
+        inst, inp = _format_version_diff(str(from_ver), str(to_ver), title)
+        return inst, inp, True
+    # 2. Official rustc release records & blog announcements
+    if source == "official_releases" or library == "rustc":
+        inst, inp = _format_rustc_release(version, title, section, post_type)
+        return inst, inp, True
+    # 3. Rust Edition Guides (2015, 2018, 2021, 2024)
+    if library in ["rust_edition_guide", "edition_guide"] or version in [
+        "2015",
+        "2018",
+        "2021",
+        "2024",
+    ]:
+        inst, inp = _format_edition_docs(version, title)
+        return inst, inp, True
+    # 4. Crate changelogs
+    if bool(meta.get("is_changelog_section", False) or "CHANGELOG" in title):
+        inst, inp = _format_changelog(library, version, title)
+        return inst, inp, True
+    # 5. Crate docs
+    if source in ["docs_rs", "api_docs"]:
+        inst, inp = _format_docs_rs(library, version, title)
+        return inst, inp, False
+    # 6. GitHub repos
+    if source in ["github", "github_repo"]:
+        inst, inp = _format_github(library, version, title, meta)
+        return inst, inp, False
+    # 7. Official general docs
+    if source in ["rust_book", "official_docs"]:
+        inst, inp = _format_edition_docs(version, title)
+        return inst, inp, False
+
+    inst, inp = _format_generic(library, version, title, source)
+    return inst, inp, False
+
+
 def format_alpaca(
     chunk: dict[str, Any], cutoff_date: str
 ) -> tuple[dict[str, str] | None, bool, bool]:
@@ -342,95 +441,16 @@ def format_alpaca(
     library = str(chunk.get("library") or meta.get("crate_name") or meta.get("library") or "Rust")
     version = str(chunk.get("version") or meta.get("version") or "current")
     title = str(chunk.get("title") or meta.get("title") or "Documentation")
-
-    from_ver = meta.get("from_version")
-    to_ver = meta.get("to_version") or version
-    section = meta.get("section")
-    post_type = meta.get("post_type")
     chunk_cutoff = str(chunk.get("cutoff_date") or meta.get("cutoff_date") or cutoff_date)
 
     # 0. Cybersecurity, RustSec, Kali Linux, LOTL, and Hardening
-    if (
-        source == "cybersec"
-        or meta.get("advisory_id")
-        or meta.get("lotl_type")
-        or meta.get("tool")
-        or meta.get("security_topic")
-    ):
-        if meta.get("advisory_id") or source == "rustsec":
-            instruction, input_text, footer = _format_rustsec_advisory(
-                library, version, title, meta, chunk_cutoff
-            )
-            output_text = content + footer if footer not in content else content
-            return (
-                {"instruction": instruction, "input": input_text, "output": output_text},
-                False,
-                True,
-            )
-        elif meta.get("tool") or source == "kali_tools":
-            instruction, input_text = _format_kali_tool(library, version, title, meta, chunk_cutoff)
-            return (
-                {"instruction": instruction, "input": input_text, "output": content},
-                False,
-                True,
-            )
-        elif meta.get("lotl_type") or source in [
-            "lolbas",
-            "gtfobins",
-            "loobins",
-            "powershell_lotl",
-        ]:
-            instruction, input_text = _format_lotl(library, version, title, meta, chunk_cutoff)
-            return (
-                {"instruction": instruction, "input": input_text, "output": content},
-                False,
-                True,
-            )
-        elif meta.get("security_topic") == "hardening" or source == "rust_hardening":
-            instruction, input_text = _format_rust_hardening(
-                library, version, title, meta, chunk_cutoff
-            )
-            return (
-                {"instruction": instruction, "input": input_text, "output": content},
-                False,
-                True,
-            )
+    cybersec_result = _format_cybersec_alpaca(content, source, meta, library, title, chunk_cutoff)
+    if cybersec_result is not None:
+        return cybersec_result
 
-    is_version_sample = False
-
-    # 1. Consecutive version diffs (e.g. 1.80.0 -> 1.81.0)
-    if meta.get("is_migration_guide") and from_ver:
-        instruction, input_text = _format_version_diff(str(from_ver), str(to_ver), title)
-        is_version_sample = True
-    # 2. Official rustc release records & blog announcements
-    elif source == "official_releases" or library == "rustc":
-        instruction, input_text = _format_rustc_release(version, title, section, post_type)
-        is_version_sample = True
-    # 3. Rust Edition Guides (2015, 2018, 2021, 2024)
-    elif library in ["rust_edition_guide", "edition_guide"] or version in [
-        "2015",
-        "2018",
-        "2021",
-        "2024",
-    ]:
-        instruction, input_text = _format_edition_docs(version, title)
-        is_version_sample = True
-    # 4. Crate changelogs
-    elif bool(meta.get("is_changelog_section", False) or "CHANGELOG" in title):
-        instruction, input_text = _format_changelog(library, version, title)
-        is_version_sample = True
-    # 5. Crate docs
-    elif source in ["docs_rs", "api_docs"]:
-        instruction, input_text = _format_docs_rs(library, version, title)
-    # 6. GitHub repos
-    elif source in ["github", "github_repo"]:
-        instruction, input_text = _format_github(library, version, title, meta)
-    # 7. Official general docs
-    elif source in ["rust_book", "official_docs"]:
-        instruction, input_text = _format_edition_docs(version, title)
-    else:
-        instruction, input_text = _format_generic(library, version, title, source)
-
+    instruction, input_text, is_version_sample = _format_general_or_version_prompt(
+        source, library, version, title, meta
+    )
     return (
         {
             "instruction": instruction,
@@ -442,18 +462,9 @@ def format_alpaca(
     )
 
 
-def main() -> None:
-    DATASETS_DIR.mkdir(parents=True, exist_ok=True)
-    chunks_file = PROCESSED_DIR / "all_chunks.jsonl"
-
-    if not chunks_file.exists():
-        print(f"Error: Processed chunks file not found at {chunks_file}")
-        return
-
-    cutoff_date = get_cutoff_date()
-    print(
-        f"Creating Alpaca dataset with version-aware & cybersec-aware instruction prompts (Cutoff: {cutoff_date})..."
-    )
+def _extract_all_samples(
+    chunks_file: Path, cutoff_date: str
+) -> tuple[list[dict[str, str]], list[dict[str, str]], list[dict[str, str]], int]:
     general_samples: list[dict[str, str]] = []
     version_samples: list[dict[str, str]] = []
     cybersec_samples: list[dict[str, str]] = []
@@ -490,13 +501,14 @@ def main() -> None:
         for _ in range(25):
             cybersec_samples.append(dict(cp))
 
-    print(
-        f"\nInitial extraction: {len(general_samples)} general samples, "
-        f"{len(version_samples)} version/edition samples, "
-        f"{len(cybersec_samples)} cybersecurity samples."
-    )
+    return general_samples, version_samples, cybersec_samples, total_chunks
 
-    # Stratified Sampling / Boosted Mix:
+
+def _stratify_and_mix(
+    general_samples: list[dict[str, str]],
+    version_samples: list[dict[str, str]],
+    cybersec_samples: list[dict[str, str]],
+) -> tuple[list[dict[str, str]], list[dict[str, str]]]:
     # 1. Version & edition knowledge (10-15%)
     current_ver_ratio = len(version_samples) / max(len(general_samples) + len(version_samples), 1)
     if current_ver_ratio < TARGET_VERSION_RATIO and version_samples:
@@ -523,6 +535,38 @@ def main() -> None:
         boosted_cybersec_samples = random.choices(cybersec_samples, k=target_cyber_count)
     else:
         boosted_cybersec_samples = cybersec_samples
+
+    return boosted_version_samples, boosted_cybersec_samples
+
+
+def main() -> None:
+    DATASETS_DIR.mkdir(parents=True, exist_ok=True)
+    chunks_file = PROCESSED_DIR / "all_chunks.jsonl"
+
+    if not chunks_file.exists():
+        print(f"Error: Processed chunks file not found at {chunks_file}")
+        return
+
+    cutoff_date = get_cutoff_date()
+    print(
+        f"Creating Alpaca dataset with version-aware & cybersec-aware instruction prompts (Cutoff: {cutoff_date})..."
+    )
+    (
+        general_samples,
+        version_samples,
+        cybersec_samples,
+        total_chunks,
+    ) = _extract_all_samples(chunks_file, cutoff_date)
+
+    print(
+        f"\nInitial extraction: {len(general_samples)} general samples, "
+        f"{len(version_samples)} version/edition samples, "
+        f"{len(cybersec_samples)} cybersecurity samples."
+    )
+
+    boosted_version_samples, boosted_cybersec_samples = _stratify_and_mix(
+        general_samples, version_samples, cybersec_samples
+    )
 
     dataset = general_samples + boosted_version_samples + boosted_cybersec_samples
     random.shuffle(dataset)
