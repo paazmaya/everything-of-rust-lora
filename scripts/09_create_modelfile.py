@@ -254,6 +254,89 @@ def build_modelfile_content(
     return "\n".join(lines) + "\n"
 
 
+def build_ollama_modelfile_content(
+    base_reference: str,
+    base_key: str,
+    adapter_filename: str = "adapter_model.safetensors",
+) -> str:
+    """Build a syntactically valid Ollama Modelfile with ADAPTER instruction."""
+    cutoff_date = get_cutoff_date()
+    system_prompt = (
+        f"You are an expert Rust programmer and cybersecurity engineer specializing in systems programming, "
+        f"async Rust, ESP32 embedded development, RustSec vulnerability analysis, Kali Linux tooling, and "
+        f"living-off-the-land (LOTL) security. Your cybersecurity, vulnerability, and tooling knowledge cutoff "
+        f"date is {cutoff_date}. For vulnerabilities discovered after this date, advise running cargo-audit."
+    )
+
+    norm_key = base_key.lower()
+    if norm_key in ("k2", "k2-horizon", "k2_horizon"):
+        return f'''FROM {base_reference}
+ADAPTER {adapter_filename}
+PARAMETER temperature 0.2
+PARAMETER num_ctx 32768
+PARAMETER stop "<|ifm|im_end|>"
+PARAMETER stop "<|ifm|endoftext|>"
+PARAMETER stop "<|im_end|>"
+TEMPLATE """{{{{ if .System }}}}<|ifm|im_start|>system
+{{{{ .System }}}}<|ifm|im_end|>
+{{{{ end }}}}{{{{ if .Prompt }}}}<|ifm|im_start|>user
+{{{{ .Prompt }}}}<|ifm|im_end|>
+{{{{ end }}}}<|ifm|im_start|>assistant
+<ifm|think>
+</ifm|think>{{{{ .Response }}}}<|ifm|im_end|>"""
+SYSTEM """{system_prompt}"""
+'''
+    elif norm_key == "granite":
+        return f'''FROM {base_reference}
+ADAPTER {adapter_filename}
+PARAMETER temperature 0.2
+PARAMETER num_ctx 32768
+PARAMETER stop "<|end_of_text|>"
+PARAMETER stop "<|start_of_role|>"
+TEMPLATE """{{{{- range .Messages }}}}
+{{{{- if eq .Role "system" }}}}<|start_of_role|>system<|end_of_role|>{{{{ .Content }}}}<|end_of_text|>
+{{{{- else if eq .Role "user" }}}}<|start_of_role|>user<|end_of_role|>{{{{ .Content }}}}<|end_of_text|>
+{{{{- else if eq .Role "assistant" }}}}<|start_of_role|>assistant<|end_of_role|>{{{{ .Content }}}}<|end_of_text|>
+{{{{- end }}}}
+{{{{- end }}}}
+{{{{- if .Prompt }}}}<|start_of_role|>user<|end_of_role|>{{{{ .Prompt }}}}<|end_of_text|><|start_of_role|>assistant<|end_of_role|>{{{{- end }}}}"""
+SYSTEM """{system_prompt}"""
+'''
+    elif norm_key == "nemotron":
+        return f'''FROM {base_reference}
+ADAPTER {adapter_filename}
+PARAMETER temperature 0.2
+PARAMETER num_ctx 32768
+PARAMETER stop "<|im_start|>"
+PARAMETER stop "<|im_end|>"
+PARAMETER stop "<extra_id_1>"
+PARAMETER stop "<extra_id_2>"
+TEMPLATE """{{{{ if .System }}}}<|im_start|>system
+{{{{ .System }}}}<|im_end|>
+{{{{ end }}}}{{{{ if .Prompt }}}}<|im_start|>user
+{{{{ .Prompt }}}}<|im_end|>
+{{{{ end }}}}<|im_start|>assistant
+{{{{ .Response }}}}<|im_end|>"""
+SYSTEM """{system_prompt}"""
+'''
+    else:  # qwen / qwen3_8
+        num_ctx = 65536 if norm_key == "qwen3_8" else 32768
+        return f'''FROM {base_reference}
+ADAPTER {adapter_filename}
+PARAMETER temperature 0.2
+PARAMETER num_ctx {num_ctx}
+PARAMETER stop "<|im_start|>"
+PARAMETER stop "<|im_end|>"
+TEMPLATE """{{{{ if .System }}}}<|im_start|>system
+{{{{ .System }}}}<|im_end|>
+{{{{ end }}}}{{{{ if .Prompt }}}}<|im_start|>user
+{{{{ .Prompt }}}}<|im_end|>
+{{{{ end }}}}<|im_start|>assistant
+{{{{ .Response }}}}<|im_end|>"""
+SYSTEM """{system_prompt}"""
+'''
+
+
 def create_modelfile(
     adapter_dir: Path,
     model_name: str,
@@ -269,14 +352,35 @@ def create_modelfile(
     output_path = output_path or adapter_dir
     output_path.mkdir(parents=True, exist_ok=True)
 
-    modelfile_path = output_path / "Modelfile"
-    print(f"Writing Modelfile to {modelfile_path}...")
-    modelfile_content = build_modelfile_content(
+    base_reference = base_override or base_metadata["reference"]
+
+    # 1. Write YAML manifest
+    manifest_path = output_path / "lora_manifest.yaml"
+    print(f"Writing LoRA YAML metadata manifest to {manifest_path}...")
+    manifest_content = build_modelfile_content(
         model_name,
         base_metadata,
         adapter_dir,
         adapter_config,
         base_override,
+    )
+    manifest_path.write_text(manifest_content, encoding="utf-8")
+
+    # 2. Write executable Ollama Modelfile with ADAPTER
+    modelfile_path = output_path / "Modelfile"
+    print(f"Writing executable Ollama Modelfile to {modelfile_path}...")
+    adapter_file = "adapter_model.safetensors"
+    if not (adapter_dir / adapter_file).exists():
+        # Fallback to .bin or search for any adapter weight file
+        for candidate in ["adapter_model.bin", "adapter_model.safetensors"]:
+            if (adapter_dir / candidate).exists():
+                adapter_file = candidate
+                break
+
+    modelfile_content = build_ollama_modelfile_content(
+        base_reference=base_reference,
+        base_key=base_key,
+        adapter_filename=adapter_file,
     )
     modelfile_path.write_text(modelfile_content, encoding="utf-8")
 

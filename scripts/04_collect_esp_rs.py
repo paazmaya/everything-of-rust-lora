@@ -177,7 +177,9 @@ class ESPCollector:
                     continue
                 s = BeautifulSoup(r.text, "lxml")
                 self._save_page_content(s, current_url, out_rel)
-                for next_url in self._extract_linked_urls_esp(s, current_url, base_domain, base_path):
+                for next_url in self._extract_linked_urls_esp(
+                    s, current_url, base_domain, base_path
+                ):
                     if next_url not in self.visited and next_url not in enqueued:
                         enqueued.add(next_url)
                         queue.append(next_url)

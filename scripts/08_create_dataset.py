@@ -368,18 +368,19 @@ def format_alpaca(
                 True,
             )
         elif meta.get("tool") or source == "kali_tools":
-            instruction, input_text = _format_kali_tool(
-                library, version, title, meta, chunk_cutoff
-            )
+            instruction, input_text = _format_kali_tool(library, version, title, meta, chunk_cutoff)
             return (
                 {"instruction": instruction, "input": input_text, "output": content},
                 False,
                 True,
             )
-        elif meta.get("lotl_type") or source in ["lolbas", "gtfobins", "loobins", "powershell_lotl"]:
-            instruction, input_text = _format_lotl(
-                library, version, title, meta, chunk_cutoff
-            )
+        elif meta.get("lotl_type") or source in [
+            "lolbas",
+            "gtfobins",
+            "loobins",
+            "powershell_lotl",
+        ]:
+            instruction, input_text = _format_lotl(library, version, title, meta, chunk_cutoff)
             return (
                 {"instruction": instruction, "input": input_text, "output": content},
                 False,
@@ -450,7 +451,9 @@ def main() -> None:
         return
 
     cutoff_date = get_cutoff_date()
-    print(f"Creating Alpaca dataset with version-aware & cybersec-aware instruction prompts (Cutoff: {cutoff_date})...")
+    print(
+        f"Creating Alpaca dataset with version-aware & cybersec-aware instruction prompts (Cutoff: {cutoff_date})..."
+    )
     general_samples: list[dict[str, str]] = []
     version_samples: list[dict[str, str]] = []
     cybersec_samples: list[dict[str, str]] = []

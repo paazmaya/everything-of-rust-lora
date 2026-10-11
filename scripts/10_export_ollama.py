@@ -35,6 +35,107 @@ def get_cutoff_date() -> str:
     return str(cutoff)
 
 
+def detect_family(model_hint: str) -> str:
+    """Detect architectural family from model path or identifier."""
+    hint = model_hint.lower()
+    if "granite" in hint:
+        return "granite"
+    if "k2" in hint or "horizon" in hint:
+        return "k2_horizon"
+    if "nemotron" in hint or "nemo" in hint:
+        return "nemotron"
+    if "3.8" in hint or "qwen3.8" in hint or "27b" in hint:
+        return "qwen3_8"
+    if "qwen" in hint:
+        return "qwen"
+    return "qwen"
+
+
+def build_ollama_modelfile_content(
+    from_path: str,
+    family: str,
+    system_prompt: str,
+) -> str:
+    """Generate family-tailored Ollama Modelfile content with precise templates and stop tokens."""
+    if family == "k2_horizon":
+        return f"""FROM {from_path}
+PARAMETER temperature 0.2
+PARAMETER num_ctx 32768
+PARAMETER stop "<|ifm|im_end|>"
+PARAMETER stop "<|ifm|endoftext|>"
+PARAMETER stop "<|im_end|>"
+TEMPLATE \"\"\"{{{{ if .System }}}}<|ifm|im_start|>system
+{{{{ .System }}}}<|ifm|im_end|>
+{{{{ end }}}}{{{{ if .Prompt }}}}<|ifm|im_start|>user
+{{{{ .Prompt }}}}<|ifm|im_end|>
+{{{{ end }}}}<|ifm|im_start|>assistant
+<ifm|think>
+</ifm|think>{{{{ .Response }}}}<|ifm|im_end|>\"\"\"
+SYSTEM {system_prompt}
+"""
+    elif family == "granite":
+        return f"""FROM {from_path}
+PARAMETER temperature 0.2
+PARAMETER num_ctx 32768
+PARAMETER stop "<|end_of_text|>"
+PARAMETER stop "<|start_of_role|>"
+TEMPLATE \"\"\"{{{{- range .Messages }}}}
+{{{{- if eq .Role "system" }}}}<|start_of_role|>system<|end_of_role|>{{{{ .Content }}}}<|end_of_text|>
+{{{{- else if eq .Role "user" }}}}<|start_of_role|>user<|end_of_role|>{{{{ .Content }}}}<|end_of_text|>
+{{{{- else if eq .Role "assistant" }}}}<|start_of_role|>assistant<|end_of_role|>{{{{ .Content }}}}<|end_of_text|>
+{{{{- end }}}}
+{{{{- end }}}}
+{{{{- if .Prompt }}}}<|start_of_role|>user<|end_of_role|>{{{{ .Prompt }}}}<|end_of_text|><|start_of_role|>assistant<|end_of_role|>{{{{- end }}}}\"\"\"
+SYSTEM {system_prompt}
+"""
+    elif family == "nemotron":
+        return f"""FROM {from_path}
+PARAMETER temperature 0.2
+PARAMETER num_ctx 32768
+PARAMETER stop "<|im_start|>"
+PARAMETER stop "<|im_end|>"
+PARAMETER stop "<extra_id_1>"
+PARAMETER stop "<extra_id_2>"
+TEMPLATE \"\"\"{{{{ if .System }}}}<|im_start|>system
+{{{{ .System }}}}<|im_end|>
+{{{{ end }}}}{{{{ if .Prompt }}}}<|im_start|>user
+{{{{ .Prompt }}}}<|im_end|>
+{{{{ end }}}}<|im_start|>assistant
+{{{{ .Response }}}}<|im_end|>\"\"\"
+SYSTEM {system_prompt}
+"""
+    elif family == "qwen3_8":
+        return f"""FROM {from_path}
+PARAMETER temperature 0.2
+PARAMETER num_ctx 65536
+PARAMETER stop "<|im_start|>"
+PARAMETER stop "<|im_end|>"
+PARAMETER stop "<|endoftext|>"
+TEMPLATE \"\"\"{{{{ if .System }}}}<|im_start|>system
+{{{{ .System }}}}<|im_end|>
+{{{{ end }}}}{{{{ if .Prompt }}}}<|im_start|>user
+{{{{ .Prompt }}}}<|im_end|>
+{{{{ end }}}}<|im_start|>assistant
+{{{{ .Response }}}}<|im_end|>\"\"\"
+SYSTEM {system_prompt}
+"""
+    else:  # qwen 3.5
+        return f"""FROM {from_path}
+PARAMETER temperature 0.2
+PARAMETER num_ctx 32768
+PARAMETER stop "<|im_start|>"
+PARAMETER stop "<|im_end|>"
+PARAMETER stop "<|endoftext|>"
+TEMPLATE \"\"\"{{{{ if .System }}}}<|im_start|>system
+{{{{ .System }}}}<|im_end|>
+{{{{ end }}}}{{{{ if .Prompt }}}}<|im_start|>user
+{{{{ .Prompt }}}}<|im_end|>
+{{{{ end }}}}<|im_start|>assistant
+{{{{ .Response }}}}<|im_end|>\"\"\"
+SYSTEM {system_prompt}
+"""
+
+
 def export_to_ollama(
     model_path: str, model_name: str, base_model: str, quant: str = "q4_k_m"
 ) -> None:
@@ -45,16 +146,38 @@ def export_to_ollama(
         model_path: Path to trained LoRA weights (e.g., models/granite_rust_lora)
         model_name: Name for the exported model (e.g., rust-granite)
         base_model: Base model identifier or local path. Can be:
-            - HuggingFace model ID: "ibm-granite/granite-4.2-8b-GGUF" (downloads if not cached)
-            - Local file path: "/path/to/granite-4.2-8b-Q4_K_M.gguf" (no download needed)
+            - HuggingFace model ID: "ibm-granite/granite-4.2-8b" or "Qwen/Qwen3.5-4B"
+            - Local file path: "/path/to/granite-4.2-8b-Q4_K_M.gguf"
         quant: Quantization method (default: q4_k_m = Q4_K_M, 4-bit K_M)
     """
     model: Any
     tokenizer: Any
-    if os.path.isdir(model_path) and os.path.exists(
-        os.path.join(model_path, "adapter_config.json")
-    ):
-        print(f"Loading LoRA checkpoint and its base model from {model_path}...")
+
+    effective_base = base_model
+    adapter_cfg_path = os.path.join(model_path, "adapter_config.json")
+    if not effective_base and os.path.exists(adapter_cfg_path):
+        import json
+
+        with open(adapter_cfg_path, encoding="utf-8") as f:
+            cfg = json.load(f)
+            effective_base = cfg.get("base_model_name_or_path", "")
+
+    family = detect_family(effective_base or model_path or model_name)
+    print(f"Detected model architecture family: {family}")
+
+    if effective_base and effective_base != model_path:
+        print(f"Loading base model from {effective_base}...")
+        model, tokenizer = FastLanguageModel.from_pretrained(
+            model_name=effective_base,
+            max_seq_length=4096,
+            dtype=None,
+            load_in_4bit=True,
+            trust_remote_code=True,
+        )
+        print(f"Applying LoRA adapter from {model_path}...")
+        model = PeftModel.from_pretrained(model, model_path, is_trainable=False)
+    elif os.path.isdir(model_path) and os.path.exists(adapter_cfg_path):
+        print(f"Loading LoRA checkpoint and configured base model from {model_path}...")
         model, tokenizer = FastLanguageModel.from_pretrained(
             model_name=model_path,
             max_seq_length=4096,
@@ -63,20 +186,9 @@ def export_to_ollama(
             trust_remote_code=True,
         )
     else:
-        if not base_model:
-            raise ValueError(
-                "Base model is required when model_path is not a LoRA adapter checkpoint."
-            )
-        print(f"Loading base model from {base_model}...")
-        model, tokenizer = FastLanguageModel.from_pretrained(
-            model_name=base_model,
-            max_seq_length=4096,
-            dtype=None,
-            load_in_4bit=True,
-            trust_remote_code=True,
+        raise ValueError(
+            f"Cannot resolve base model for {model_path}. Provide --base <model_id_or_path>."
         )
-        print(f"Applying LoRA adapter from {model_path}...")
-        model = PeftModel.from_pretrained(model, model_path, is_trainable=False)
 
     # Merge LoRA weights into base model
     print("Merging LoRA weights...")
@@ -103,13 +215,6 @@ def export_to_ollama(
         raise RuntimeError(f"Could not determine GGUF filename in {gguf_dir}.")
     from_path = gguf_filename
 
-    # Detect if target is K2-Horizon to configure proper delimiters and stop tokens
-    is_k2 = (
-        "k2" in (base_model or "").lower()
-        or "k2" in model_path.lower()
-        or "k2" in model_name.lower()
-    )
-
     cutoff_date = get_cutoff_date()
 
     system_prompt = (
@@ -119,28 +224,11 @@ def export_to_ollama(
         f"date is {cutoff_date}. For vulnerabilities discovered after this date, advise running cargo-audit."
     )
 
-    if is_k2:
-        modelfile_content = f"""FROM {from_path}
-PARAMETER stop "<|ifm|im_end|>"
-PARAMETER stop "<|ifm|endoftext|>"
-PARAMETER stop "<|im_end|>"
-PARAMETER temperature 0.2
-TEMPLATE \"\"\"{{{{ if .System }}}}<|ifm|im_start|>system
-{{{{ .System }}}}<|ifm|im_end|>
-{{{{ end }}}}{{{{ if .Prompt }}}}<|ifm|im_start|>user
-{{{{ .Prompt }}}}<|ifm|im_end|>
-{{{{ end }}}}<|ifm|im_start|>assistant
-<ifm|think>
-</ifm|think>{{{{ .Response }}}}<|ifm|im_end|>\"\"\"
-SYSTEM {system_prompt}
-"""
-    else:
-        modelfile_content = f"""FROM {from_path}
-PARAMETER stop "<|im_start|>"
-PARAMETER stop "<|im_end|>"
-PARAMETER temperature 0.2
-SYSTEM {system_prompt}
-"""
+    modelfile_content = build_ollama_modelfile_content(
+        from_path=from_path,
+        family=family,
+        system_prompt=system_prompt,
+    )
 
     modelfile_path = f"{gguf_dir}/Modelfile"
     with open(modelfile_path, "w") as f:

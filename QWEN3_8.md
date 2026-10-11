@@ -70,6 +70,27 @@ This trains with:
 - Checkpointing every 25 steps to `models/qwen3_8_27b_rust_lora/checkpoints/`
 - Output adapter saved to `models/qwen3_8_27b_rust_lora/`
 
+OR
+
+use [DavidAU/Qwen3.8-27B-TURBO-Fable-Cold-Fusion-735-882-Heretic-Uncensored-NM-DAU](https://huggingface.co/DavidAU/Qwen3.8-27B-TURBO-Fable-Cold-Fusion-735-882-Heretic-Uncensored-NM-DAU/) as a base model.
+
+Since the network might get unstable, download in more controlled fashion:
+
+```sh
+hf download DavidAU/Qwen3.8-27B-TURBO-Fable-Cold-Fusion-735-882-Heretic-Uncensored-NM-DAU \
+ --local-dir ./models/DavidAU__Qwen3.8-27B-TURBO-Fable-Cold-Fusion-735-882-Heretic-Uncensored-NM-DAU \
+ --include "*.json"
+
+hf download DavidAU/Qwen3.8-27B-TURBO-Fable-Cold-Fusion-735-882-Heretic-Uncensored-NM-DAU \
+ --local-dir ./models/DavidAU__Qwen3.8-27B-TURBO-Fable-Cold-Fusion-735-882-Heretic-Uncensored-NM-DAU \
+ chat_template.jinja model-mtp-restored.safetensors
+
+hf download DavidAU/Qwen3.8-27B-TURBO-Fable-Cold-Fusion-735-882-Heretic-Uncensored-NM-DAU \
+ --local-dir ./models/DavidAU__Qwen3.8-27B-TURBO-Fable-Cold-Fusion-735-882-Heretic-Uncensored-NM-DAU \
+  model-00001-of-00012.safetensors
+# Then download the rest 11 safetensors files one by one
+```
+
 ### Step 3: Resuming an Interrupted Run
 
 If training is stopped or interrupted (e.g., via `Ctrl+C` or system sleep), simply add `--resume`:
@@ -192,3 +213,10 @@ model = AutoModelForCausalLM.from_pretrained(
 )
 model = PeftModel.from_pretrained(model, adapter_path)
 ```
+
+### Merging, MTP GGUF Quantization & Unsloth Studio
+
+To merge the adapter with either `Qwen/Qwen3.8-27B` or `DavidAU/Qwen3.8-27B-TURBO-Fable-Cold-Fusion-735-882-Heretic-Uncensored-NM-DAU` and create an extreme 2-bit $IQ2\_XS$ quantization with Multi-Token Prediction (MTP) for Unsloth Studio:
+
+- Export for Unsloth Studio: `uv run python scripts/11_export_unsloth.py --model models/qwen3_8_27b_rust_lora --base Qwen/Qwen3.8-27B --mode merged-hf`
+- Complete step-by-step MTP GGUF and importance matrix guide: See [QUANTIZIZE.md](QUANTIZIZE.md#4-showcase-extreme-iq2_xs-merge-with-mtp-for-unsloth-studio).

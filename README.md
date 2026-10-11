@@ -463,7 +463,38 @@ Once training is complete:
    ollama run rust-granite "How do I set up a WiFi connection on an ESP32 using esp-wifi and async Rust?"
    ```
 
-## Phase 5: Maintenance & 6-Month Updates
+## Phase 6: Quantization & Unsloth Studio Export
+
+For advanced quantization, standalone adapter compression, SVD rank reduction, and Unsloth Studio integration, see [QUANTIZIZE.md](QUANTIZIZE.md).
+
+### Quick Unsloth Studio Export (Script 11)
+
+Use [scripts/11_export_unsloth.py](scripts/11_export_unsloth.py) to export merged Hugging Face weights, standalone adapter bundles, or GGUF files with embedded Jinja chat templates for [Unsloth Studio](https://unsloth.ai/docs/new/studio/chat):
+
+```bash
+# 1. Export merged 16-bit model with chat_template.jinja for Unsloth Studio
+uv run python scripts/11_export_unsloth.py \
+  --model models/granite_rust_lora \
+  --base ibm-granite/granite-4.2-8b \
+  --mode merged-hf
+
+# 2. Package standalone adapter with tokenizer and studio manifest
+uv run python scripts/11_export_unsloth.py \
+  --model models/k2_horizon_rust_lora \
+  --base IFM/K2-Horizon-3.7B \
+  --mode adapter
+
+# 3. Direct GGUF quantization (Q4_K_M)
+uv run python scripts/11_export_unsloth.py \
+  --model models/qwen3_8_27b_rust_lora \
+  --base Qwen/Qwen3.8-27B \
+  --mode gguf \
+  --quant q4_k_m
+```
+
+For the complete guide on creating an extreme 2-bit **$IQ2\_XS$** merge with **Multi-Token Prediction (MTP)** and an **Importance Matrix (imatrix)** for Qwen 3.8 27B, see [QUANTIZIZE.md](QUANTIZIZE.md#4-showcase-extreme-iq2_xs-merge-with-mtp-for-unsloth-studio).
+
+## Phase 7: Maintenance & 6-Month Updates
 
 Because we stored the raw data in ChromaDB (a local vector database), you do not need to re-scrape everything when Rust updates.
 
