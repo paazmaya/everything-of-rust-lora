@@ -467,7 +467,7 @@ def export_merged_hf(
         auto_model: Any = AutoModelForCausalLM
         base_causal_model: Any = auto_model.from_pretrained(
             base_model,
-            torch_dtype=dtype,
+            dtype=dtype,
             device_map="auto",
             trust_remote_code=trust_remote_code,
         )

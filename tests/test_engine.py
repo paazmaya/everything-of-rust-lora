@@ -15,11 +15,13 @@ from lib.engine import (
     _extract_checkpoint_step,
     _find_latest_checkpoint,
     build_training_arguments,
+    cleanup_unsloth_patches,
     create_output_directories,
     execute_training_pipeline,
     get_latest_checkpoint,
     get_optimal_dtype,
     load_model_and_tokenizer,
+    rematerialize_meta_adapters,
     resolve_checkpoint_resumption,
     run_sft_training,
     save_training_metadata,
@@ -306,13 +308,14 @@ def test_load_model_and_tokenizer_fallback_transformers_peft(tmp_path: Any) -> N
                 "transformers.AutoModelForCausalLM.from_pretrained", return_value=mock_base_model
             ) as mock_causal:
                 with patch("peft.get_peft_model", return_value=mock_peft_model):
-                    model, tokenizer = load_model_and_tokenizer(cfg, logger=logger)
-                    assert model is mock_peft_model
-                    assert tokenizer is mock_tokenizer
-                    assert tokenizer.pad_token == "<eos>"
-                    assert os.path.isdir(offload_dir)
-                    mock_base_model.gradient_checkpointing_enable.assert_called_once()
-                    mock_causal.assert_called_once()
+                    with patch("lib.engine.rematerialize_meta_adapters", return_value=2):
+                        model, tokenizer = load_model_and_tokenizer(cfg, logger=logger)
+                        assert model is mock_peft_model
+                        assert tokenizer is mock_tokenizer
+                        assert tokenizer.pad_token == "<eos>"
+                        assert os.path.isdir(offload_dir)
+                        mock_base_model.gradient_checkpointing_enable.assert_called_once()
+                        mock_causal.assert_called_once()
 
 
 def test_run_sft_training(tmp_path: Any) -> None:
@@ -395,3 +398,170 @@ def test_execute_training_pipeline() -> None:
                         config=cfg,
                         logger=logger,
                     )
+
+
+def test_patch_caching_allocator_warmup_handles_exceptions() -> None:
+    """Verify patch_caching_allocator_warmup suppresses RuntimeError and ValueError."""
+    import transformers.modeling_utils as mu
+
+    from lib.engine import patch_caching_allocator_warmup
+
+    mock_warmup = MagicMock(side_effect=RuntimeError("Invalid buffer size: 31.43 GiB"))
+    mock_warmup._is_safe_patched = False
+
+    with patch.object(mu, "caching_allocator_warmup", mock_warmup):
+        patch_caching_allocator_warmup()
+        # Calling the patched warmup should catch the RuntimeError without raising
+        mu.caching_allocator_warmup("dummy_model", {}, None)
+        mock_warmup.assert_called_once()
+
+        # Calling again when ValueError occurs
+        mock_warmup.side_effect = ValueError("Invalid dimension")
+        mu.caching_allocator_warmup("dummy_model", {}, None)
+
+
+def test_patch_caching_allocator_warmup_idempotent() -> None:
+    """Verify patch_caching_allocator_warmup is idempotent and handles missing module."""
+    import transformers.modeling_utils as mu
+
+    from lib.engine import patch_caching_allocator_warmup
+
+    mock_warmup = MagicMock()
+    mock_warmup._is_safe_patched = True
+
+    with patch.object(mu, "caching_allocator_warmup", mock_warmup):
+        patch_caching_allocator_warmup()
+        assert mu.caching_allocator_warmup is mock_warmup
+
+    with patch.dict(sys.modules, {"transformers.modeling_utils": None}):
+        # Should cleanly handle ImportError without crashing
+        patch_caching_allocator_warmup()
+
+
+def test_cleanup_unsloth_patches() -> None:
+    """Verify cleanup_unsloth_patches reverts monkey patches on Tensor and cuda."""
+    # Test Tensor.to restoration
+    orig_to = MagicMock()
+    mock_to = MagicMock()
+    mock_to._unsloth_mlx_cuda_noop = True
+    mock_to._unsloth_original_to = orig_to
+    with patch.object(torch.Tensor, "to", mock_to):
+        cleanup_unsloth_patches()
+        assert torch.Tensor.to is orig_to
+
+    # Test Tensor.cuda restoration
+    orig_cuda = MagicMock()
+    mock_cuda = MagicMock()
+    mock_cuda._unsloth_mlx_cuda_noop = True
+    mock_cuda._unsloth_original_cuda = orig_cuda
+    with patch.object(torch.Tensor, "cuda", mock_cuda, create=True):
+        cleanup_unsloth_patches()
+        assert torch.Tensor.cuda is orig_cuda
+
+    # Test torch.cuda restoration
+    mock_cuda_mod = MagicMock()
+    mock_cuda_mod._unsloth_mlx_cuda_compat_api = True
+    mock_cuda_mod.current_device = MagicMock()
+    with patch.object(torch, "cuda", mock_cuda_mod):
+        cleanup_unsloth_patches()
+        assert mock_cuda_mod._unsloth_mlx_cuda_compat_api is False
+        assert mock_cuda_mod.device_count() == 0
+        assert not hasattr(mock_cuda_mod, "current_device")
+
+
+def test_rematerialize_meta_adapters() -> None:
+    """Verify rematerialize_meta_adapters replaces meta LoRA weights with real tensors."""
+    import torch.nn as nn
+
+    class DummyLayer(nn.Module):
+        def __init__(self, on_meta: bool = True):
+            super().__init__()
+            dev = "meta" if on_meta else "cpu"
+            self.lora_A = nn.ModuleDict(
+                {"default": nn.Linear(16, 4, bias=False, device=dev, dtype=torch.bfloat16)}
+            )
+            self.lora_B = nn.ModuleDict(
+                {"default": nn.Linear(4, 16, bias=False, device=dev, dtype=torch.bfloat16)}
+            )
+
+    class DummyModel(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.layer1 = DummyLayer(on_meta=True)
+            self.layer2 = DummyLayer(on_meta=False)
+            self.plain_linear = nn.Linear(10, 10)
+
+    model = DummyModel()
+    count = rematerialize_meta_adapters(model, device="cpu", dtype=torch.bfloat16)
+    assert count == 1
+    assert model.layer1.lora_A["default"].weight.device.type == "cpu"
+    assert model.layer1.lora_B["default"].weight.device.type == "cpu"
+    assert model.layer2.lora_A["default"].weight.device.type == "cpu"
+
+    # Test default device resolution branches (mps and cpu)
+    model_default = DummyModel()
+    with patch.object(torch.backends, "mps", MagicMock(is_available=lambda: True)):
+        rematerialize_meta_adapters(model_default, device=None)
+        assert model_default.layer1.lora_A["default"].weight.device.type == "mps"
+
+    model_cpu = DummyModel()
+    with patch.object(torch.backends, "mps", MagicMock(is_available=lambda: False)):
+        with patch("torch.cuda.is_available", return_value=False):
+            rematerialize_meta_adapters(model_cpu, device=None)
+            assert model_cpu.layer1.lora_A["default"].weight.device.type == "cpu"
+
+
+def test_load_model_and_tokenizer_fix_mistral_regex_fallback(tmp_path: Any) -> None:
+    """Verify AutoTokenizer fallback when fix_mistral_regex is not supported."""
+    cfg = TrainingConfig(model_path="test/model")
+    logger = logging.getLogger("test_engine")
+
+    mock_tok = MagicMock()
+    mock_tok.pad_token = "<pad>"
+
+    call_count = [0]
+
+    def mock_from_pretrained(*args: Any, **kwargs: Any) -> Any:
+        call_count[0] += 1
+        if "fix_mistral_regex" in kwargs:
+            raise TypeError("unexpected keyword argument fix_mistral_regex")
+        return mock_tok
+
+    with patch("transformers.AutoTokenizer.from_pretrained", side_effect=mock_from_pretrained):
+        with patch("transformers.AutoModelForCausalLM.from_pretrained", return_value=MagicMock()):
+            with patch("peft.get_peft_model", return_value=MagicMock()):
+                model, tokenizer = load_model_and_tokenizer(cfg, logger=logger)
+                assert tokenizer is mock_tok
+                assert call_count[0] == 2
+
+
+def test_build_training_arguments_fallback() -> None:
+    """Verify build_training_arguments falls back to TrainingArguments if SFTConfig fails."""
+    cfg = TrainingConfig(model_path="test/model")
+    with patch.dict(sys.modules, {"trl": None}):
+        args = build_training_arguments(cfg, checkpoint_dir="test_ckpt", report_to=[])
+        assert args.per_device_train_batch_size == cfg.batch_size
+
+
+def test_run_sft_training_callable_trainer(tmp_path: Any) -> None:
+    """Verify run_sft_training handles callable non-type SFTTrainer with processing_class."""
+    out_dir = str(tmp_path / "out_callable")
+    cfg = TrainingConfig(model_path="test/model", output_dir=out_dir)
+    logger = logging.getLogger("test_engine")
+
+    mock_model = MagicMock()
+    mock_tokenizer = MagicMock()
+    mock_dataset = [{"text": "Sample text"}]
+
+    mock_trainer_instance = MagicMock()
+    mock_trainer_instance.train.return_value = MagicMock(spec=[])
+
+    def mock_trainer_factory(*args: Any, **kwargs: Any) -> Any:
+        assert "processing_class" in kwargs or "tokenizer" in kwargs
+        return mock_trainer_instance
+
+    with patch("lib.engine.resolve_checkpoint_resumption", return_value=None):
+        with patch("lib.engine.SFTTrainer", mock_trainer_factory):
+            run_sft_training(mock_model, mock_tokenizer, mock_dataset, cfg, logger=logger)
+            mock_trainer_instance.train.assert_called_once()
+

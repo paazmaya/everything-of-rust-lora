@@ -89,6 +89,8 @@ hf download DavidAU/Qwen3.8-27B-TURBO-Fable-Cold-Fusion-735-882-Heretic-Uncensor
  --local-dir ./models/DavidAU__Qwen3.8-27B-TURBO-Fable-Cold-Fusion-735-882-Heretic-Uncensored-NM-DAU \
   model-00001-of-00012.safetensors
 # Then download the rest 11 safetensors files one by one
+
+uv run python train_qwen3_8.py --model-path ./models/DavidAU__Qwen3.8-27B-TURBO-Fable-Cold-Fusion-735-882-Heretic-Uncensored-NM-DAU
 ```
 
 ### Step 3: Resuming an Interrupted Run
@@ -208,7 +210,7 @@ adapter_path = "models/qwen3_8_27b_rust_lora"
 tokenizer = AutoTokenizer.from_pretrained(base_model)
 model = AutoModelForCausalLM.from_pretrained(
     base_model,
-    torch_dtype=torch.bfloat16,
+    dtype=torch.bfloat16,
     device_map="auto",
 )
 model = PeftModel.from_pretrained(model, adapter_path)

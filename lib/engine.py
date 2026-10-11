@@ -2,12 +2,23 @@
 Execution engine for dual-backend model loading and SFT training.
 """
 
+import inspect
 import json
 import logging
+import math
 import os
+import sys
+import warnings
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+
+# Suppress known upstream third-party deprecation warnings
+warnings.filterwarnings("ignore", category=FutureWarning, module=r"trl(\..*)?")
+warnings.filterwarnings("ignore", category=FutureWarning, module=r"huggingface_hub(\..*)?")
+warnings.filterwarnings("ignore", message=r".*BestOfNSampler.*", category=FutureWarning)
+warnings.filterwarnings("ignore", message=r".*HF_HUB_ENABLE_HF_TRANSFER.*", category=FutureWarning)
+warnings.filterwarnings("ignore", message=r".*torch_dtype.*is deprecated.*", category=UserWarning)
 
 import torch
 from transformers import TrainingArguments
@@ -16,6 +27,13 @@ from trl.trainer.sft_trainer import SFTTrainer
 from .config import TrainingConfig
 from .dataset import load_and_prepare_dataset
 from .validation import run_preflight_checks
+
+DEFAULT_ENGINE_LOGGER = "rust_lora.engine"
+
+try:
+    _SFT_INIT_PARAMS = set(inspect.signature(SFTTrainer.__init__).parameters.keys())
+except (ValueError, TypeError):  # pragma: no cover
+    _SFT_INIT_PARAMS = {"processing_class", "tokenizer"}
 
 
 def setup_logging(name: str = "rust_lora", verbose: bool = False) -> logging.Logger:
@@ -39,6 +57,132 @@ def get_optimal_dtype() -> torch.dtype:
     if torch.cuda.is_available():
         return torch.float16
     return torch.float32
+
+
+def patch_caching_allocator_warmup() -> None:
+    """Patch transformers caching_allocator_warmup to safely handle buffer size limits on MPS and other accelerators."""
+    try:
+        import transformers.modeling_utils as mu
+
+        if hasattr(mu, "caching_allocator_warmup"):
+            orig_warmup = mu.caching_allocator_warmup
+            if not getattr(orig_warmup, "_is_safe_patched", False):
+
+                def safe_caching_allocator_warmup(
+                    model: Any, expanded_device_map: Any, hf_quantizer: Any
+                ) -> None:
+                    try:
+                        orig_warmup(model, expanded_device_map, hf_quantizer)
+                    except (RuntimeError, ValueError) as exc:
+                        log = logging.getLogger(DEFAULT_ENGINE_LOGGER)
+                        log.debug(f"Suppressed accelerator warmup exception: {exc}")
+
+                safe_caching_allocator_warmup._is_safe_patched = True  # type: ignore[attr-defined]
+                mu.caching_allocator_warmup = safe_caching_allocator_warmup
+    except ImportError:
+        pass
+
+
+patch_caching_allocator_warmup()
+
+
+def cleanup_unsloth_patches() -> None:
+    """Revert any monkey-patches introduced by unsloth on non-CUDA / Darwin platforms."""
+    tensor_to = getattr(torch.Tensor, "to", None)
+    if getattr(tensor_to, "_unsloth_mlx_cuda_noop", False):
+        torch.Tensor.to = getattr(tensor_to, "_unsloth_original_to", torch.Tensor.to)
+
+    tensor_cuda = getattr(torch.Tensor, "cuda", None)
+    if getattr(tensor_cuda, "_unsloth_mlx_cuda_noop", False):
+        orig_cuda = getattr(tensor_cuda, "_unsloth_original_cuda", None)
+        if orig_cuda is not None:
+            torch.Tensor.cuda = orig_cuda
+
+    cuda = getattr(torch, "cuda", None)
+    if cuda is not None and getattr(cuda, "_unsloth_mlx_cuda_compat_api", False):
+        cuda._unsloth_mlx_cuda_compat_api = False
+        cuda.device_count = lambda: 0
+        if hasattr(cuda, "current_device"):
+            delattr(cuda, "current_device")
+
+
+def _get_default_target_device() -> str:
+    """Determine the default target device for rematerializing adapters."""
+    if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+        return "mps"
+    if torch.cuda.is_available():
+        return "cuda"
+    return "cpu"
+
+
+def _rematerialize_module_adapter(
+    module: Any,
+    adapter_name: str,
+    target_device: str | torch.device,
+    dtype: torch.dtype,
+) -> bool:
+    """Rematerialize a single adapter if its weights are on meta device."""
+    import torch.nn as nn
+
+    layer_a = module.lora_A[adapter_name]
+    layer_b = module.lora_B[adapter_name]
+    weight = getattr(layer_a, "weight", None)
+    if weight is None or getattr(weight, "device", None) is None or weight.device.type != "meta":
+        return False
+
+    new_a = nn.Linear(
+        layer_a.in_features,
+        layer_a.out_features,
+        bias=False,
+        device=target_device,
+        dtype=dtype,
+    )
+    nn.init.kaiming_uniform_(new_a.weight, a=math.sqrt(5))
+    module.lora_A[adapter_name] = new_a
+
+    new_b = nn.Linear(
+        layer_b.in_features,
+        layer_b.out_features,
+        bias=False,
+        device=target_device,
+        dtype=dtype,
+    )
+    nn.init.zeros_(new_b.weight)
+    module.lora_B[adapter_name] = new_b
+    return True
+
+
+def _rematerialize_module_if_needed(
+    module: Any,
+    target_device: str | torch.device,
+    dtype: torch.dtype,
+) -> int:
+    """Rematerialize all adapters of a module if on meta device, returning count."""
+    if not (hasattr(module, "lora_A") and hasattr(module, "lora_B")):
+        return 0
+
+    count = 0
+    for adapter_name in module.lora_A:
+        if _rematerialize_module_adapter(module, adapter_name, target_device, dtype):
+            count += 1
+    return count
+
+
+def rematerialize_meta_adapters(
+    model: Any,
+    device: str | torch.device | None = None,
+    dtype: torch.dtype = torch.bfloat16,
+) -> int:
+    """Ensure any LoRA adapter parameters residing on the 'meta' device (due to base model disk offload)
+    are re-materialized with initialized storage on the active compute device.
+    """
+    target_device = device if device is not None else _get_default_target_device()
+
+    fixed_count = 0
+    for _name, module in model.named_modules():
+        fixed_count += _rematerialize_module_if_needed(module, target_device, dtype)
+
+    return fixed_count
 
 
 def _extract_checkpoint_step(entry: os.DirEntry[str], require_valid: bool) -> int | None:
@@ -127,44 +271,54 @@ def load_model_and_tokenizer(
     If FastLanguageModel fails (e.g. unsupported architecture, remote code differences),
     it seamlessly falls back to Hugging Face AutoModelForCausalLM + PEFT.
     """
-    log = logger or logging.getLogger("rust_lora.engine")
+    log = logger or logging.getLogger(DEFAULT_ENGINE_LOGGER)
     dtype = get_optimal_dtype()
     log.info(f"Target precision: {dtype} (4-bit: {config.load_in_4bit})")
 
     # Attempt 1: Unsloth FastLanguageModel
-    try:
-        from unsloth import FastLanguageModel
+    # Note: On macOS (darwin), Unsloth is MLX-based and incompatible with PyTorch SFTTrainer,
+    # and its import hooks register a dummy CUDA device that disrupts accelerate memory mapping.
+    # Therefore, real Unsloth is only used on CUDA/Linux platforms (or when mocked in unit tests).
+    is_mock_unsloth = (
+        "unsloth" in sys.modules and getattr(sys.modules["unsloth"], "__file__", None) is None
+    )
+    can_try_unsloth = torch.cuda.is_available() or sys.platform != "darwin" or is_mock_unsloth
 
-        log.info(f"Loading model via Unsloth FastLanguageModel: {config.model_path}")
-        model, tokenizer = FastLanguageModel.from_pretrained(
-            model_name=config.model_path,
-            max_seq_length=config.max_seq_length,
-            dtype=dtype,
-            load_in_4bit=config.load_in_4bit,
-            load_in_16bit=config.load_in_16bit and not config.load_in_4bit,
-            full_finetuning=False,
-            trust_remote_code=config.trust_remote_code,
-        )
+    if can_try_unsloth:
+        try:
+            from unsloth import FastLanguageModel
 
-        model = FastLanguageModel.get_peft_model(
-            model,
-            r=config.lora_r,
-            target_modules=config.target_modules,
-            lora_alpha=config.lora_alpha,
-            lora_dropout=config.lora_dropout,
-            bias=config.lora_bias,
-            use_gradient_checkpointing="unsloth",
-            random_state=config.seed,
-        )
-        log.info(
-            f"Successfully loaded and configured LoRA via Unsloth (r={config.lora_r}, alpha={config.lora_alpha})"
-        )
-        return model, tokenizer
+            log.info(f"Loading model via Unsloth FastLanguageModel: {config.model_path}")
+            model, tokenizer = FastLanguageModel.from_pretrained(
+                model_name=config.model_path,
+                max_seq_length=config.max_seq_length,
+                dtype=dtype,
+                load_in_4bit=config.load_in_4bit,
+                load_in_16bit=config.load_in_16bit and not config.load_in_4bit,
+                full_finetuning=False,
+                trust_remote_code=config.trust_remote_code,
+            )
 
-    except Exception as exc:
-        log.info(
-            f"Unsloth loading deferred ({exc}). Falling back to Transformers + PEFT pipeline..."
-        )
+            model = FastLanguageModel.get_peft_model(
+                model,
+                r=config.lora_r,
+                target_modules=config.target_modules,
+                lora_alpha=config.lora_alpha,
+                lora_dropout=config.lora_dropout,
+                bias=config.lora_bias,
+                use_gradient_checkpointing="unsloth",
+                random_state=config.seed,
+            )
+            log.info(
+                f"Successfully loaded and configured LoRA via Unsloth (r={config.lora_r}, alpha={config.lora_alpha})"
+            )
+            return model, tokenizer
+
+        except Exception as exc:
+            cleanup_unsloth_patches()
+            log.info(
+                f"Unsloth loading deferred ({exc}). Falling back to Transformers + PEFT pipeline..."
+            )
 
     # Attempt 2: Standard Transformers + PEFT fallback
     from peft import LoraConfig, get_peft_model
@@ -173,16 +327,22 @@ def load_model_and_tokenizer(
     log.info(
         f"Loading tokenizer from {config.model_path} (trust_remote_code={config.trust_remote_code})..."
     )
-    tokenizer = AutoTokenizer.from_pretrained(
-        config.model_path,
-        trust_remote_code=config.trust_remote_code,
-    )
+    tokenizer_kwargs: dict[str, Any] = {
+        "trust_remote_code": config.trust_remote_code,
+        "fix_mistral_regex": False,
+    }
+    try:
+        tokenizer = AutoTokenizer.from_pretrained(config.model_path, **tokenizer_kwargs)
+    except TypeError:
+        tokenizer_kwargs.pop("fix_mistral_regex", None)
+        tokenizer = AutoTokenizer.from_pretrained(config.model_path, **tokenizer_kwargs)
+
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
     model_kwargs: dict[str, Any] = {
         "trust_remote_code": config.trust_remote_code,
-        "torch_dtype": dtype,
+        "dtype": dtype,
         "device_map": "auto",
     }
 
@@ -201,6 +361,7 @@ def load_model_and_tokenizer(
             bnb_4bit_compute_dtype=dtype,
         )
 
+    patch_caching_allocator_warmup()
     log.info(f"Loading base model via AutoModelForCausalLM from {config.model_path}...")
     model = AutoModelForCausalLM.from_pretrained(config.model_path, **model_kwargs)
 
@@ -218,6 +379,11 @@ def load_model_and_tokenizer(
         task_type="CAUSAL_LM",
     )
     model = get_peft_model(model, peft_config)
+    rematerialized = rematerialize_meta_adapters(model, dtype=dtype)
+    if rematerialized:
+        log.info(
+            f"Rematerialized {rematerialized} LoRA adapter modules offloaded to disk on compute device."
+        )
     model.print_trainable_parameters()
     log.info("Successfully configured LoRA with PEFT")
     return model, tokenizer
@@ -235,26 +401,39 @@ def build_training_arguments(
     use_fp16 = is_cuda and not use_bf16
     optimizer_name = "adamw_8bit" if is_cuda else "adamw_torch"
 
-    return TrainingArguments(
-        per_device_train_batch_size=config.batch_size,
-        gradient_accumulation_steps=config.gradient_accumulation_steps,
-        warmup_steps=config.warmup_steps,
-        num_train_epochs=config.num_epochs,
-        learning_rate=config.learning_rate,
-        fp16=use_fp16,
-        bf16=use_bf16,
-        logging_steps=config.logging_steps,
-        output_dir=checkpoint_dir,
-        save_strategy=config.save_strategy,
-        save_steps=config.save_steps if config.save_strategy == "steps" else 500,
-        save_total_limit=config.save_total_limit,
-        optim=optimizer_name,
-        weight_decay=config.weight_decay,
-        lr_scheduler_type=config.lr_scheduler_type,
-        gradient_checkpointing=getattr(config, "gradient_checkpointing", False),
-        seed=config.seed,
-        report_to=report_to,
-    )
+    args_kwargs: dict[str, Any] = {
+        "per_device_train_batch_size": config.batch_size,
+        "gradient_accumulation_steps": config.gradient_accumulation_steps,
+        "warmup_steps": config.warmup_steps,
+        "num_train_epochs": config.num_epochs,
+        "learning_rate": config.learning_rate,
+        "fp16": use_fp16,
+        "bf16": use_bf16,
+        "logging_steps": config.logging_steps,
+        "output_dir": checkpoint_dir,
+        "save_strategy": config.save_strategy,
+        "save_steps": config.save_steps if config.save_strategy == "steps" else 500,
+        "save_total_limit": config.save_total_limit,
+        "optim": optimizer_name,
+        "weight_decay": config.weight_decay,
+        "lr_scheduler_type": config.lr_scheduler_type,
+        "gradient_checkpointing": getattr(config, "gradient_checkpointing", False),
+        "seed": config.seed,
+        "report_to": report_to,
+        "dataloader_pin_memory": False if is_mps else True,
+    }
+
+    try:
+        from trl import SFTConfig
+
+        return SFTConfig(
+            dataset_text_field="text",
+            max_length=config.max_seq_length,
+            dataset_num_proc=config.dataset_num_proc,
+            **args_kwargs,
+        )
+    except (ImportError, TypeError):
+        return TrainingArguments(**args_kwargs)
 
 
 def _find_latest_checkpoint(checkpoint_dir: str, fallback_dir: str | None = None) -> str | None:
@@ -349,7 +528,7 @@ def run_sft_training(
     logger: logging.Logger | None = None,
 ) -> None:
     """Run supervised fine-tuning using SFTTrainer and save trained weights."""
-    log = logger or logging.getLogger("rust_lora.engine")
+    log = logger or logging.getLogger(DEFAULT_ENGINE_LOGGER)
     create_output_directories(
         config.output_dir, config.checkpoint_dir or f"{config.output_dir}/checkpoints", logger=log
     )
@@ -369,15 +548,25 @@ def run_sft_training(
     )
 
     log.info("Initializing SFTTrainer...")
-    trainer = SFTTrainer(
-        model=model,
-        tokenizer=tokenizer,
-        train_dataset=dataset,
-        dataset_text_field="text",
-        max_seq_length=config.max_seq_length,
-        dataset_num_proc=config.dataset_num_proc,
-        args=training_args,
-    )
+    sft_kwargs: dict[str, Any] = {
+        "model": model,
+        "train_dataset": dataset,
+        "args": training_args,
+    }
+
+    if "processing_class" in _SFT_INIT_PARAMS:
+        sft_kwargs["processing_class"] = tokenizer
+    else:  # pragma: no cover
+        sft_kwargs["tokenizer"] = tokenizer
+
+    if "dataset_text_field" in _SFT_INIT_PARAMS:
+        sft_kwargs["dataset_text_field"] = "text"
+    if "max_seq_length" in _SFT_INIT_PARAMS:
+        sft_kwargs["max_seq_length"] = config.max_seq_length
+    if "dataset_num_proc" in _SFT_INIT_PARAMS:
+        sft_kwargs["dataset_num_proc"] = config.dataset_num_proc
+
+    trainer = SFTTrainer(**sft_kwargs)
 
     log.info("=" * 80)
     log.info(f"STARTING {config.model_family.upper()} LORA TRAINING")

@@ -670,7 +670,7 @@ tokenizer = AutoTokenizer.from_pretrained(base_dir, trust_remote_code=True)
 print("Loading base model in bfloat16 with device offload...")
 model = AutoModelForCausalLM.from_pretrained(
     base_dir,
-    torch_dtype=torch.bfloat16,
+    dtype=torch.bfloat16,
     device_map="cpu", # Merge on CPU RAM or unified memory
     trust_remote_code=True,
 )

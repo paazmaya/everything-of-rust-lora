@@ -93,7 +93,7 @@ class K2HorizonEngine:
 
         model_kwargs: dict[str, Any] = {
             "trust_remote_code": trust_remote_code,
-            "torch_dtype": self.dtype,
+            "dtype": self.dtype,
         }
 
         if self.device == "cuda":
