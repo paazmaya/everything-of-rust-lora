@@ -39,7 +39,7 @@ where = ["."]
 exclude = ["data", "config", "unsloth_compiled_cache"]
 
 [dependency-groups]
-dev = ["ruff>=0.15.14"]
+dev = ["pytest>=8.0.0", "pytest-cov>=5.0.0", "ruff>=0.15.14"]
 
 [[tool.uv.index]]
 name = "pytorch-cu130"
@@ -70,3 +70,17 @@ select = [
 ignore = [
   "E501", # line too long, handled by formatter
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+pythonpath = ["."]
+addopts = "-v --cov=lib --cov-report=term-missing --cov-report=xml:coverage.xml"
+
+[tool.coverage.run]
+source = ["lib"]
+branch = true
+
+[tool.coverage.report]
+fail_under = 97
+show_missing = true
