@@ -122,3 +122,39 @@ models/qwen3_5_4b_rust_lora/
 └── checkpoints/               # Periodic step checkpoints (if enabled)
     └── checkpoint-50/
 ```
+
+## 6. Exporting, Quantization & Unsloth Studio Deployment
+
+### Unsloth Specific Optimizations for Qwen 3.5 4B
+
+1. **Reasoning Activation in Compact Models:**
+   On compact Qwen 3.5 variants (0.8B to 9B), reasoning is disabled by default. When running `llama-server` or importing into Unsloth Studio, enable thinking mode via template kwargs:
+   ```bash
+   --chat-template-kwargs '{"enable_thinking":true}'
+   ```
+2. **Precise Rust Coding Parameters:**
+   - **Thinking Mode (Coding):** `temperature=0.6, top_p=0.95, top_k=20, min_p=0.0, presence_penalty=0.0`
+   - **Non-Thinking Mode:** `temperature=0.7, top_p=0.80, presence_penalty=1.5`
+3. **Sensitive Tensor Protection:**
+   The hybrid attention/SSM architecture of Qwen 3.5 has high sensitivity in `ssm_out` and `attn_gate`. Do not use aggressive 2-bit quantization on these layers.
+4. **Recommended Quantization:** `UD-Q4_K_XL` (~3.2GB) balances speed and accuracy for 8GB VRAM or Apple Silicon devices.
+
+### Export Commands
+
+```bash
+# Export merged model for Unsloth Studio
+uv run python scripts/11_export_unsloth.py \
+    --model models/qwen3_5_4b_rust_lora \
+    --base Qwen/Qwen3.5-4B \
+    --mode merged-hf \
+    --output-dir models/qwen3_5_4b_merged
+
+# Serve with llama-server
+llama-server \
+    --model models/qwen3_5_4b_merged/qwen3.5-4b-UD-Q4_K_XL.gguf \
+    --temp 0.6 --top-p 0.95 --top-k 20 --min-p 0.0 \
+    --chat-template-kwargs '{"enable_thinking":true}' \
+    --port 8001
+```
+
+For detailed multi-model quantization recipes and Dynamic 3.0 benchmarks, see [QUANTIZIZE.md](QUANTIZIZE.md).

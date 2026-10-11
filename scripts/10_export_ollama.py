@@ -56,11 +56,13 @@ def build_ollama_modelfile_content(
     family: str,
     system_prompt: str,
 ) -> str:
-    """Generate family-tailored Ollama Modelfile content with precise templates and stop tokens."""
+    """Generate family-tailored Ollama Modelfile content with Unsloth-optimized parameters and stop tokens."""
     if family == "k2_horizon":
         return f"""FROM {from_path}
-PARAMETER temperature 0.2
-PARAMETER num_ctx 32768
+PARAMETER temperature 0.6
+PARAMETER top_p 0.95
+PARAMETER min_p 0.01
+PARAMETER num_ctx 65536
 PARAMETER stop "<|ifm|im_end|>"
 PARAMETER stop "<|ifm|endoftext|>"
 PARAMETER stop "<|im_end|>"
@@ -75,7 +77,9 @@ SYSTEM {system_prompt}
 """
     elif family == "granite":
         return f"""FROM {from_path}
-PARAMETER temperature 0.2
+PARAMETER temperature 0.0
+PARAMETER top_p 1.0
+PARAMETER top_k 0
 PARAMETER num_ctx 32768
 PARAMETER stop "<|end_of_text|>"
 PARAMETER stop "<|start_of_role|>"
@@ -90,8 +94,9 @@ SYSTEM {system_prompt}
 """
     elif family == "nemotron":
         return f"""FROM {from_path}
-PARAMETER temperature 0.2
-PARAMETER num_ctx 32768
+PARAMETER temperature 0.6
+PARAMETER top_p 0.95
+PARAMETER num_ctx 65536
 PARAMETER stop "<|im_start|>"
 PARAMETER stop "<|im_end|>"
 PARAMETER stop "<extra_id_1>"
@@ -106,7 +111,10 @@ SYSTEM {system_prompt}
 """
     elif family == "qwen3_8":
         return f"""FROM {from_path}
-PARAMETER temperature 0.2
+PARAMETER temperature 1.0
+PARAMETER top_p 0.95
+PARAMETER top_k 20
+PARAMETER min_p 0.0
 PARAMETER num_ctx 65536
 PARAMETER stop "<|im_start|>"
 PARAMETER stop "<|im_end|>"
@@ -119,10 +127,13 @@ TEMPLATE \"\"\"{{{{ if .System }}}}<|im_start|>system
 {{{{ .Response }}}}<|im_end|>\"\"\"
 SYSTEM {system_prompt}
 """
-    else:  # qwen 3.5
+    else:  # qwen 3.5 4b
         return f"""FROM {from_path}
-PARAMETER temperature 0.2
-PARAMETER num_ctx 32768
+PARAMETER temperature 0.6
+PARAMETER top_p 0.95
+PARAMETER top_k 20
+PARAMETER min_p 0.0
+PARAMETER num_ctx 65536
 PARAMETER stop "<|im_start|>"
 PARAMETER stop "<|im_end|>"
 PARAMETER stop "<|endoftext|>"

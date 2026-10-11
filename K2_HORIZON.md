@@ -145,20 +145,43 @@ To package and run in Ollama:
      --base k2_horizon
    ```
 
-2. **Merge LoRA and create GGUF:**
+2. **Merge LoRA and create GGUF for Ollama or Unsloth Studio:**
 
    ```bash
+   # Option A: Merge & export for Unsloth Studio / llama.cpp
+   uv run python scripts/11_export_unsloth.py \
+     --model models/k2_horizon_rust_lora \
+     --base IFM/K2-Horizon-3.7B \
+     --mode merged-hf \
+     --trust-remote-code \
+     --output-dir models/k2_horizon_merged
+
+   # Option B: Merge for Ollama
    uv run python scripts/10_export_ollama.py \
      --model models/k2_horizon_rust_lora \
      --name rust-k2-horizon \
      --base IFM/K2-Horizon-3.7B
    ```
 
-3. **Create and run in Ollama:**
+3. **High-Speed Inference with MoE CPU Offloading:**
+   K2-Horizon's sparse MoE architecture can be accelerated using llama.cpp's expert offload regex:
+
+   ```bash
+   llama-cli \
+     --model models/k2_horizon_rust_Q4_K_M.gguf \
+     --n-gpu-layers 99 \
+     -ot ".ffn_.*_exps.=CPU" \
+     --temp 0.6 --min-p 0.01 --top-p 0.95 \
+     --ctx-size 65536
+   ```
+
+4. **Create and run in Ollama:**
    ```bash
    ollama create rust-k2-horizon -f models/rust-k2-horizon_gguf/Modelfile
    ollama run rust-k2-horizon "Write an embedded Rust driver for I2C sensors using embedded-hal."
    ```
+
+For detailed quantization analysis and MoE offloading parameters, see [QUANTIZIZE.md](QUANTIZIZE.md).
 
 ## 4. Coding Agent Configurations
 

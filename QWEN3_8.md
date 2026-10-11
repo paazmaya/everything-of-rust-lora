@@ -214,9 +214,36 @@ model = AutoModelForCausalLM.from_pretrained(
 model = PeftModel.from_pretrained(model, adapter_path)
 ```
 
-### Merging, MTP GGUF Quantization & Unsloth Studio
+### Merging, Dynamic 3.0 GGUF Quantization & Unsloth Studio
 
-To merge the adapter with either `Qwen/Qwen3.8-27B` or `DavidAU/Qwen3.8-27B-TURBO-Fable-Cold-Fusion-735-882-Heretic-Uncensored-NM-DAU` and create an extreme 2-bit $IQ2\_XS$ quantization with Multi-Token Prediction (MTP) for Unsloth Studio:
+To export the adapter for [Unsloth Studio](https://unsloth.ai/docs/new/studio/chat), llama.cpp, or Ollama:
 
-- Export for Unsloth Studio: `uv run python scripts/11_export_unsloth.py --model models/qwen3_8_27b_rust_lora --base Qwen/Qwen3.8-27B --mode merged-hf`
-- Complete step-by-step MTP GGUF and importance matrix guide: See [QUANTIZIZE.md](QUANTIZIZE.md#4-showcase-extreme-iq2_xs-merge-with-mtp-for-unsloth-studio).
+1. **Export Merged Model for Unsloth Studio:**
+
+   ```bash
+   uv run python scripts/11_export_unsloth.py \
+       --model models/qwen3_8_27b_rust_lora \
+       --base Qwen/Qwen3.8-27B \
+       --mode merged-hf \
+       --output-dir models/qwen3_8_27b_merged
+   ```
+
+2. **Serve with Multi-Token Prediction (MTP) Speculative Decoding:**
+   Deploy with llama-server or Unsloth Studio using speculative MTP layers (1.4x-2.2x inference speedup):
+
+   ```bash
+   llama-server \
+       --model models/qwen3_8_27b_UD_Q4_K_XL.gguf \
+       --spec-type draft-mtp --spec-draft-n-max 2 \
+       --temp 1.0 --top-p 0.95 --top-k 20 --min-p 0.0 \
+       --chat-template-kwargs '{"reasoning_effort":"medium"}' \
+       --port 8001
+   ```
+
+3. **Dynamic 3.0 Quantization Selection:**
+   - **`UD-Q4_K_XL` (~20.7GB):** Recommended default; cuts maximum outlier KLD by 51% while matching BF16 accuracy.
+   - **`UD-Q2_K_XL` (~9.8GB):** Minimal viable quant for 16GB VRAM/Metal; retains working multi-step code generation.
+   - **Divergence-300 @32 Warning:** Do not use 1-bit quants (`UD-IQ1_S`, `UD-TQ1_0`) for Rust coding as trajectory retention drops below 8-10%, causing infinite loops and tool failures.
+   - **NVIDIA Blackwell NVFP4:** On RTX 5080/5090 or B200 hardware, deploy `unsloth/Qwen3.8-27B-NVFP4` in vLLM for 1.5x speedup with FP8 KV cache calibration.
+
+Complete step-by-step MTP GGUF, importance matrix calibration, and DavidAU uncensored merge guide: See [QUANTIZIZE.md](QUANTIZIZE.md#5-showcase-extreme-iq2_xs-merge-with-mtp-for-unsloth-studio).

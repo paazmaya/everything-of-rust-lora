@@ -470,31 +470,53 @@ W&B tracks:
 
 Useful for comparing multiple training runs and reproducibility.
 
-## Next Steps: Export to Ollama
+## Next Steps: Export to Unsloth Studio & Ollama
 
-After training, merge your LoRA adapter with the base model and export to GGUF for Ollama:
+### Unsloth Specific Optimizations for Nemotron 3 Nano
+
+1. **NoPE Positional Architecture (1M Context):**
+   Nemotron 3 Nano is trained with **NoPE (No Positional Embeddings)**. You can freely expand context from 16K up to 1,000,000 tokens using `--ctx-size` without needing RoPE scaling or YaRN.
+2. **Special Reasoning Tokens:**
+   Nemotron 3 uses `<think>` (token ID 12) and `</think>` (token ID 13). When deploying in llama.cpp, include `--special` (and `--verbose-prompt` if needed) to ensure the thinking tags render properly.
+3. **Coding & Tool-Calling Presets:**
+   - Coding: `temperature=0.6, top_p=0.95`
+   - General chat: `temperature=1.0, top_p=1.0`
+   - Stop tokens: `<|im_end|>`, `<extra_id_1>`, `<extra_id_2>`
+4. **Quantization Footprint:**
+   - 4-bit (`UD-Q4_K_XL`): ~3GB RAM/VRAM
+   - 8-bit (`Q8_0`): ~5GB RAM/VRAM
+
+### Export Commands
 
 ```bash
-# Package the adapter
+# Export merged model for Unsloth Studio
+uv run python scripts/11_export_unsloth.py \
+  --model models/nemotron3_nano_rust_lora \
+  --base NVIDIA/Nemotron-3-Nano-4B \
+  --mode merged-hf \
+  --output-dir models/nemotron3_nano_merged
+
+# Serve in llama-server with special reasoning tokens
+llama-server \
+  --model models/nemotron3_nano_merged/nemotron3_nano_Q8_0.gguf \
+  --special \
+  --ctx-size 32768 \
+  --temp 0.6 --top-p 0.95 \
+  --port 8001
+
+# Or export to Ollama
 uv run python scripts/09_create_modelfile.py \
   --model models/nemotron3_nano_rust_lora \
   --name rust-nemotron \
   --base nemotron
 
-# Merge and export GGUF
 uv run python scripts/10_export_ollama.py \
   --model models/nemotron3_nano_rust_lora \
   --name rust-nemotron \
   --base NVIDIA/Nemotron-3-Nano-4B
-
-# Import into Ollama
-ollama create rust-nemotron -f models/rust-nemotron_gguf/Modelfile
-
-# Test
-ollama run rust-nemotron "How do I use async Rust?"
 ```
 
-See [README.md](README.md#phase-4-exporting-to-ollama) for complete export instructions.
+For complete quantization analysis and Dynamic 3.0 benchmarks, see [QUANTIZIZE.md](QUANTIZIZE.md).
 
 ## References
 

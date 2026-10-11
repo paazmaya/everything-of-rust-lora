@@ -52,6 +52,9 @@ logging.basicConfig(
 logger = logging.getLogger("rust_lora.unsloth_export")
 
 
+TOKEN_IM_END = "<|im_end|>"
+TOKEN_ENDOFTEXT = "<|endoftext|>"
+
 # Standard Jinja chat templates for supported architectures
 CHAT_TEMPLATES: dict[str, str] = {
     "granite": (
@@ -67,53 +70,134 @@ CHAT_TEMPLATES: dict[str, str] = {
         "{{- '<|ifm|im_start|>' + message['role'] + '\\n' + message['content'] + '<|ifm|im_end|>\\n' }}"
         "{%- endfor %}"
         "{%- if add_generation_prompt %}"
-        "{{- '<|ifm|im_start|>assistant\\n<ifm|think>\\n</ifm|think>' }}"
+        "{{- '<|ifm|im_start|>assistant\\n<ifm|think>\\n' }}"
         "{%- endif %}"
     ),
     "nemotron": (
         "{%- for message in messages %}"
-        "{{- '<|im_start|>' + message['role'] + '\\n' + message['content'] + '<|im_end|>\\n' }}"
+        "{{- '<|im_start|>' + message['role'] + '\\n' + message['content'] + '"
+        + TOKEN_IM_END
+        + "\\n' }}"
         "{%- endfor %}"
         "{%- if add_generation_prompt %}"
-        "{{- '<|im_start|>assistant\\n' }}"
+        "{{- '<|im_start|>assistant\\n<think>\\n' }}"
         "{%- endif %}"
     ),
     "qwen": (
         "{%- if messages[0]['role'] == 'system' %}"
-        "{{- '<|im_start|>system\\n' + messages[0]['content'] + '<|im_end|>\\n' }}"
+        "{{- '<|im_start|>system\\n' + messages[0]['content'] + '" + TOKEN_IM_END + "\\n' }}"
         "{%- set messages = messages[1:] %}"
         "{%- else %}"
-        "{{- '<|im_start|>system\\nYou are a helpful assistant.<|im_end|>\\n' }}"
+        "{{- '<|im_start|>system\\nYou are an expert Rust programming assistant."
+        + TOKEN_IM_END
+        + "\\n' }}"
         "{%- endif %}"
         "{%- for message in messages %}"
-        "{{- '<|im_start|>' + message['role'] + '\\n' + message['content'] + '<|im_end|>\\n' }}"
+        "{{- '<|im_start|>' + message['role'] + '\\n' + message['content'] + '"
+        + TOKEN_IM_END
+        + "\\n' }}"
         "{%- endfor %}"
         "{%- if add_generation_prompt %}"
         "{{- '<|im_start|>assistant\\n' }}"
+        "{%- if enable_thinking is not defined or enable_thinking %}"
+        "{{- '<think>\\n' }}"
+        "{%- endif %}"
         "{%- endif %}"
     ),
     "qwen3_8": (
         "{%- if not messages %}{{- raise_exception('No messages provided.') }}{%- endif %}"
         "{%- if messages[0]['role'] == 'system' %}"
-        "{{- '<|im_start|>system\\n' + messages[0]['content'] + '<|im_end|>\\n' }}"
+        "{{- '<|im_start|>system\\n' + messages[0]['content'] + '" + TOKEN_IM_END + "\\n' }}"
         "{%- set messages = messages[1:] %}"
         "{%- endif %}"
         "{%- for message in messages %}"
-        "{{- '<|im_start|>' + message['role'] + '\\n' + message['content'] + '<|im_end|>\\n' }}"
+        "{{- '<|im_start|>' + message['role'] + '\\n' + message['content'] + '"
+        + TOKEN_IM_END
+        + "\\n' }}"
         "{%- endfor %}"
         "{%- if add_generation_prompt %}"
-        "{{- '<|im_start|>assistant\\n<think>\\n</think>' }}"
+        "{{- '<|im_start|>assistant\\n<think>\\n' }}"
         "{%- endif %}"
     ),
 }
 
 DEFAULT_STOP_TOKENS: dict[str, list[str]] = {
     "granite": ["<|end_of_text|>", "<|start_of_role|>"],
-    "k2_horizon": ["<|ifm|im_end|>", "<|ifm|endoftext|>", "<|im_end|>"],
-    "nemotron": ["<|im_end|>", "<extra_id_1>", "<extra_id_2>"],
-    "qwen": ["<|im_end|>", "<|endoftext|>"],
-    "qwen3_8": ["<|im_end|>", "<|endoftext|>", "<|im_start|>"],
+    "k2_horizon": ["<|ifm|im_end|>", "<|ifm|endoftext|>", TOKEN_IM_END],
+    "nemotron": [TOKEN_IM_END, "<extra_id_1>", "<extra_id_2>"],
+    "qwen": [TOKEN_IM_END, TOKEN_ENDOFTEXT],
+    "qwen3_8": [TOKEN_IM_END, TOKEN_ENDOFTEXT, "<|im_start|>"],
 }
+
+# Unsloth-optimized default generation configurations per architectural family
+FAMILY_GENERATION_CONFIGS: dict[str, dict[str, Any]] = {
+    "granite": {
+        "temperature": 0.0,
+        "top_p": 1.0,
+        "top_k": 0,
+        "repetition_penalty": 1.0,
+        "max_new_tokens": 4096,
+        "stop_strings": ["<|end_of_text|>", "<|start_of_role|>"],
+        "notes": "Deterministic instruction following recommended by Unsloth Granite documentation.",
+    },
+    "k2_horizon": {
+        "temperature": 0.6,
+        "top_p": 0.95,
+        "min_p": 0.01,
+        "top_k": 20,
+        "repetition_penalty": 1.0,
+        "max_new_tokens": 8192,
+        "stop_strings": ["<|ifm|im_end|>", "<|ifm|endoftext|>", TOKEN_IM_END],
+        "notes": "Native INT4 base architecture; min_p=0.01 suppresses low-probability outlier tokens.",
+    },
+    "nemotron": {
+        "temperature": 0.6,
+        "top_p": 0.95,
+        "repetition_penalty": 1.05,
+        "max_new_tokens": 8192,
+        "stop_strings": [TOKEN_IM_END, "<extra_id_1>", "<extra_id_2>"],
+        "notes": "Hybrid MoE with NoPE architecture; uses <think> token ID 12 and </think> token ID 13.",
+    },
+    "qwen": {
+        "temperature": 0.6,
+        "top_p": 0.95,
+        "top_k": 20,
+        "min_p": 0.0,
+        "presence_penalty": 0.0,
+        "repetition_penalty": 1.0,
+        "enable_thinking": True,
+        "max_new_tokens": 8192,
+        "stop_strings": [TOKEN_IM_END, TOKEN_ENDOFTEXT],
+        "notes": "Precise coding preset; reasoning is enabled explicitly via template kwargs.",
+    },
+    "qwen3_8": {
+        "temperature": 1.0,
+        "top_p": 0.95,
+        "top_k": 20,
+        "min_p": 0.0,
+        "presence_penalty": 0.0,
+        "repetition_penalty": 1.0,
+        "reasoning_effort": "medium",
+        "preserve_thinking": True,
+        "max_new_tokens": 16384,
+        "stop_strings": [TOKEN_IM_END, TOKEN_ENDOFTEXT, "<|im_start|>"],
+        "notes": "Hybrid thinking architecture with MTP speculative decoding and reasoning_effort control.",
+    },
+}
+
+# Unsloth Dynamic 3.0 / 2.0 quantization profiles
+DYNAMIC_QUANT_PRESETS = [
+    "ud_q4_k_xl",
+    "ud_q3_k_xl",
+    "ud_q2_k_xl",
+    "ud_iq2_s",
+    "ud_iq1_s",
+    "q4_k_m",
+    "q5_k_m",
+    "q8_0",
+    "f16",
+    "bf16",
+]
 
 
 def get_cutoff_date() -> str:
@@ -153,7 +237,7 @@ def create_unsloth_model_card(
     is_adapter: bool = False,
     quant_method: str | None = None,
 ) -> None:
-    """Write an Unsloth Studio compatible README.md model card."""
+    """Write an Unsloth Studio compatible README.md model card with architecture-specific runtime guidance."""
     cutoff_date = get_cutoff_date()
     quant_str = f" ({quant_method})" if quant_method else ""
     artifact_kind = "LoRA Adapter" if is_adapter else f"Merged Model{quant_str}"
@@ -163,6 +247,50 @@ def create_unsloth_model_card(
         tags.extend(["peft", "lora"])
     if quant_method:
         tags.append("gguf")
+
+    family_cfg = FAMILY_GENERATION_CONFIGS.get(family, FAMILY_GENERATION_CONFIGS["qwen"])
+
+    runtime_guidance = ""
+    if family == "qwen3_8":
+        runtime_guidance = """### Qwen 3.8 27B Specific Optimizations
+- **Multi-Token Prediction (MTP):** Run with speculative decoding for 1.4x-2.2x speedup:
+  ```bash
+  llama-server --model <model.gguf> --spec-type draft-mtp --spec-draft-n-max 2
+  ```
+- **Reasoning Effort Control:** Set reasoning depth in Unsloth Studio or llama-server:
+  ```bash
+  --chat-template-kwargs '{"reasoning_effort":"medium"}'  # options: xhigh, medium, low, none
+  ```
+- **Dynamic 3.0 Quantization:** For agentic Rust coding, `UD-Q4_K_XL` (20.7GB) or `UD-Q2_K_XL` (9.8GB) is recommended. Avoid 1-bit quants as Divergence-300 @32 drops below 10%."""
+    elif family == "qwen":
+        runtime_guidance = """### Qwen 3.5 4B Specific Optimizations
+- **Thinking Mode Activation:** On compact Qwen 3.5 models (0.8B - 9B), reasoning is disabled by default. Enable via:
+  ```bash
+  --chat-template-kwargs '{"enable_thinking":true}'
+  ```
+- **Coding Sampling:** Recommended settings for precise Rust code generation:
+  `temperature=0.6, top_p=0.95, top_k=20, min_p=0.0`
+- **Protected Tensors:** Keep `ssm_out` and attention gates out of low-bit quantization."""
+    elif family == "nemotron":
+        runtime_guidance = """### Nemotron 3 Nano 4B Specific Optimizations
+- **NoPE Positional Embeddings:** Context window expands up to 1M tokens without RoPE / YaRN scaling.
+- **Reasoning Tokens:** Nemotron 3 uses `<think>` (ID 12) and `</think>` (ID 13). Use `--special` to view tokens in llama.cpp:
+  ```bash
+  llama-cli --model <model.gguf> --special --ctx-size 32768 --temp 0.6 --top-p 0.95
+  ```
+- **Stop Tokens:** `<|im_end|>`, `<extra_id_1>`, `<extra_id_2>`"""
+    elif family == "k2_horizon":
+        runtime_guidance = """### IFM K2-Horizon 3.7B Specific Optimizations
+- **MoE CPU Expert Offloading:** Offload sparse expert MLPs to system RAM while keeping attention in VRAM:
+  ```bash
+  llama-cli --model <model.gguf> -ot ".ffn_.*_exps.=CPU" --temp 0.6 --min-p 0.01
+  ```
+- **Native INT4 Base Precision:** Preserved accurately in `UD-Q4_K_XL` GGUFs."""
+    elif family == "granite":
+        runtime_guidance = """### IBM Granite 4.2 8B Specific Optimizations
+- **Deterministic Sampling:** Granite instruction models excel with zero-temperature greedy generation:
+  `temperature=0.0, top_k=0, top_p=1.0`
+- **Native Context Window:** 131,072 tokens."""
 
     readme_content = f"""---
 base_model: {base_model}
@@ -185,6 +313,9 @@ RustSec advisory triage, and living-off-the-land (LOTL) cybersecurity concepts.
 - **Knowledge Cutoff:** `{cutoff_date}`
 - **Format:** `{"Standalone LoRA Adapter" if is_adapter else "Merged Model"}`
 - **Unsloth Studio Compatibility:** Full (includes `chat_template.jinja` & generation configs)
+- **Default Sampling:** `temperature={family_cfg.get("temperature", 0.6)}, top_p={family_cfg.get("top_p", 0.95)}`
+
+{runtime_guidance}
 
 ## Loading in Unsloth Studio
 
@@ -230,23 +361,16 @@ def ensure_chat_template(output_dir: Path, family: str, base_model_path: str | N
 
 
 def ensure_generation_config(output_dir: Path, family: str) -> None:
-    """Ensure generation_config.json exists with recommended sampling settings."""
+    """Ensure generation_config.json exists with family-specific recommended sampling settings."""
     config_path = output_dir / "generation_config.json"
     if config_path.exists():
         return
 
-    stop_tokens = DEFAULT_STOP_TOKENS.get(family, ["<|im_end|>", "<|endoftext|>"])
-    config_data = {
-        "temperature": 0.2,
-        "top_p": 0.95,
-        "top_k": 40,
-        "repetition_penalty": 1.05,
-        "max_new_tokens": 4096,
-        "stop_strings": stop_tokens,
-    }
+    family_cfg = FAMILY_GENERATION_CONFIGS.get(family, FAMILY_GENERATION_CONFIGS["qwen"])
+    config_data = {k: v for k, v in family_cfg.items() if k != "notes"}
     with open(config_path, "w", encoding="utf-8") as f:
         json.dump(config_data, f, indent=2)
-    logger.info(f"Created generation_config.json at {config_path}")
+    logger.info(f"Created family-optimized generation_config.json ({family}) at {config_path}")
 
 
 def export_adapter_package(
@@ -366,8 +490,28 @@ def export_gguf_unsloth(
     max_seq_length: int = 4096,
     trust_remote_code: bool = True,
 ) -> None:
-    """Merge LoRA and export to GGUF using Unsloth native save_pretrained_gguf."""
+    """Merge LoRA and export to GGUF using Unsloth native save_pretrained_gguf with Dynamic 3.0 checks."""
     output_dir.mkdir(parents=True, exist_ok=True)
+    quant_lower = quant.lower()
+
+    # Dynamic 3.0 Divergence-300 @32 check
+    if any(k in quant_lower for k in ["iq1", "tq1", "q1_0", "1bit", "1_bit"]):
+        logger.warning(
+            "⚠️  QUANTIZATION WARNING (Unsloth Dynamic 3.0): You selected a 1-bit quantization variant (%s). "
+            "Unsloth Divergence-300 @32 benchmarks demonstrate that 1-bit quants suffer from sharp accuracy drops "
+            "(<8-10%% trajectory retention), tool-calling failure, and endless generation loops. "
+            "For Rust coding and agentic workflows, UD-Q2_K_XL or UD-Q4_K_XL is strongly recommended.",
+            quant,
+        )
+
+    # Check for MTP auxiliary layers
+    base_path = Path(base_model) if os.path.isdir(base_model) else None
+    if base_path and (base_path / "model-mtp-restored.safetensors").exists():
+        logger.info(
+            "⚡ Multi-Token Prediction (MTP) weights detected! "
+            "Ensure MTP projection layers remain at Q8_0 or FP16 to retain >55-65%% speculative acceptance rates."
+        )
+
     from unsloth import FastLanguageModel
 
     logger.info(f"Loading LoRA/base for GGUF export ({quant}) via Unsloth...")
@@ -394,6 +538,71 @@ def export_gguf_unsloth(
         quant_method=quant,
     )
     logger.info(f"GGUF export complete at: {output_dir}")
+
+
+def resolve_base_model(model_path: Path, base_arg: str) -> str:
+    """Resolve base model identifier from CLI argument or adapter metadata."""
+    if base_arg:
+        return base_arg
+    manifest_file = model_path / "manifest.json"
+    if manifest_file.exists():
+        with open(manifest_file, encoding="utf-8") as f:
+            data = json.load(f)
+            base_model = data.get("model_path", "")
+            if base_model:
+                return str(base_model)
+    adapter_cfg = model_path / "adapter_config.json"
+    if adapter_cfg.exists():
+        with open(adapter_cfg, encoding="utf-8") as f:
+            data = json.load(f)
+            return str(data.get("base_model_name_or_path", ""))
+    return ""
+
+
+def determine_output_dir(model_name: str, mode: str, explicit_output_dir: str) -> Path:
+    """Determine output directory based on export mode or explicit flag."""
+    if explicit_output_dir:
+        return Path(explicit_output_dir)
+    suffix_map = {
+        "adapter": "adapter",
+        "gguf": "gguf",
+        "merged-hf": "merged",
+    }
+    suffix = suffix_map.get(mode, "merged")
+    return Path(f"models/{model_name}_{suffix}_unsloth")
+
+
+def execute_export(
+    args: argparse.Namespace, base_model: str, output_dir: Path, family: str
+) -> None:
+    """Dispatch export operation based on selected mode."""
+    if args.mode == "adapter":
+        export_adapter_package(
+            model_path=args.model,
+            base_model=base_model,
+            output_dir=output_dir,
+            family=family,
+        )
+    elif args.mode == "merged-hf":
+        export_merged_hf(
+            model_path=args.model,
+            base_model=base_model,
+            output_dir=output_dir,
+            family=family,
+            save_dtype=args.save_dtype,
+            max_seq_length=args.max_seq_length,
+            trust_remote_code=args.trust_remote_code,
+        )
+    elif args.mode == "gguf":
+        export_gguf_unsloth(
+            model_path=args.model,
+            base_model=base_model,
+            output_dir=output_dir,
+            family=family,
+            quant=args.quant,
+            max_seq_length=args.max_seq_length,
+            trust_remote_code=args.trust_remote_code,
+        )
 
 
 def main() -> None:
@@ -429,7 +638,7 @@ def main() -> None:
         "--quant",
         type=str,
         default="q4_k_m",
-        help="Quantization method for GGUF mode (e.g. q4_k_m, q5_k_m, q8_0, f16)",
+        help="Quantization method for GGUF mode (e.g. ud_q4_k_xl, ud_q2_k_xl, q4_k_m, q5_k_m, q8_0, f16)",
     )
     parser.add_argument(
         "--save-dtype",
@@ -458,20 +667,7 @@ def main() -> None:
         logger.error(f"LoRA model path not found: {model_path}")
         sys.exit(1)
 
-    base_model = args.base
-    if not base_model:
-        # Try reading base model from manifest.json or adapter_config.json
-        manifest_file = model_path / "manifest.json"
-        adapter_cfg = model_path / "adapter_config.json"
-        if manifest_file.exists():
-            with open(manifest_file, encoding="utf-8") as f:
-                data = json.load(f)
-                base_model = data.get("model_path", "")
-        if not base_model and adapter_cfg.exists():
-            with open(adapter_cfg, encoding="utf-8") as f:
-                data = json.load(f)
-                base_model = data.get("base_model_name_or_path", "")
-
+    base_model = resolve_base_model(model_path, args.base)
     if not base_model:
         logger.error("Base model identifier is required. Specify via --base <repo_or_dir>.")
         sys.exit(1)
@@ -479,44 +675,11 @@ def main() -> None:
     family = detect_family(base_model or args.model)
     logger.info(f"Detected architecture family: {family}")
 
-    if args.output_dir:
-        output_dir = Path(args.output_dir)
-    else:
-        suffix = (
-            "adapter" if args.mode == "adapter" else ("gguf" if args.mode == "gguf" else "merged")
-        )
-        output_dir = Path(f"models/{model_path.name}_{suffix}_unsloth")
-
+    output_dir = determine_output_dir(model_path.name, args.mode, args.output_dir)
     logger.info(f"Target export mode: {args.mode}")
     logger.info(f"Output directory: {output_dir}")
 
-    if args.mode == "adapter":
-        export_adapter_package(
-            model_path=args.model,
-            base_model=base_model,
-            output_dir=output_dir,
-            family=family,
-        )
-    elif args.mode == "merged-hf":
-        export_merged_hf(
-            model_path=args.model,
-            base_model=base_model,
-            output_dir=output_dir,
-            family=family,
-            save_dtype=args.save_dtype,
-            max_seq_length=args.max_seq_length,
-            trust_remote_code=args.trust_remote_code,
-        )
-    elif args.mode == "gguf":
-        export_gguf_unsloth(
-            model_path=args.model,
-            base_model=base_model,
-            output_dir=output_dir,
-            family=family,
-            quant=args.quant,
-            max_seq_length=args.max_seq_length,
-            trust_remote_code=args.trust_remote_code,
-        )
+    execute_export(args, base_model, output_dir, family)
 
 
 if __name__ == "__main__":

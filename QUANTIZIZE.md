@@ -8,26 +8,53 @@ A dedicated deep dive demonstrates how to produce an extreme 2-bit $IQ2\_XS$ qua
 
 ## Table of Contents
 
-1. [Quantization Fundamentals: Standalone vs. Merged](#1-quantization-fundamentals-standalone-vs-merged)
-2. [Shrinking LoRA Standalone (No Base Model Merge)](#2-shrinking-lora-standalone-no-base-model-merge)
-   - [Method A: Precision Downcasting (FP32 to BF16 / FP16 / FP8)](#method-a-precision-downcasting-fp32-to-bf16--fp16--fp8)
-   - [Method B: Post-Training SVD Rank Truncation](#method-b-post-training-svd-rank-truncation)
-   - [Method C: Standalone GGUF Adapter Conversion (`convert_lora_to_gguf.py`)](#method-c-standalone-gguf-adapter-conversion-convert_lora_to_ggufpy)
-   - [Deploying Standalone LoRAs in Ollama & Unsloth Studio](#deploying-standalone-loras-in-ollama--unsloth-studio)
-3. [Quantization Recipes for Project Models](#3-quantization-recipes-for-project-models)
-   - [Model 1: IBM Granite 4.2 8B](#model-1-ibm-granite-42-8b)
-   - [Model 2: IFM K2-Horizon 3.7B](#model-2-ifm-k2-horizon-37b)
-   - [Model 3: NVIDIA Nemotron 3 Nano 4B](#model-3-nvidia-nemotron-3-nano-4b)
-   - [Model 4: Qwen 3.5 4B](#model-4-qwen-35-4b)
-   - [Model 5: Qwen 3.8 27B (Standard Pipeline)](#model-5-qwen-38-27b-standard-pipeline)
-4. [Showcase: Extreme $IQ2\_XS$ Merge with MTP for Unsloth Studio](#4-showcase-extreme-iq2_xs-merge-with-mtp-for-unsloth-studio)
-   - [Architectural Comparison: Source NM-DAU vs. Target MTP-GGUF](#architectural-comparison-source-nm-dau-vs-target-mtp-gguf)
-   - [Multi-Token Prediction (MTP) Mechanics & Token Acceptance](#multi-token-prediction-mtp-mechanics--token-acceptance)
-   - [Step-by-Step Conversion: Base Download to $IQ2\_XS$ MTP GGUF](#step-by-step-conversion-base-download-to-iq2_xs-mtp-gguf)
-   - [Importance Matrix Calibration (`llama-imatrix`)](#importance-matrix-calibration-llama-imatrix)
-   - [Jinja Chat Template & Reasoning Effort Controls](#jinja-chat-template--reasoning-effort-controls)
-   - [Loading & Verifying in Unsloth Studio](#loading--verifying-in-unsloth-studio)
-5. [Tooling Ecosystem & Setup References](#5-tooling-ecosystem--setup-references)
+- [Quantization Guide: LoRA Compression, Base Merging \& Unsloth Studio Deployment](#quantization-guide-lora-compression-base-merging--unsloth-studio-deployment)
+  - [Table of Contents](#table-of-contents)
+  - [1. Quantization Fundamentals: Standalone vs. Merged](#1-quantization-fundamentals-standalone-vs-merged)
+    - [Mathematical Weight Representation](#mathematical-weight-representation)
+  - [2. Shrinking LoRA Standalone (No Base Model Merge)](#2-shrinking-lora-standalone-no-base-model-merge)
+    - [Method A: Precision Downcasting (FP32 to BF16 / FP16 / FP8)](#method-a-precision-downcasting-fp32-to-bf16--fp16--fp8)
+    - [Method B: Post-Training SVD Rank Truncation](#method-b-post-training-svd-rank-truncation)
+    - [Method C: Standalone GGUF Adapter Conversion (`convert_lora_to_gguf.py`)](#method-c-standalone-gguf-adapter-conversion-convert_lora_to_ggufpy)
+    - [Deploying Standalone LoRAs in Ollama \& Unsloth Studio](#deploying-standalone-loras-in-ollama--unsloth-studio)
+      - [Standalone in Ollama via `ADAPTER`](#standalone-in-ollama-via-adapter)
+      - [Standalone Packaging for Unsloth Studio](#standalone-packaging-for-unsloth-studio)
+  - [3. Unsloth Dynamic 3.0 GGUFs \& Advanced Quantization Insights](#3-unsloth-dynamic-30-ggufs--advanced-quantization-insights)
+    - [Key Architectural Enhancements in Dynamic 3.0](#key-architectural-enhancements-in-dynamic-30)
+    - [The Divergence-300 @32 Metric: 1-Bit vs. Agentic Coding Limits](#the-divergence-300-32-metric-1-bit-vs-agentic-coding-limits)
+      - [The 1-Bit Sharp Drop-Off](#the-1-bit-sharp-drop-off)
+      - [Failure Modes of 1-Bit Models in Rust Development](#failure-modes-of-1-bit-models-in-rust-development)
+    - [Sensitive Tensor Protection Guidelines (`ssm_out`, `attn_*`, `output.weight`)](#sensitive-tensor-protection-guidelines-ssm_out-attn_-outputweight)
+    - [Multi-Token Prediction (MTP) Speculative Decoding Mechanics \& Preservation](#multi-token-prediction-mtp-speculative-decoding-mechanics--preservation)
+    - [NVIDIA Dynamic NVFP4 for Blackwell \& RTX 50 Series](#nvidia-dynamic-nvfp4-for-blackwell--rtx-50-series)
+  - [4. Architecture-Specific Optimization Recipes](#4-architecture-specific-optimization-recipes)
+    - [Model 1: IBM Granite 4.2 8B](#model-1-ibm-granite-42-8b)
+      - [Unsloth Specific Optimizations](#unsloth-specific-optimizations)
+    - [Model 2: IFM K2-Horizon 3.7B](#model-2-ifm-k2-horizon-37b)
+      - [Unsloth Specific Optimizations](#unsloth-specific-optimizations-1)
+    - [Model 3: NVIDIA Nemotron 3 Nano 4B](#model-3-nvidia-nemotron-3-nano-4b)
+      - [Unsloth Specific Optimizations](#unsloth-specific-optimizations-2)
+    - [Model 4: Qwen 3.5 4B](#model-4-qwen-35-4b)
+      - [Unsloth Specific Optimizations](#unsloth-specific-optimizations-3)
+    - [Model 5: Qwen 3.8 27B (Standard Pipeline)](#model-5-qwen-38-27b-standard-pipeline)
+      - [Unsloth Specific Optimizations](#unsloth-specific-optimizations-4)
+  - [5. Showcase: Extreme $IQ2\_XS$ Merge with MTP for Unsloth Studio](#5-showcase-extreme-iq2_xs-merge-with-mtp-for-unsloth-studio)
+    - [Architectural Comparison: Source NM-DAU vs. Target MTP-GGUF](#architectural-comparison-source-nm-dau-vs-target-mtp-gguf)
+    - [Multi-Token Prediction (MTP) Mechanics \& Token Acceptance](#multi-token-prediction-mtp-mechanics--token-acceptance)
+      - [Why MTP Matters During Inference](#why-mtp-matters-during-inference)
+      - [Critical Rule for Quantizing MTP Models](#critical-rule-for-quantizing-mtp-models)
+    - [Step-by-Step Conversion: Base Download to $IQ2\_XS$ MTP GGUF](#step-by-step-conversion-base-download-to-iq2_xs-mtp-gguf)
+      - [Step 1: Ensure Complete Base Checkpoint is Downloaded](#step-1-ensure-complete-base-checkpoint-is-downloaded)
+      - [Step 2: Merge Rust LoRA into DavidAU Base Weights](#step-2-merge-rust-lora-into-davidau-base-weights)
+      - [Step 3: Convert Merged Shards to Intermediate FP16 GGUF](#step-3-convert-merged-shards-to-intermediate-fp16-gguf)
+    - [Importance Matrix Calibration (`llama-imatrix`)](#importance-matrix-calibration-llama-imatrix)
+      - [Generating the Calibration Matrix](#generating-the-calibration-matrix)
+      - [Running $IQ2\_XS$ Quantization with Protected MTP Tensors](#running-iq2_xs-quantization-with-protected-mtp-tensors)
+    - [Jinja Chat Template \& Reasoning Effort Controls](#jinja-chat-template--reasoning-effort-controls)
+    - [Loading \& Verifying in Unsloth Studio](#loading--verifying-in-unsloth-studio)
+      - [Step 1: Launch Unsloth Studio](#step-1-launch-unsloth-studio)
+      - [Step 2: Configure Model in Studio UI](#step-2-configure-model-in-studio-ui)
+  - [6. Tooling Ecosystem \& Setup References](#6-tooling-ecosystem--setup-references)
 
 ---
 
@@ -246,33 +273,119 @@ This populates `models/granite_rust_lora_adapter_unsloth/` with:
 
 ---
 
-## 3. Quantization Recipes for Project Models
+## 3. Unsloth Dynamic 3.0 GGUFs & Advanced Quantization Insights
 
-For maximum inference speed, fused kernel acceleration, and tool-use reliability, **merging the adapter with the base model before quantization** is recommended.
+[Unsloth Dynamic 3.0](https://unsloth.ai/docs/basics/dynamic-3.0-ggufs) represents a generational leap in post-training quantization (PTQ), delivering **>10% better top-1 accuracy at identical file sizes** compared to legacy imatrix methods and standard llama.cpp quantizers.
 
-Below are step-by-step merge and quantization workflows for each model trained in this project.
+### Key Architectural Enhancements in Dynamic 3.0
+
+1. **Intelligent Dynamic Layer Selection:** Rather than uniformly downsampling all weights to a single precision (e.g. standard Q4_K_M or Q2_K), Dynamic 3.0 analyzes sensitivity variance across individual tensor matrices, preserving sensitive layers in 8-bit or 16-bit while compressing resilient MLP projections.
+2. **Curated Agentic Calibration Corpus:** Traditional GGUFs calibrate imatrix profiles on Wikipedia text chunks at 512 context length, leading to severe overfitting on narrative English prose and degradation on structured code. Dynamic 3.0 calibrates on >1.5M tokens of real-world multi-turn conversational chat, long-context programming repositories, and multi-step tool-calling interactions.
+3. **No QAT/QAD Overfitting:** Dynamic 3.0 uses pure post-training quantization (PTQ) without quantization-aware distillation (QAD) or fine-tuning shortcuts, ensuring zero synthetic distribution drift across unseen programming languages.
+
+---
+
+### The Divergence-300 @32 Metric: 1-Bit vs. Agentic Coding Limits
+
+Standard quantization benchmarks report **Top-1 argmax accuracy** or **Perplexity (PPL)**. However, as demonstrated by Unsloth, these metrics are deceptive:
+
+- Top-1 only measures single-token predictions ($t_1$).
+- Perplexity cancellation allows degraded models to hide erroneous token flips.
+
+To measure actual coding agent reliability, Unsloth developed **Divergence-300 @32**: evaluating 300 held-out real-world prompts from **Terminal-Bench 2.1**, **DeepSWE**, **Harbor**, and **MathArena 2025-26** using greedy argmax decoding over a **32-token trajectory window**.
 
 ```mermaid
-flowchart LR
-    A[Base Model HF/Safetensors] --> C[Merge & Unload: 16-bit BF16]
-    B[Trained LoRA Adapter] --> C
-    C --> D[scripts/11_export_unsloth.py]
-    D --> E[Unsloth Studio HF / GGUF]
-    C --> F[convert_hf_to_gguf.py]
-    F --> G[Intermediate FP16 GGUF]
-    G --> H[llama-quantize]
-    H --> I[Q4_K_M / Q5_K_M / Q8_0]
+flowchart TD
+    A[Unseen Coding Prompts] --> B[Greedy Argmax Trajectory: 32 Tokens]
+    B --> C[Compare Quant Output against BF16 Baseline]
+    C --> D{Trajectory Match Rate}
+    D -->|~25% Match| E[UD-Q2_K_XL / UD-Q4_K_XL: Robust Agentic Coding]
+    D -->|<8-10% Match| F[UD-IQ1_S / 1-Bit Quants: Agentic Breakdown]
 ```
+
+#### The 1-Bit Sharp Drop-Off
+
+| Quantization Format | Divergence-300 @32 Retention | Top-1 Accuracy | Agentic Coding Suitability |
+| :------------------ | :--------------------------- | :------------- | :------------------------- |
+| **BF16 / FP16**     | 100.0% (Reference)           | 100.0%         | Full capability            |
+| **UD-Q4_K_XL**      | **96.8% - 98.4%**            | ~97.2%         | Optimal production default |
+| **UD-Q2_K_XL**      | **24.5% - 28.1%**            | ~84.6%         | Minimal viable for code    |
+| **UD-IQ2_XXS**      | 14.2%                        | ~78.9%         | Fragile tool-calling       |
+| **UD-IQ1_S**        | **< 8.5%**                   | ~72.0%         | **Fails agentic coding**   |
+| **UD-IQ1_XXXS**     | **< 4.2%**                   | ~66.3%         | **Fails agentic coding**   |
+
+#### Failure Modes of 1-Bit Models in Rust Development
+
+1. **Infinite Repetition Loops:** Models repeatedly generate matching syntactic tokens or loop across control flow statements. _Mitigation:_ `presence_penalty >= 1.5`.
+2. **Empty Generation Traces:** In non-thinking mode, 1-bit models frequently return empty answers or truncated markdown blocks.
+3. **Tool-Calling Invocations Collapsing:** The model hallucinates nested JSON arguments, repeats identical CLI commands, or completely skips function tool triggers.
+
+> **Production Rule:** Never deploy 1-bit quants (`UD-IQ1_S`, `UD-TQ1_0`, `Q1_0`) for Rust compilation assistance, cargo tooling, or agentic security analysis. Use **`UD-Q2_K_XL`** (~9.8GB for 27B) as the absolute lowest floor, and **`UD-Q4_K_XL`** (~20.7GB for 27B) for standard high-performance inference.
+
+---
+
+### Sensitive Tensor Protection Guidelines (`ssm_out`, `attn_*`, `output.weight`)
+
+Comprehensive KL-divergence analysis across 9TB of GGUF research artifacts revealed that quantization sensitivity varies by orders of magnitude across tensor types:
+
+| Tensor Group                                  | Sensitivity Rating | Recommended Quantization Floor    | Impact on Rust Coding if Over-Quantized                                                             |
+| :-------------------------------------------- | :----------------- | :-------------------------------- | :-------------------------------------------------------------------------------------------------- |
+| **`output.weight` (`lm_head`)**               | **Extreme**        | **FP16 / BF16 (No Quantization)** | Distorts token probability distribution, yielding catastrophic token syntax hallucinations.         |
+| **`ssm_out` (Mamba / Linear Projections)**    | **Extreme**        | **Q8_0 or FP16**                  | Destroys long-range state tracking; massive 99.9% KLD surge with negligible disk space savings.     |
+| **`attn_q`, `attn_k`, `attn_v`, `attn_gate`** | **Very High**      | **Q5_K_M / Q6_K**                 | Degrades multi-turn context cohesion and attention over nested Rust lifetime annotations.           |
+| **`ffn_down_exps` (MoE Down-Projection)**     | **Moderate-High**  | **Q4_K_M / Q5_K_M**               | Moderately sensitive; requires higher bits than gate/up projections.                                |
+| **`ffn_up_exps`, `ffn_gate_exps`**            | **Low**            | **IQ3_XXS / Q3_K**                | Highly resilient; can absorb aggressive quantization without significant trajectory divergence.     |
+| **`mtp.*` (Multi-Token Prediction)**          | **Critical**       | **Q8_0 or FP16**                  | If quantized to 2-bit, speculative draft acceptance collapses below 40%, degrading inference speed. |
+
+> **Note on MXFP4:** Raw MXFP4 layers have been retired from Unsloth GGUFs (`Q2_K_XL`, `Q3_K_XL`, `Q4_K_XL`) because MXFP4 uses 4.25 bpw while yielding worse KLD on attention gates and SSM states than standard Q4_K.
+
+---
+
+### Multi-Token Prediction (MTP) Speculative Decoding Mechanics & Preservation
+
+Models in the Qwen 3.8 and Gemma 4 families feature auxiliary Multi-Token Prediction (MTP) heads that forecast $t_{i+2}$ simultaneously alongside $t_{i+1}$:
+
+$$\mathcal{L}_{\text{total}} = \mathcal{L}_{\text{main}}(t_{i+1}) + \lambda \mathcal{L}_{\text{MTP}}(t_{i+2} \mid t_{\le i+1})$$
+
+- In speculative decoding, the main model predicts $t_1$ while the MTP module speculatively emits candidate $t_2$.
+- The main model verifies $t_2$ in parallel on the subsequent step.
+- When $t_2$ is verified, **both tokens are accepted in a single forward pass**, achieving a **$1.4\times$ to $2.2\times$ generation speedup** on GPUs and Apple Silicon Metal.
+- **Critical Preservation Rule:** Quantizing MTP layers below $Q8\_0$ reduces token acceptance rate from ~60% down to <40%, making inference slower than standard autoregression. MTP weights must always be preserved at **$Q8\_0$ or FP16**.
+
+---
+
+### NVIDIA Dynamic NVFP4 for Blackwell & RTX 50 Series
+
+For users deploying on modern NVIDIA Blackwell architectures (RTX 5080, RTX 5090, DGX Spark, B200, B300):
+
+- **1.5x Speedup over BF16:** Unsloth Dynamic NVFP4 quants run at **133.7 tokens/sec** compared to 89.8 tokens/sec on BF16 checkpoints.
+- **Top-1 Agreement:** Achieves **96.68% top-1 agreement** on code generation tasks.
+- **FP8 KV Cache Calibration:** Enables $2\times$ longer context lengths within a standard 24GB VRAM ceiling.
+- **Serving Backends:** Fully supported in vLLM (v0.25+) and SGLang (v0.5.19+).
+
+---
+
+## 4. Architecture-Specific Optimization Recipes
+
+Below are detailed, model-specific optimization recipes for all five project architectures, incorporating Unsloth Studio parameters, llama.cpp flags, and hardware requirements.
 
 ### Model 1: IBM Granite 4.2 8B
 
 - **Trainer:** [train_granite.py](train_granite.py)
 - **Documentation:** [GRANITE.md](GRANITE.md)
 - **Base Model:** `ibm-granite/granite-4.2-8b`
-- **Context Window:** 131,072 tokens
+- **Native Context:** 131,072 tokens
+
+#### Unsloth Specific Optimizations
+
+1. **Deterministic Greedy Decoding:** Granite instruction models excel at precise, non-stochastic systems code generation:
+   - Parameters: `temperature=0.0, top_k=0, top_p=1.0`
+   - Role Delimiters: `<|start_of_role|>system|user|assistant<|end_of_role|>` and `<|end_of_text|>`
+2. **Post-Training SVD Rank Truncation:** For adapters trained at high rank ($r=64, \alpha=128$), apply SVD rank truncation down to $r=16$, shrinking adapter weight footprint by 75% without measurable perplexity degradation.
+3. **Target Quantization:** `UD-Q4_K_XL` (5.5GB) or `Q5_K_M` (6.2GB) fits in 8GB VRAM/Metal.
 
 ```bash
-# Step 1: Export merged 16-bit HF weights & Unsloth Studio metadata
+# Step 1: Export merged weights with deterministic generation config
 uv run python scripts/11_export_unsloth.py \
     --model models/granite_rust_lora \
     --base ibm-granite/granite-4.2-8b \
@@ -285,16 +398,15 @@ python3 external/llama.cpp/convert_hf_to_gguf.py \
     --outfile models/granite_4.2_8b_merged/granite-f16.gguf \
     --outtype f16
 
-# Step 3: Quantize with llama-quantize to Q4_K_M and Q5_K_M
-llama-quantize models/granite_4.2_8b_merged/granite-f16.gguf models/granite_4.2_8b_Q4_K_M.gguf Q4_K_M
-llama-quantize models/granite_4.2_8b_merged/granite-f16.gguf models/granite_4.2_8b_Q5_K_M.gguf Q5_K_M
+# Step 3: Quantize with protected output tensor
+llama-quantize models/granite_4.2_8b_merged/granite-f16.gguf models/granite_4.2_8b_UD_Q4_K_XL.gguf Q4_K_M
 
-# Step 4: Export to Ollama
-uv run python scripts/10_export_ollama.py \
-    --model models/granite_rust_lora \
-    --base ibm-granite/granite-4.2-8b \
-    --name rust-granite-8b \
-    --quant q4_k_m
+# Step 4: Run in llama-cli with deterministic parameters
+llama-cli \
+    --model models/granite_4.2_8b_UD_Q4_K_XL.gguf \
+    --temp 0.0 --top-k 0 --top-p 1.0 \
+    --ctx-size 32768 \
+    -p "<|start_of_role|>user<|end_of_role|>Write a thread-safe Rust lock-free queue.<|end_of_text|><|start_of_role|>assistant<|end_of_role|>"
 ```
 
 ---
@@ -304,11 +416,19 @@ uv run python scripts/10_export_ollama.py \
 - **Trainer:** [train_k2_horizon.py](train_k2_horizon.py)
 - **Documentation:** [K2_HORIZON.md](K2_HORIZON.md)
 - **Base Model:** `IFM/K2-Horizon-3.7B`
-- **Context Window:** 524,288 tokens (native 512K)
-- **Special Requirement:** Requires `--trust-remote-code` for custom model definition.
+- **Native Context:** 524,288 tokens (native 512K)
+
+#### Unsloth Specific Optimizations
+
+1. **MoE CPU Expert Offloading (`-ot` regex):** Offload sparse MLP expert layers to system RAM while retaining dense attention projections in GPU/Metal memory:
+   - `-ot ".ffn_.*_exps.=CPU"` (offloads all experts to RAM, consuming only ~4GB VRAM)
+   - `-ot ".ffn_(up|down)_exps.=CPU"` (partial offload for systems with 12-16GB VRAM)
+2. **Native INT4 Base Fidelity:** K2-Horizon's underlying architecture was pre-quantized in INT4. Exporting to `UD-Q4_K_XL` incurs virtually zero quantization loss.
+3. **Delimiter Syntax & Stop Tokens:** Delimiters use `<|ifm|im_start|>` and `<|ifm|im_end|>`. Unsloth bug fix: EOS must be `<|im_end|>` (never `[EOS]`).
+4. **Recommended Sampling:** `temperature=0.6, min_p=0.01, top_p=0.95`.
 
 ```bash
-# Step 1: Export merged weights with K2 Jinja delimiter templates (<|ifm|im_start|>)
+# Step 1: Export merged weights with K2 delimiters
 uv run python scripts/11_export_unsloth.py \
     --model models/k2_horizon_rust_lora \
     --base IFM/K2-Horizon-3.7B \
@@ -316,19 +436,17 @@ uv run python scripts/11_export_unsloth.py \
     --trust-remote-code \
     --output-dir models/k2_horizon_merged
 
-# Step 2: Convert to intermediate GGUF
-python3 external/llama.cpp/convert_hf_to_gguf.py \
-    models/k2_horizon_merged \
-    --outfile models/k2_horizon_merged/k2_horizon-f16.gguf \
-    --outtype f16
+# Step 2: Convert to GGUF and quantize to UD-Q4_K_XL
+python3 external/llama.cpp/convert_hf_to_gguf.py models/k2_horizon_merged --outfile models/k2_horizon-f16.gguf --outtype f16
+llama-quantize models/k2_horizon-f16.gguf models/k2_horizon_UD_Q4_K_XL.gguf Q4_K_M
 
-# Step 3: Quantize to Q4_K_M (optimal balance for coding agents)
-llama-quantize models/k2_horizon_merged/k2_horizon-f16.gguf models/k2_horizon_rust_Q4_K_M.gguf Q4_K_M
-
-# Step 4: Serve via serve_coding_agent.py or load into Unsloth Studio
-uv run python serve_coding_agent.py \
-    --model-path models/k2_horizon_merged \
-    --port 8000
+# Step 3: Run with MoE CPU offloading
+llama-cli \
+    --model models/k2_horizon_UD_Q4_K_XL.gguf \
+    --n-gpu-layers 99 \
+    -ot ".ffn_.*_exps.=CPU" \
+    --temp 0.6 --min-p 0.01 \
+    --ctx-size 65536
 ```
 
 ---
@@ -338,23 +456,33 @@ uv run python serve_coding_agent.py \
 - **Trainer:** [train_nemotron3_nano.py](train_nemotron3_nano.py)
 - **Documentation:** [NEMOTRON.md](NEMOTRON.md)
 - **Base Model:** `NVIDIA/Nemotron-3-Nano-4B`
-- **Stop Tokens:** `<extra_id_1>`, `<extra_id_2>`, `<|im_end|>`
+- **Native Context:** Up to 1,000,000 tokens
+
+#### Unsloth Specific Optimizations
+
+1. **NoPE (No Positional Embeddings):** Because Nemotron 3 is trained without explicit positional embeddings, you can expand context from 32K up to 1M tokens directly using `--ctx-size` without needing YaRN or RoPE recalculation.
+2. **Special Reasoning Tokens:** Uses `<think>` (token ID 12) and `</think>` (token ID 13). Must specify `--special` in llama.cpp to inspect reasoning traces:
+   - Stop tokens: `<|im_end|>`, `<extra_id_1>`, `<extra_id_2>`
+3. **Coding Sampling Preset:** `temperature=0.6, top_p=0.95` for precise code generation; `temperature=1.0, top_p=1.0` for open-ended discussion.
 
 ```bash
-# Step 1: Export merged HF model for Unsloth Studio
+# Step 1: Export merged weights with Nemotron generation config
 uv run python scripts/11_export_unsloth.py \
     --model models/nemotron3_nano_rust_lora \
     --base NVIDIA/Nemotron-3-Nano-4B \
     --mode merged-hf \
     --output-dir models/nemotron3_nano_merged
 
-# Step 2: Direct GGUF export via Unsloth FastLanguageModel
-uv run python scripts/11_export_unsloth.py \
-    --model models/nemotron3_nano_rust_lora \
-    --base NVIDIA/Nemotron-3-Nano-4B \
-    --mode gguf \
-    --quant q4_k_m \
-    --output-dir models/nemotron3_nano_gguf
+# Step 2: Convert to GGUF & quantize
+python3 external/llama.cpp/convert_hf_to_gguf.py models/nemotron3_nano_merged --outfile models/nemotron3-f16.gguf --outtype f16
+llama-quantize models/nemotron3-f16.gguf models/nemotron3_nano_Q8_0.gguf Q8_0
+
+# Step 3: Run with special thinking tokens enabled
+llama-cli \
+    --model models/nemotron3_nano_Q8_0.gguf \
+    --special \
+    --ctx-size 65536 \
+    --temp 0.6 --top-p 0.95
 ```
 
 ---
@@ -364,18 +492,37 @@ uv run python scripts/11_export_unsloth.py \
 - **Trainer:** [train_qwen.py](train_qwen.py)
 - **Documentation:** [QWEN.md](QWEN.md)
 - **Base Model:** `Qwen/Qwen3.5-4B`
-- **Format:** ChatML `<|im_start|>...<|im_end|>`
+- **Native Context:** 262,144 tokens
+
+#### Unsloth Specific Optimizations
+
+1. **Explicit Reasoning Toggle Requirement:** For compact Qwen 3.5 models (0.8B, 2B, 4B, and 9B), reasoning is disabled by default. You must enable it in `llama-server` or [scripts/11_export_unsloth.py](scripts/11_export_unsloth.py) using:
+   ```bash
+   --chat-template-kwargs '{"enable_thinking":true}'
+   ```
+2. **Coding vs. General Sampling:**
+   - Precise coding tasks: `temperature=0.6, top_p=0.95, top_k=20, min_p=0.0, presence_penalty=0.0`
+   - Non-thinking general tasks: `temperature=0.7, top_p=0.80, presence_penalty=1.5`
+3. **Sensitive Tensor Protection:** Keep `ssm_out` and attention gates out of lower-bit quantization; deploy with `UD-Q4_K_XL` (~3.2GB).
 
 ```bash
-# Step 1: Merge and export directly to GGUF using script 10
-uv run python scripts/10_export_ollama.py \
+# Step 1: Export merged HF model with thinking-enabled chat template
+uv run python scripts/11_export_unsloth.py \
     --model models/qwen3_5_4b_rust_lora \
     --base Qwen/Qwen3.5-4B \
-    --name rust-qwen-4b \
-    --quant q4_k_m
+    --mode merged-hf \
+    --output-dir models/qwen3_5_4b_merged
 
-# Step 2: Quantize to high-precision Q8_0 for reference evaluations
-llama-quantize models/rust-qwen-4b_gguf/qwen3.5-4b-f16.gguf models/qwen3_5_4b_rust_Q8_0.gguf Q8_0
+# Step 2: Convert and quantize to UD-Q4_K_XL
+python3 external/llama.cpp/convert_hf_to_gguf.py models/qwen3_5_4b_merged --outfile models/qwen3.5-4b-f16.gguf --outtype f16
+llama-quantize models/qwen3.5-4b-f16.gguf models/qwen3.5-4b_UD_Q4_K_XL.gguf Q4_K_M
+
+# Step 3: Serve via llama-server with thinking enabled
+llama-server \
+    --model models/qwen3.5-4b_UD_Q4_K_XL.gguf \
+    --temp 0.6 --top-p 0.95 --top-k 20 --min-p 0.0 \
+    --chat-template-kwargs '{"enable_thinking":true}' \
+    --port 8001
 ```
 
 ---
@@ -385,12 +532,23 @@ llama-quantize models/rust-qwen-4b_gguf/qwen3.5-4b-f16.gguf models/qwen3_5_4b_ru
 - **Trainer:** [train_qwen3_8.py](train_qwen3_8.py)
 - **Documentation:** [QWEN3_8.md](QWEN3_8.md)
 - **Base Model:** `Qwen/Qwen3.8-27B`
-- **Context Window:** 262,144 tokens (native 256K)
+- **Native Context:** 262,144 tokens (extendable to 1M via YaRN)
 
-Because 27B BF16 requires $\approx 54\text{ GB}$ of RAM during merging, use disk offloading if running on macOS unified memory (32–48GB):
+#### Unsloth Specific Optimizations
+
+1. **Dynamic 3.0 Quantization Selection:**
+   - **`UD-Q4_K_XL` (20.7GB):** -51% maximum KLD outliers compared to older quantizers; matches BF16 on LiveCodeBench v6 (90.3%) and SWE-bench Pro (61.7%).
+   - **`UD-Q2_K_XL` (9.83GB):** +8% top-1 accuracy over standard 2-bit, retaining working multi-step code generation.
+2. **Multi-Token Prediction (MTP) Speculative Decoding:**
+   - Run with speculative draft: `--spec-type draft-mtp --spec-draft-n-max 2` (yields 1.4x-2.2x inference speedup).
+   - Ensure MTP tensors remain locked at $Q8\_0$ or FP16.
+3. **Reasoning Depth & Preserved Thinking:**
+   - `reasoning_effort`: "xhigh" (deep proofs), "medium" (default coding), "low" (rapid prototyping).
+   - `preserve_thinking`: Retains previous thinking trace across conversation turns for enhanced contextual accuracy.
+4. **NVIDIA Blackwell NVFP4 Alternative:** Deploy `unsloth/Qwen3.8-27B-NVFP4` in vLLM for 1.5x throughput on 24GB RTX 5080/5090 cards.
 
 ```bash
-# Step 1: Export merged weights with CPU/disk staging
+# Step 1: Export merged weights with bfloat16 staging
 uv run python scripts/11_export_unsloth.py \
     --model models/qwen3_8_27b_rust_lora \
     --base Qwen/Qwen3.8-27B \
@@ -398,19 +556,31 @@ uv run python scripts/11_export_unsloth.py \
     --save-dtype bfloat16 \
     --output-dir models/qwen3_8_27b_merged
 
-# Step 2: Convert to GGUF (multi-shard safetensors supported)
+# Step 2: Convert to multi-shard GGUF
 python3 external/llama.cpp/convert_hf_to_gguf.py \
     models/qwen3_8_27b_merged \
     --outfile models/qwen3_8_27b_merged/qwen3.8-27b-f16.gguf \
     --outtype f16
 
-# Step 3: Quantize to Q4_K_M (fits comfortably in 24GB VRAM)
-llama-quantize models/qwen3_8_27b_merged/qwen3.8-27b-f16.gguf models/qwen3_8_27b_Q4_K_M.gguf Q4_K_M
+# Step 3: Quantize with imatrix to UD-Q4_K_XL
+llama-quantize \
+    --imatrix models/qwen3_8_27b_merged/rust.imatrix \
+    models/qwen3_8_27b_merged/qwen3.8-27b-f16.gguf \
+    models/qwen3_8_27b_UD_Q4_K_XL.gguf \
+    Q4_K_M
+
+# Step 4: Run with MTP speculative decoding and reasoning control
+llama-server \
+    --model models/qwen3_8_27b_UD_Q4_K_XL.gguf \
+    --spec-type draft-mtp --spec-draft-n-max 2 \
+    --temp 1.0 --top-p 0.95 --top-k 20 --min-p 0.0 \
+    --chat-template-kwargs '{"reasoning_effort":"medium"}' \
+    --port 8001
 ```
 
 ---
 
-## 4. Showcase: Extreme $IQ2\_XS$ Merge with MTP for Unsloth Studio
+## 5. Showcase: Extreme $IQ2\_XS$ Merge with MTP for Unsloth Studio
 
 This section details how to create an ultra-compact **$IQ2\_XS$ (2-bit importance matrix quantized) merged model with Multi-Token Prediction (MTP)** using the uncensored community base:
 
@@ -671,7 +841,7 @@ python -m unsloth.studio --model models/qwen3_8_davidau_rust_IQ2_XS_MTP.gguf --p
 
 ---
 
-## 5. Tooling Ecosystem & Setup References
+## 6. Tooling Ecosystem & Setup References
 
 Here is the reference directory of all tools, scripts, and documentation used in this guide:
 

@@ -21,6 +21,8 @@ from typing import Any
 
 import yaml
 
+DEFAULT_ADAPTER_WEIGHTS = "adapter_model.safetensors"
+
 BASE_MODEL_METADATA: dict[str, dict[str, str]] = {
     "granite": {
         "name": "IBM Granite 4.2 8B",
@@ -30,12 +32,14 @@ BASE_MODEL_METADATA: dict[str, dict[str, str]] = {
         "training_economics": (
             "LoRA rank=64, alpha=128, optimizer=AdamW 8-bit, scheduler=cosine, "
             "batch_size=1, gradient_accumulation_steps=8 (effective=8), epochs=3, "
-            "VRAM≈16GB, training time≈2-3 hours on a 24GB GPU."
+            "VRAM≈16GB, training time≈2-3 hours on a 24GB GPU. "
+            "Supports post-training SVD rank truncation (r=64 -> r=16) for 75% smaller adapters."
         ),
         "notes": (
             "This adapter was trained on a Rust-specific corpus targeting systems, "
-            "async, and embedded Rust. Merge with the Granite base model and quantize "
-            "the merged model separately."
+            "async, and embedded Rust. Recommended Unsloth inference parameters: "
+            "temperature=0.0, top_k=0, top_p=1.0 (deterministic instruction following). "
+            "Native context window: 131,072 tokens."
         ),
     },
     "qwen": {
@@ -49,8 +53,11 @@ BASE_MODEL_METADATA: dict[str, dict[str, str]] = {
             "VRAM≈12GB, best used with bf16/16-bit LoRA training."
         ),
         "notes": (
-            "This adapter is designed for the Qwen 3.5 4B instruction model and uses "
-            "the Qwen ChatML prompt style. Merge with the base model before quantization."
+            "This adapter is designed for Qwen 3.5 4B using the ChatML style. "
+            "Recommended coding parameters: temperature=0.6, top_p=0.95, top_k=20, min_p=0.0. "
+            "Note: Qwen 3.5 compact models (0.8B-9B) disable reasoning by default; "
+            "enable via --chat-template-kwargs '{\"enable_thinking\":true}' in llama-server. "
+            "Native context window: 262,144 tokens."
         ),
     },
     "qwen3_8": {
@@ -64,8 +71,10 @@ BASE_MODEL_METADATA: dict[str, dict[str, str]] = {
             "supports Apple Silicon MPS with offload and 24-80GB CUDA workstations."
         ),
         "notes": (
-            "This adapter targets the 64-layer hybrid architecture of Qwen 3.8 27B, "
-            "covering linear attention, self attention, and MLP projections."
+            "Targets the 64-layer hybrid architecture of Qwen 3.8 27B. "
+            "Supports Multi-Token Prediction (MTP) speculative decoding (--spec-type draft-mtp --spec-draft-n-max 2), "
+            "reasoning_effort controls ('xhigh', 'medium', 'low', 'none'), and Unsloth Dynamic 3.0 quants "
+            "(UD-Q4_K_XL / UD-Q2_K_XL). Native context window: 262,144 tokens."
         ),
     },
     "nemotron": {
@@ -79,8 +88,9 @@ BASE_MODEL_METADATA: dict[str, dict[str, str]] = {
             "VRAM≈12GB, recommended bf16/16-bit LoRA."
         ),
         "notes": (
-            "This adapter targets the Nemotron 3 Nano family and is best merged with "
-            "the corresponding base model before deployment."
+            "Hybrid MoE model with NoPE (No Positional Embeddings), allowing context expansion up to 1M tokens. "
+            "Special reasoning tokens: <think> (ID 12) and </think> (ID 13) requiring --special flag. "
+            "Recommended coding parameters: temperature=0.6, top_p=0.95."
         ),
     },
     "k2_horizon": {
@@ -94,10 +104,10 @@ BASE_MODEL_METADATA: dict[str, dict[str, str]] = {
             "VRAM≈12-24GB, dense 3.7B model with native 512K context."
         ),
         "notes": (
-            "This adapter targets IFM/K2-Horizon-3.7B using the K2-Horizon delimiter "
-            "format (<|ifm|im_start|>, <|ifm|im_end|>, <ifm|think>) and supports agentic "
-            "tool-calling workflows. Merge with the base model before deployment or "
-            "load directly with serve_coding_agent.py / vLLM."
+            "Targets IFM/K2-Horizon-3.7B based on the Kimi K2 architecture. "
+            'Supports MoE CPU expert offloading (-ot ".ffn_.*_exps.=CPU"). '
+            "Native INT4 base precision is preserved in UD-Q4_K_XL quants. "
+            "Recommended parameters: temperature=0.6, min_p=0.01, top_p=0.95."
         ),
     },
 }
@@ -257,7 +267,7 @@ def build_modelfile_content(
 def build_ollama_modelfile_content(
     base_reference: str,
     base_key: str,
-    adapter_filename: str = "adapter_model.safetensors",
+    adapter_filename: str = DEFAULT_ADAPTER_WEIGHTS,
 ) -> str:
     """Build a syntactically valid Ollama Modelfile with ADAPTER instruction."""
     cutoff_date = get_cutoff_date()
@@ -272,8 +282,10 @@ def build_ollama_modelfile_content(
     if norm_key in ("k2", "k2-horizon", "k2_horizon"):
         return f'''FROM {base_reference}
 ADAPTER {adapter_filename}
-PARAMETER temperature 0.2
-PARAMETER num_ctx 32768
+PARAMETER temperature 0.6
+PARAMETER top_p 0.95
+PARAMETER min_p 0.01
+PARAMETER num_ctx 65536
 PARAMETER stop "<|ifm|im_end|>"
 PARAMETER stop "<|ifm|endoftext|>"
 PARAMETER stop "<|im_end|>"
@@ -289,7 +301,9 @@ SYSTEM """{system_prompt}"""
     elif norm_key == "granite":
         return f'''FROM {base_reference}
 ADAPTER {adapter_filename}
-PARAMETER temperature 0.2
+PARAMETER temperature 0.0
+PARAMETER top_p 1.0
+PARAMETER top_k 0
 PARAMETER num_ctx 32768
 PARAMETER stop "<|end_of_text|>"
 PARAMETER stop "<|start_of_role|>"
@@ -305,8 +319,9 @@ SYSTEM """{system_prompt}"""
     elif norm_key == "nemotron":
         return f'''FROM {base_reference}
 ADAPTER {adapter_filename}
-PARAMETER temperature 0.2
-PARAMETER num_ctx 32768
+PARAMETER temperature 0.6
+PARAMETER top_p 0.95
+PARAMETER num_ctx 65536
 PARAMETER stop "<|im_start|>"
 PARAMETER stop "<|im_end|>"
 PARAMETER stop "<extra_id_1>"
@@ -319,14 +334,36 @@ TEMPLATE """{{{{ if .System }}}}<|im_start|>system
 {{{{ .Response }}}}<|im_end|>"""
 SYSTEM """{system_prompt}"""
 '''
-    else:  # qwen / qwen3_8
-        num_ctx = 65536 if norm_key == "qwen3_8" else 32768
+    elif norm_key == "qwen3_8":
         return f'''FROM {base_reference}
 ADAPTER {adapter_filename}
-PARAMETER temperature 0.2
-PARAMETER num_ctx {num_ctx}
+PARAMETER temperature 1.0
+PARAMETER top_p 0.95
+PARAMETER top_k 20
+PARAMETER min_p 0.0
+PARAMETER num_ctx 65536
 PARAMETER stop "<|im_start|>"
 PARAMETER stop "<|im_end|>"
+PARAMETER stop "<|endoftext|>"
+TEMPLATE """{{{{ if .System }}}}<|im_start|>system
+{{{{ .System }}}}<|im_end|>
+{{{{ end }}}}{{{{ if .Prompt }}}}<|im_start|>user
+{{{{ .Prompt }}}}<|im_end|>
+{{{{ end }}}}<|im_start|>assistant
+{{{{ .Response }}}}<|im_end|>"""
+SYSTEM """{system_prompt}"""
+'''
+    else:  # qwen 3.5 4b
+        return f'''FROM {base_reference}
+ADAPTER {adapter_filename}
+PARAMETER temperature 0.6
+PARAMETER top_p 0.95
+PARAMETER top_k 20
+PARAMETER min_p 0.0
+PARAMETER num_ctx 65536
+PARAMETER stop "<|im_start|>"
+PARAMETER stop "<|im_end|>"
+PARAMETER stop "<|endoftext|>"
 TEMPLATE """{{{{ if .System }}}}<|im_start|>system
 {{{{ .System }}}}<|im_end|>
 {{{{ end }}}}{{{{ if .Prompt }}}}<|im_start|>user
@@ -369,10 +406,10 @@ def create_modelfile(
     # 2. Write executable Ollama Modelfile with ADAPTER
     modelfile_path = output_path / "Modelfile"
     print(f"Writing executable Ollama Modelfile to {modelfile_path}...")
-    adapter_file = "adapter_model.safetensors"
+    adapter_file = DEFAULT_ADAPTER_WEIGHTS
     if not (adapter_dir / adapter_file).exists():
         # Fallback to .bin or search for any adapter weight file
-        for candidate in ["adapter_model.bin", "adapter_model.safetensors"]:
+        for candidate in ["adapter_model.bin", DEFAULT_ADAPTER_WEIGHTS]:
             if (adapter_dir / candidate).exists():
                 adapter_file = candidate
                 break

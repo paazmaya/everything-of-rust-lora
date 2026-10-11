@@ -120,19 +120,38 @@ options:
   --trust-remote-code   Enable execution of custom remote code
 ```
 
-## 6. Exporting to Ollama / GGUF
+## 6. Exporting to Unsloth Studio, Ollama & GGUF
 
-Once training is complete, export the adapter into a quantized GGUF file for local deployment:
+### Unsloth Specific Optimizations for Granite 4.2 8B
+
+1. **Deterministic Greedy Decoding:**
+   As highlighted in Unsloth Granite documentation, Granite instruction models perform best with zero-temperature greedy generation:
+   - `temperature=0.0, top_k=0, top_p=1.0`
+   - Role Delimiters: `<|start_of_role|>system|user|assistant<|end_of_role|>` and `<|end_of_text|>`
+2. **Post-Training SVD Rank Truncation:**
+   Because Granite was trained with high rank ($r=64, \alpha=128$), you can optionally truncate the adapter down to $r=16$ using Singular Value Decomposition (SVD), shrinking the adapter by 75% with virtually zero loss in Rust code reasoning.
+3. **Native Context Length:**
+   Supports up to 131,072 tokens natively.
+
+### Export Commands
 
 ```bash
+# Export merged model for Unsloth Studio
+uv run python scripts/11_export_unsloth.py \
+    --model models/granite_rust_lora \
+    --base ibm-granite/granite-4.2-8b \
+    --mode merged-hf \
+    --output-dir models/granite_4.2_8b_merged
+
+# Export for Ollama
 uv run python scripts/10_export_ollama.py \
-    --model-path models/granite_4.2_8b_rust_lora \
-    --base-model ibm-granite/granite-4.2-8b \
-    --model-name rust-granite-8b \
+    --model models/granite_rust_lora \
+    --base ibm-granite/granite-4.2-8b \
+    --name rust-granite-8b \
     --quant q4_k_m
 ```
 
-This generates an Ollama Modelfile and packages the model for `ollama run rust-granite-8b`.
+This generates an Ollama Modelfile and packages the model for `ollama run rust-granite-8b`. For complete quantization and SVD compression details, see [QUANTIZIZE.md](QUANTIZIZE.md).
 
 ## 7. Output Artifacts
 
