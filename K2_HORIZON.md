@@ -64,12 +64,34 @@ uv run python train_k2_horizon.py --hardware-profile rtx3090_4090
 # High-memory cloud GPU:
 uv run python train_k2_horizon.py --hardware-profile a100
 
+# Resume interrupted training from the latest checkpoint:
+uv run python train_k2_horizon.py --resume
+
+# Resume from a specific checkpoint:
+uv run python train_k2_horizon.py --resume-from-checkpoint models/k2_horizon_rust_lora/checkpoints/checkpoint-50
+
 # Custom parameters:
 uv run python train_k2_horizon.py \
   --batch-size 2 \
   --max-seq-length 4096 \
   --num-epochs 3 \
   --learning-rate 1.5e-4
+```
+
+### Resuming an Interrupted Run
+
+If training is stopped or interrupted (e.g., via `Ctrl+C` or system sleep), simply add `--resume`:
+
+```bash
+uv run python train_k2_horizon.py --resume
+```
+
+The script automatically detects the latest checkpoint directory (`checkpoint-<step>`) and resumes optimizer, scheduler, and model states from that exact point.
+
+To resume from a specific checkpoint:
+
+```bash
+uv run python train_k2_horizon.py --resume-from-checkpoint models/k2_horizon_rust_lora/checkpoints/checkpoint-50
 ```
 
 ## 3. Serving the Model for Coding Agents

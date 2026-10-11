@@ -3,9 +3,34 @@ Shared CLI argument parser and argument binding helpers.
 """
 
 import argparse
+import logging
+import sys
+from collections.abc import Callable
 from typing import Any
 
 from .config import DEFAULT_TRAIN_FILE, TrainingConfig, apply_hardware_profile
+from .validation import run_preflight_checks
+
+
+def build_resume_epilog(script_name: str, extra_examples: str = "") -> str:
+    """Generate standardized epilog containing resume and dry-run instructions."""
+    base_examples = f"""
+Examples:
+  # Dry-run preflight check:
+  uv run python {script_name} --dry-run
+
+  # Standard training run:
+  uv run python {script_name}
+
+  # Resume interrupted training from the latest checkpoint:
+  uv run python {script_name} --resume
+
+  # Resume from a specific checkpoint:
+  uv run python {script_name} --resume-from-checkpoint models/.../checkpoint-50
+"""
+    if extra_examples:
+        base_examples += f"\n{extra_examples.strip()}\n"
+    return base_examples
 
 
 def build_arg_parser(
@@ -108,6 +133,25 @@ def build_arg_parser(
         help="Directory to store training checkpoints (defaults to output_dir/checkpoints).",
     )
     parser.add_argument(
+        "--save-steps",
+        type=int,
+        default=None,
+        help="Number of update steps between saving checkpoints [default: 50].",
+    )
+    parser.add_argument(
+        "--save-total-limit",
+        type=int,
+        default=None,
+        help="Maximum number of checkpoints to retain in checkpoint directory [default: 3].",
+    )
+    parser.add_argument(
+        "--save-strategy",
+        type=str,
+        default=None,
+        choices=["steps", "epoch", "no"],
+        help="Checkpoint save strategy ('steps', 'epoch', or 'no') [default: steps].",
+    )
+    parser.add_argument(
         "--resume",
         action="store_true",
         help="Automatically resume training from the latest checkpoint found in checkpoint directory.",
@@ -164,6 +208,9 @@ def apply_args_to_config(
         "data_file",
         "output_dir",
         "checkpoint_dir",
+        "save_steps",
+        "save_total_limit",
+        "save_strategy",
         "resume_from_checkpoint",
         "offload_folder",
         "wandb_project",
@@ -173,6 +220,9 @@ def apply_args_to_config(
         val = getattr(args, field_name, None)
         if val is not None:
             setattr(config, field_name, val)
+
+    if getattr(args, "checkpoint_dir", None) is None:
+        config.checkpoint_dir = f"{config.output_dir}/checkpoints"
 
     if getattr(args, "resume", False):
         config.resume = True
@@ -184,7 +234,37 @@ def apply_args_to_config(
     if getattr(args, "trust_remote_code", False):
         config.trust_remote_code = True
 
-    if config.checkpoint_dir is None:
-        config.checkpoint_dir = f"{config.output_dir}/checkpoints"
-
     return config
+
+
+def run_training_cli(
+    config: TrainingConfig,
+    args: argparse.Namespace,
+    train_fn: Callable[[TrainingConfig], None],
+    min_vram_gb: float = 12.0,
+    allow_mps: bool = False,
+    logger: logging.Logger | None = None,
+) -> None:
+    """Standardized CLI runner handling --dry-run, interruptions, and exceptions."""
+    family_slug = (
+        getattr(config, "model_family", "model").lower().replace(" ", "_").replace("-", "_")
+    )
+    log = logger or logging.getLogger(f"rust_lora.{family_slug}")
+
+    if getattr(args, "dry_run", False):
+        log.info(f"Executing dry-run validation for {config.model_family}...")
+        passed = run_preflight_checks(
+            config, min_vram_gb=min_vram_gb, logger=log, allow_mps=allow_mps
+        )
+        sys.exit(0 if passed else 1)
+
+    try:
+        train_fn(config)
+    except KeyboardInterrupt:
+        log.info(
+            "Training interrupted by user. Run with --resume to continue from last checkpoint."
+        )
+        sys.exit(130)
+    except Exception:
+        log.exception("Training failed with unexpected exception")
+        sys.exit(1)

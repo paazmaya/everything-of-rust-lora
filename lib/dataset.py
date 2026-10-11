@@ -10,6 +10,63 @@ from datasets import load_dataset
 
 _logger = logging.getLogger("rust_lora.dataset")
 
+DEFAULT_RUST_SYSTEM_PROMPT = (
+    "You are an expert Rust programmer, specializing in systems programming, "
+    "async Rust, ESP32 embedded development, and popular Rust libraries."
+)
+
+CHATML_PROMPT_TEMPLATE = (
+    "<|im_start|>system\n"
+    "{system_prompt}<|im_end|>\n"
+    "<|im_start|>user\n"
+    "{user_message}<|im_end|>\n"
+    "<|im_start|>assistant\n"
+    "{assistant_message}<|im_end|>"
+)
+
+ALPACA_PROMPT_TEMPLATE = """Below is an instruction that describes a task, paired with an input that provides further context. Write a response that appropriately completes the request.
+
+### Instruction:
+{}
+
+### Input:
+{}
+
+### Response:
+{}"""
+
+
+def format_chatml_prompts(
+    examples: dict[str, list[str]],
+    system_prompt: str = DEFAULT_RUST_SYSTEM_PROMPT,
+) -> dict[str, list[str]]:
+    """Format instruction examples into standard ChatML format."""
+    instructions = examples["instruction"]
+    inputs = examples["input"]
+    outputs = examples["output"]
+    texts: list[str] = []
+    for instruction, input_text, output in zip(instructions, inputs, outputs, strict=False):
+        user_msg = f"{instruction}\n{input_text}" if input_text else instruction
+        text = CHATML_PROMPT_TEMPLATE.format(
+            system_prompt=system_prompt,
+            user_message=user_msg,
+            assistant_message=output,
+        )
+        texts.append(text)
+    return {"text": texts}
+
+
+def format_alpaca_prompts(examples: dict[str, list[str]]) -> dict[str, list[str]]:
+    """Format instruction examples into Alpaca prompt format."""
+    instructions = examples["instruction"]
+    inputs = examples["input"]
+    outputs = examples["output"]
+    texts: list[str] = []
+    for instruction, input_text, output in zip(instructions, inputs, outputs, strict=False):
+        text = ALPACA_PROMPT_TEMPLATE.format(instruction, input_text, output)
+        texts.append(text)
+    return {"text": texts}
+
 
 def load_and_prepare_dataset(
     data_file: str,

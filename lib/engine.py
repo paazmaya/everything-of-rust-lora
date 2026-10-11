@@ -14,6 +14,8 @@ from transformers import TrainingArguments
 from trl.trainer.sft_trainer import SFTTrainer
 
 from .config import TrainingConfig
+from .dataset import load_and_prepare_dataset
+from .validation import run_preflight_checks
 
 
 def setup_logging(name: str = "rust_lora", verbose: bool = False) -> logging.Logger:
@@ -39,18 +41,31 @@ def get_optimal_dtype() -> torch.dtype:
     return torch.float32
 
 
-def get_latest_checkpoint(checkpoint_dir: str) -> str | None:
-    """Find the latest checkpoint directory matching checkpoint-<step> in checkpoint_dir."""
+def _extract_checkpoint_step(entry: os.DirEntry[str], require_valid: bool) -> int | None:
+    """Extract step number if entry is a valid checkpoint directory."""
+    if not (entry.is_dir() and entry.name.startswith("checkpoint-")):
+        return None
+    try:
+        step = int(entry.name.split("-")[1])
+    except (IndexError, ValueError):
+        return None
+    if require_valid and not os.path.isfile(os.path.join(entry.path, "trainer_state.json")):
+        return None
+    return step
+
+
+def get_latest_checkpoint(checkpoint_dir: str, require_valid: bool = True) -> str | None:
+    """Find the latest checkpoint directory matching checkpoint-<step> in checkpoint_dir.
+
+    If require_valid is True, only checkpoints containing trainer_state.json are considered.
+    """
     if not os.path.isdir(checkpoint_dir):
         return None
     checkpoints: list[tuple[int, str]] = []
     for entry in os.scandir(checkpoint_dir):
-        if entry.is_dir() and entry.name.startswith("checkpoint-"):
-            try:
-                step = int(entry.name.split("-")[1])
-                checkpoints.append((step, entry.path))
-            except (IndexError, ValueError):
-                continue
+        step = _extract_checkpoint_step(entry, require_valid)
+        if step is not None:
+            checkpoints.append((step, entry.path))
     if not checkpoints:
         return None
     checkpoints.sort(key=lambda x: x[0])
@@ -242,31 +257,88 @@ def build_training_arguments(
     )
 
 
+def _find_latest_checkpoint(checkpoint_dir: str, fallback_dir: str | None = None) -> str | None:
+    """Search for the latest valid checkpoint in checkpoint_dir or fallback_dir."""
+    target = get_latest_checkpoint(checkpoint_dir)
+    if (
+        not target
+        and fallback_dir
+        and os.path.isdir(fallback_dir)
+        and fallback_dir != checkpoint_dir
+    ):
+        target = get_latest_checkpoint(fallback_dir)
+    return target
+
+
 def resolve_checkpoint_resumption(
     config: TrainingConfig,
     checkpoint_dir: str,
     logger: logging.Logger,
 ) -> str | None:
     """Determine the checkpoint path to resume from, if requested."""
-    if config.resume_from_checkpoint:
-        if config.resume_from_checkpoint.lower() == "latest":
-            latest = get_latest_checkpoint(checkpoint_dir)
-            if not latest:
-                logger.warning(
-                    f"No existing checkpoints found in {checkpoint_dir} to resume from. Starting from scratch."
-                )
-            return latest
-        return config.resume_from_checkpoint
+    target_path = config.resume_from_checkpoint
+    auto_resume = getattr(config, "resume", False)
 
-    if getattr(config, "resume", False):
-        latest = get_latest_checkpoint(checkpoint_dir)
-        if not latest:
+    if not target_path and not auto_resume:
+        return None
+
+    if target_path and target_path.lower() != "latest":
+        if not os.path.isdir(target_path):
             logger.warning(
-                f"No existing checkpoints found in {checkpoint_dir} to resume from. Starting from scratch."
+                f"Specified checkpoint directory does not exist: {target_path}. Starting from scratch."
             )
-        return latest
+            return None
+        if not os.path.isfile(os.path.join(target_path, "trainer_state.json")):
+            logger.warning(
+                f"Specified checkpoint directory '{target_path}' does not contain trainer_state.json; checkpoint may be incomplete."
+            )
+        return target_path
 
-    return None
+    latest = _find_latest_checkpoint(checkpoint_dir, config.output_dir)
+    if not latest:
+        logger.warning(
+            f"No existing checkpoints found in {checkpoint_dir} or {config.output_dir} to resume from. Starting from scratch."
+        )
+    return latest
+
+
+def execute_training_pipeline(
+    config: TrainingConfig,
+    prompt_formatter_fn: Any,
+    min_vram_gb: float = 12.0,
+    allow_mps: bool = False,
+    logger: logging.Logger | None = None,
+) -> None:
+    """Execute the standardized 4-step LoRA fine-tuning workflow with resumability."""
+    family_slug = (
+        getattr(config, "model_family", "model").lower().replace(" ", "_").replace("-", "_")
+    )
+    log = logger or logging.getLogger(f"rust_lora.{family_slug}")
+
+    # 1. Preflight validation
+    if not run_preflight_checks(config, min_vram_gb=min_vram_gb, logger=log, allow_mps=allow_mps):
+        log.warning("Preflight checks reported issues; proceeding with caution.")
+
+    # 2. Load model and tokenizer
+    model, tokenizer = load_model_and_tokenizer(config, logger=log)
+
+    # 3. Load and format dataset
+    dataset = load_and_prepare_dataset(
+        data_file=config.data_file,
+        prompt_formatter_fn=prompt_formatter_fn,
+        tokenizer=tokenizer,
+        max_seq_length=config.max_seq_length,
+        logger=log,
+    )
+
+    # 4. Train and save model (with resumption support)
+    run_sft_training(
+        model=model,
+        tokenizer=tokenizer,
+        dataset=dataset,
+        config=config,
+        logger=log,
+    )
 
 
 def run_sft_training(

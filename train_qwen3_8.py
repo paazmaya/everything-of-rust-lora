@@ -40,10 +40,10 @@ from lib import (
     TrainingConfig,
     apply_args_to_config,
     build_arg_parser,
-    load_and_prepare_dataset,
-    load_model_and_tokenizer,
-    run_preflight_checks,
-    run_sft_training,
+    build_resume_epilog,
+    execute_training_pipeline,
+    format_chatml_prompts,
+    run_training_cli,
     setup_logging,
 )
 
@@ -133,55 +133,18 @@ HARDWARE_PROFILES: dict[str, dict[str, Any]] = {
     },
 }
 
-QWEN_PROMPT = """<|im_start|>system
-You are an expert Rust programmer, specializing in systems programming, async Rust, ESP32 embedded development, and popular Rust libraries.<|im_end|>
-<|im_start|>user
-{}{}<|im_end|>
-<|im_start|>assistant
-{}"""
-
-
-def format_qwen_prompts(examples: dict[str, list[str]]) -> dict[str, list[str]]:
-    """Format instruction examples into ChatML format for Qwen 3.8."""
-    instructions = examples["instruction"]
-    inputs = examples["input"]
-    outputs = examples["output"]
-    texts: list[str] = []
-    for instruction, input_text, output in zip(instructions, inputs, outputs, strict=False):
-        user_msg = f"{instruction}\n{input_text}" if input_text else instruction
-        text = QWEN_PROMPT.format(user_msg, "", output) + "<|im_end|>"
-        texts.append(text)
-    return {"text": texts}
-
 
 def train_qwen3_8(config: TrainingConfig) -> None:
-    """Execute LoRA training workflow for Qwen 3.8 27B."""
+    """Execute LoRA training workflow for Qwen 3.8 27B with resumability."""
     logger = setup_logging(name="rust_lora.qwen3_8")
     config.model_family = "Qwen3.8-27B"
-
-    # 1. Preflight validation
     min_ram = 32.0 if IS_MACOS else 24.0
-    if not run_preflight_checks(config, min_vram_gb=min_ram, logger=logger, allow_mps=True):
-        logger.warning("Preflight checks reported issues; proceeding with caution.")
 
-    # 2. Load model and tokenizer
-    model, tokenizer = load_model_and_tokenizer(config, logger=logger)
-
-    # 3. Load and format dataset
-    dataset = load_and_prepare_dataset(
-        data_file=config.data_file,
-        prompt_formatter_fn=format_qwen_prompts,
-        tokenizer=tokenizer,
-        max_seq_length=config.max_seq_length,
-        logger=logger,
-    )
-
-    # 4. Train and save model (with resumption support)
-    run_sft_training(
-        model=model,
-        tokenizer=tokenizer,
-        dataset=dataset,
+    execute_training_pipeline(
         config=config,
+        prompt_formatter_fn=format_chatml_prompts,
+        min_vram_gb=min_ram,
+        allow_mps=True,
         logger=logger,
     )
 
@@ -226,41 +189,30 @@ def main() -> None:
         default_batch_size=1,
         default_grad_accum=default_grad_accum,
         default_load_in_4bit=False if IS_MACOS else True,
-        epilog="""
-Examples:
-  # Dry-run validation check:
-  uv run python train_qwen3_8.py --dry-run
-
+        epilog=build_resume_epilog(
+            "train_qwen3_8.py",
+            """
   # Train on macOS with default memory-safe profile:
   uv run python train_qwen3_8.py
 
-  # Resume interrupted training from the latest checkpoint:
-  uv run python train_qwen3_8.py --resume
-
   # Train on 80GB GPU server:
   uv run python train_qwen3_8.py --hardware-profile a100_80gb
-        """,
+            """,
+        ),
     )
     args = parser.parse_args()
     logger = setup_logging(name="rust_lora.qwen3_8")
     config = create_qwen3_8_config(args)
+    min_ram = 32.0 if IS_MACOS else 24.0
 
-    if args.dry_run:
-        logger.info("Executing dry-run validation for Qwen 3.8 27B...")
-        min_ram = 32.0 if IS_MACOS else 24.0
-        passed = run_preflight_checks(config, min_vram_gb=min_ram, logger=logger, allow_mps=True)
-        sys.exit(0 if passed else 1)
-
-    try:
-        train_qwen3_8(config)
-    except KeyboardInterrupt:
-        logger.info(
-            "Training interrupted by user. Run with --resume to continue from last checkpoint."
-        )
-        sys.exit(130)
-    except Exception:
-        logger.exception("Training failed with unexpected exception")
-        sys.exit(1)
+    run_training_cli(
+        config=config,
+        args=args,
+        train_fn=train_qwen3_8,
+        min_vram_gb=min_ram,
+        allow_mps=True,
+        logger=logger,
+    )
 
 
 if __name__ == "__main__":

@@ -64,6 +64,28 @@ uv run python train_granite.py --model-path ibm-granite/granite-4.2-3b --hardwar
 
 # Train on workstation with RTX 6000 Ada
 uv run python train_granite.py --hardware-profile rtx6000
+
+# Resume interrupted training from the latest checkpoint:
+uv run python train_granite.py --resume
+
+# Resume from a specific checkpoint:
+uv run python train_granite.py --resume-from-checkpoint models/granite_4.2_8b_rust_lora/checkpoints/checkpoint-50
+```
+
+### Resuming an Interrupted Run
+
+If training is stopped or interrupted (e.g., via `Ctrl+C` or system sleep), simply add `--resume`:
+
+```bash
+uv run python train_granite.py --resume
+```
+
+The script automatically detects the latest checkpoint directory (`checkpoint-<step>`) and resumes optimizer, scheduler, and model states from that exact point.
+
+To resume from a specific checkpoint:
+
+```bash
+uv run python train_granite.py --resume-from-checkpoint models/granite_4.2_8b_rust_lora/checkpoints/checkpoint-50
 ```
 
 ## 3. Variant Auto-Detection
@@ -113,6 +135,10 @@ options:
   --data-file           Path to training JSONL dataset
   --output-dir          Directory to save final LoRA weights
   --checkpoint-dir      Directory for intermediate training checkpoints
+  --save-steps          Number of update steps between saving checkpoints
+  --save-total-limit    Maximum number of checkpoints to retain
+  --save-strategy       Checkpoint save strategy (steps, epoch, no)
+  --resume              Automatically resume training from latest checkpoint
   --resume-from-checkpoint
                         Path to checkpoint directory to resume training
   --wandb-project       Weights & Biases project name for tracking

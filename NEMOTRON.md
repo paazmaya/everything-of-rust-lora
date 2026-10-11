@@ -153,7 +153,13 @@ Enables detailed experiment tracking in Weights & Biases.
 
 ### Example 3: Resume from Checkpoint
 
-If training was interrupted, resume from the last checkpoint:
+If training was interrupted (e.g., via `Ctrl+C` or system sleep), resume from the latest checkpoint:
+
+```bash
+uv run python train_nemotron3_nano.py --resume
+```
+
+Or resume from a specific checkpoint:
 
 ```bash
 uv run python train_nemotron3_nano.py \
@@ -224,7 +230,12 @@ Data Arguments:
 
 Output Arguments:
   --output-dir DIR                     LoRA adapter output directory
-  --resume-from-checkpoint PATH        Resume from checkpoint
+  --checkpoint-dir DIR                 Intermediate checkpoints directory
+  --save-steps STEPS                   Steps between saving checkpoints
+  --save-total-limit LIMIT             Maximum checkpoints to retain
+  --save-strategy STRATEGY             Save strategy (steps, epoch, no)
+  --resume                             Automatically resume from latest checkpoint
+  --resume-from-checkpoint PATH        Resume from specific checkpoint
 
 Tracking Arguments:
   --wandb-project PROJECT              W&B project name (enables tracking)

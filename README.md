@@ -253,6 +253,10 @@ The Nemotron 3 Nano training script provides production-grade features including
 5. **Resume from checkpoint:**
 
    ```bash
+   # Automatically resume from latest checkpoint:
+   uv run python train_nemotron3_nano.py --resume
+
+   # Or resume from a specific checkpoint:
    uv run python train_nemotron3_nano.py --resume-from-checkpoint models/nemotron3_nano_rust_lora/checkpoints/checkpoint-50
    ```
 

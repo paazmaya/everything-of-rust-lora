@@ -3,7 +3,7 @@
 Production-Grade IBM Granite 4.2 LoRA Training Script
 
 Trains a LoRA adapter on IBM Granite 4.2 (8B or 3B variant) for Rust systems programming.
-Features inline configuration, automatic variant detection, and preflight dry-run validation.
+Features inline configuration, automatic variant detection, checkpoint resumption, and preflight dry-run validation.
 
 Usage:
     # Dry-run validation:
@@ -11,6 +11,12 @@ Usage:
 
     # Train using default Granite 4.2 8B:
     uv run python train_granite.py
+
+    # Resume interrupted training from the latest checkpoint:
+    uv run python train_granite.py --resume
+
+    # Resume from a specific checkpoint:
+    uv run python train_granite.py --resume-from-checkpoint models/granite_4.2_8b_rust_lora/checkpoints/checkpoint-50
 
     # Train with Granite 4.2 3B variant:
     uv run python train_granite.py --model-path ibm-granite/granite-4.2-3b
@@ -20,7 +26,6 @@ Usage:
 """
 
 import re
-import sys
 from typing import Any
 
 from lib import (
@@ -28,10 +33,10 @@ from lib import (
     TrainingConfig,
     apply_args_to_config,
     build_arg_parser,
-    load_and_prepare_dataset,
-    load_model_and_tokenizer,
-    run_preflight_checks,
-    run_sft_training,
+    build_resume_epilog,
+    execute_training_pipeline,
+    format_alpaca_prompts,
+    run_training_cli,
     setup_logging,
 )
 
@@ -48,6 +53,8 @@ HARDWARE_PROFILES: dict[str, dict[str, Any]] = {
         "gradient_accumulation_steps": 8,
         "max_seq_length": 2048,
         "load_in_4bit": True,
+        "save_steps": 50,
+        "save_total_limit": 3,
         "description": "NVIDIA RTX 4070 (12GB VRAM) - 4-bit QLoRA",
     },
     "rtx3090_4090": {
@@ -55,6 +62,8 @@ HARDWARE_PROFILES: dict[str, dict[str, Any]] = {
         "gradient_accumulation_steps": 8,
         "max_seq_length": 4096,
         "load_in_4bit": True,
+        "save_steps": 50,
+        "save_total_limit": 3,
         "description": "NVIDIA RTX 3090/4090 (24GB VRAM) - 4-bit QLoRA default",
     },
     "rtx6000": {
@@ -62,6 +71,8 @@ HARDWARE_PROFILES: dict[str, dict[str, Any]] = {
         "gradient_accumulation_steps": 4,
         "max_seq_length": 4096,
         "load_in_4bit": False,
+        "save_steps": 50,
+        "save_total_limit": 3,
         "description": "NVIDIA RTX 6000 Ada (48GB VRAM) - 16-bit bf16 LoRA",
     },
     "a100": {
@@ -69,6 +80,8 @@ HARDWARE_PROFILES: dict[str, dict[str, Any]] = {
         "gradient_accumulation_steps": 4,
         "max_seq_length": 4096,
         "load_in_4bit": False,
+        "save_steps": 50,
+        "save_total_limit": 3,
         "description": "NVIDIA A100 40GB/80GB - 16-bit bf16 LoRA",
     },
     "dev": {
@@ -76,20 +89,11 @@ HARDWARE_PROFILES: dict[str, dict[str, Any]] = {
         "gradient_accumulation_steps": 1,
         "max_seq_length": 512,
         "load_in_4bit": True,
+        "save_steps": 5,
+        "save_total_limit": 2,
         "description": "Development profile - fast iteration and minimal VRAM",
     },
 }
-
-ALPACA_PROMPT = """Below is an instruction that describes a task, paired with an input that provides further context. Write a response that appropriately completes the request.
-
-### Instruction:
-{}
-
-### Input:
-{}
-
-### Response:
-{}"""
 
 
 def detect_model_variant(model_path: str) -> str:
@@ -101,47 +105,17 @@ def detect_model_variant(model_path: str) -> str:
     return "8B"
 
 
-def format_granite_prompts(examples: dict[str, list[str]]) -> dict[str, list[str]]:
-    """Format instruction examples into Alpaca format for Granite."""
-    instructions = examples["instruction"]
-    inputs = examples["input"]
-    outputs = examples["output"]
-    texts: list[str] = []
-    for instruction, input_text, output in zip(instructions, inputs, outputs, strict=False):
-        text = ALPACA_PROMPT.format(instruction, input_text, output)
-        texts.append(text)
-    return {"text": texts}
-
-
 def train_granite(config: TrainingConfig) -> None:
-    """Execute LoRA training workflow for IBM Granite 4.2."""
+    """Execute LoRA training workflow for IBM Granite 4.2 with resumability."""
     logger = setup_logging(name="rust_lora.granite")
     variant = detect_model_variant(config.model_path)
     config.model_family = "Granite"
     config.variant = variant
 
-    # 1. Preflight validation
-    if not run_preflight_checks(config, min_vram_gb=12.0, logger=logger):
-        logger.warning("Preflight checks reported issues; proceeding with caution.")
-
-    # 2. Load model and tokenizer
-    model, tokenizer = load_model_and_tokenizer(config, logger=logger)
-
-    # 3. Load and format dataset
-    dataset = load_and_prepare_dataset(
-        data_file=config.data_file,
-        prompt_formatter_fn=format_granite_prompts,
-        tokenizer=tokenizer,
-        max_seq_length=config.max_seq_length,
-        logger=logger,
-    )
-
-    # 4. Train and save model
-    run_sft_training(
-        model=model,
-        tokenizer=tokenizer,
-        dataset=dataset,
+    execute_training_pipeline(
         config=config,
+        prompt_formatter_fn=format_alpaca_prompts,
+        min_vram_gb=12.0,
         logger=logger,
     )
 
@@ -158,6 +132,13 @@ def main() -> None:
         default_batch_size=1,
         default_grad_accum=8,
         default_load_in_4bit=True,
+        epilog=build_resume_epilog(
+            "train_granite.py",
+            """
+  # Train with Granite 4.2 3B variant:
+  uv run python train_granite.py --model-path ibm-granite/granite-4.2-3b
+            """,
+        ),
     )
     args = parser.parse_args()
     logger = setup_logging(name="rust_lora.granite")
@@ -186,19 +167,13 @@ def main() -> None:
     )
     config = apply_args_to_config(config, args, hardware_profiles=HARDWARE_PROFILES)
 
-    if args.dry_run:
-        logger.info(f"Executing dry-run validation for Granite 4.2 {variant}...")
-        passed = run_preflight_checks(config, min_vram_gb=12.0, logger=logger)
-        sys.exit(0 if passed else 1)
-
-    try:
-        train_granite(config)
-    except KeyboardInterrupt:
-        logger.info("Training interrupted by user.")
-        sys.exit(130)
-    except Exception:
-        logger.exception("Training failed with unexpected exception")
-        sys.exit(1)
+    run_training_cli(
+        config=config,
+        args=args,
+        train_fn=train_granite,
+        min_vram_gb=12.0,
+        logger=logger,
+    )
 
 
 if __name__ == "__main__":
