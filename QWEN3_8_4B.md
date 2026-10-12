@@ -20,18 +20,18 @@ Because the model, gradients, optimizer states, and activations fit 100% inside 
 
 ### Architectural Metric Comparison
 
-| Architectural Metric | Qwen 3.5 4B | Qwen 3.8 4B Distill | Qwen 3.8 27B |
-| :--- | :--- | :--- | :--- |
-| **Base Model Identifier** | `Qwen/Qwen3.5-4B` | `empero-ai/Qwen3.8-4B-Distill` | `Qwen/Qwen3.8-27B` |
-| **Total Layers** | 32 layers | **32 layers** | 64 layers |
-| **Hidden Dimension ($d$)** | 2,560 | **2,560** | 5,120 |
-| **Intermediate Size (FFN)** | 9,216 | **9,216** | 17,408 |
-| **Attention Architecture** | 32 standard layers | **Hybrid (24 linear + 8 full)** | Hybrid (48 linear + 16 full) |
-| **Full Attention Layers** | 32 layers | **8 layers** (every 4th layer) | 16 layers (every 4th layer) |
-| **Linear Attention Layers** | 0 layers | **24 layers** | 48 layers |
-| **Target Projections** | 7 standard projections | **All 12 hybrid projections** | All 12 hybrid projections |
-| **Context Window** | 32,768 tokens | **262,144 tokens (native)** | 262,144 tokens (native) |
-| **Disk Offloading Needed** | No | **No (0 offload required)** | Yes (on unified RAM < 64GB) |
+| Architectural Metric        | Qwen 3.5 4B            | Qwen 3.8 4B Distill             | Qwen 3.8 27B                 |
+| :-------------------------- | :--------------------- | :------------------------------ | :--------------------------- |
+| **Base Model Identifier**   | `Qwen/Qwen3.5-4B`      | `empero-ai/Qwen3.8-4B-Distill`  | `Qwen/Qwen3.8-27B`           |
+| **Total Layers**            | 32 layers              | **32 layers**                   | 64 layers                    |
+| **Hidden Dimension ($d$)**  | 2,560                  | **2,560**                       | 5,120                        |
+| **Intermediate Size (FFN)** | 9,216                  | **9,216**                       | 17,408                       |
+| **Attention Architecture**  | 32 standard layers     | **Hybrid (24 linear + 8 full)** | Hybrid (48 linear + 16 full) |
+| **Full Attention Layers**   | 32 layers              | **8 layers** (every 4th layer)  | 16 layers (every 4th layer)  |
+| **Linear Attention Layers** | 0 layers               | **24 layers**                   | 48 layers                    |
+| **Target Projections**      | 7 standard projections | **All 12 hybrid projections**   | All 12 hybrid projections    |
+| **Context Window**          | 32,768 tokens          | **262,144 tokens (native)**     | 262,144 tokens (native)      |
+| **Disk Offloading Needed**  | No                     | **No (0 offload required)**     | Yes (on unified RAM < 64GB)  |
 
 ### Universal Hybrid Target Projections
 
@@ -102,14 +102,14 @@ uv run python train_qwen3_8_4b.py --resume-from-checkpoint models/qwen3_8_4b_rus
 
 Select a profile tailored to your available hardware using `--hardware-profile`:
 
-| Profile | Target Platform | Memory | Batch | Grad Accum | Context | Description |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| `mac_native` | Apple Silicon Mac | 16GB–48GB | 1 | 8 | 2048 | 100% in-memory 16-bit BF16 LoRA (**macOS default**) |
-| `mac_fast` | Apple Silicon Mac | 16GB–48GB | 1 | 4 | 1024 | Fast iteration cycle (1024 tokens) |
-| `rtx4070` | RTX 4070 / 3060 | 12GB | 1 | 4 | 2048 | 16-bit BF16 LoRA (**CUDA default**) |
-| `rtx3090_4090` | RTX 3090 / 4090 | 24GB | 2 | 4 | 4096 | 16-bit BF16 with 4K context window |
-| `a100` | NVIDIA A100 / H100 | 40GB–80GB | 4 | 2 | 8192 | High-throughput data center profile |
-| `dev` | Any hardware | Minimal | 1 | 1 | 512 | Fast test profile (512 tokens, 5 save steps) |
+| Profile        | Target Platform    | Memory    | Batch | Grad Accum | Context | Description                                         |
+| :------------- | :----------------- | :-------- | :---- | :--------- | :------ | :-------------------------------------------------- |
+| `mac_native`   | Apple Silicon Mac  | 16GB–48GB | 1     | 8          | 2048    | 100% in-memory 16-bit BF16 LoRA (**macOS default**) |
+| `mac_fast`     | Apple Silicon Mac  | 16GB–48GB | 1     | 4          | 1024    | Fast iteration cycle (1024 tokens)                  |
+| `rtx4070`      | RTX 4070 / 3060    | 12GB      | 1     | 4          | 2048    | 16-bit BF16 LoRA (**CUDA default**)                 |
+| `rtx3090_4090` | RTX 3090 / 4090    | 24GB      | 2     | 4          | 4096    | 16-bit BF16 with 4K context window                  |
+| `a100`         | NVIDIA A100 / H100 | 40GB–80GB | 4     | 2          | 8192    | High-throughput data center profile                 |
+| `dev`          | Any hardware       | Minimal   | 1     | 1          | 512     | Fast test profile (512 tokens, 5 save steps)        |
 
 ### Usage Examples
 
@@ -194,19 +194,26 @@ llama-quantize \
 ## 5. Troubleshooting & Verification
 
 ### Verifying MPS Acceleration
+
 Run the dry-run command:
+
 ```bash
 uv run python train_qwen3_8_4b.py --dry-run
 ```
+
 Output should display:
+
 ```text
 Apple Silicon Metal Performance Shaders (MPS) available.
 Preflight checks passed: Environment and dataset are valid.
 ```
 
 ### Adapter Parameter Count
+
 When model loading completes, the trainable parameter summary should reflect all 12 target projections:
+
 ```text
 trainable params: ~32,000,000 || all params: ~4,200,000,000 || trainable%: ~0.76%
 ```
+
 Both `linear_attn` and `self_attn` blocks will contain active `lora_A` and `lora_B` tensors on the active compute device (`mps`).

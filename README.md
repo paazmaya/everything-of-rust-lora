@@ -112,7 +112,7 @@ Generate a token at: https://github.com/settings/tokens (requires `repo` and `re
 3. **Store in Vector Database (For Updates & Version-Aware RAG):**
 
    ```bash
-   # Index all chunks into ChromaDB using Nomic Embed Text v2 MoE 8-bit GGUF (~488MB)
+   # Index all chunks into ChromaDB using Google DeepMind EmbeddingGemma-2 (~540MB)
    uv run python scripts/07_vector_store.py
 
    # Reset and re-index from scratch

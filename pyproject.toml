@@ -26,11 +26,12 @@ dependencies = [
   "peft>=0.19.1",
   "pyarrow>=24.0.0",
   "requests>=2.34.2",
+  "sentence-transformers>=6.1.0",
   "tiktoken>=0.13.0",
   "torch==2.10.0 ; sys_platform == 'win32'",
   "torchvision>=0.25.0 ; sys_platform == 'win32'",
   "tqdm>=4.67.3",
-  "transformers>=5.5.0",
+  "transformers>=5.19.0",
   "trl>=0.24.0",
   "unsloth[colab-new]>=2026.5.8",
 ]
@@ -50,6 +51,9 @@ explicit = true
 [tool.uv.sources]
 torch = { index = "pytorch-cu130" }
 torchvision = { index = "pytorch-cu130" }
+
+[tool.uv]
+override-dependencies = ["transformers>=5.19.0"]
 
 [tool.ruff]
 line-length = 100

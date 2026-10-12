@@ -3,11 +3,11 @@ import argparse
 import hashlib
 import json
 import logging
-import os
 from pathlib import Path
 from typing import Any, cast
 
 import chromadb
+import torch
 from chromadb.api.types import (
     EmbeddingFunction,
     Embeddings,
@@ -16,8 +16,7 @@ from chromadb.api.types import (
     Where,
 )
 from chromadb.config import Settings
-from huggingface_hub import hf_hub_download
-from llama_cpp import Llama
+from sentence_transformers import SentenceTransformer
 from tqdm import tqdm
 
 from lib.config import DEFAULT_CHUNKS_FILE, DEFAULT_PROCESSED_DIR
@@ -28,80 +27,102 @@ BASE_DIR = Path(__file__).parent.parent
 PROCESSED_DIR = BASE_DIR / DEFAULT_PROCESSED_DIR
 VECTORS_DIR = BASE_DIR / "data" / "vectors"
 
-DEFAULT_GGUF_REPO = "nomic-ai/nomic-embed-text-v2-moe-GGUF"
-DEFAULT_GGUF_FILE = "nomic-embed-text-v2-moe.Q8_0.gguf"
+DEFAULT_EMBEDDING_MODEL = "google/embeddinggemma-2"
 
 
-class NomicGGUFEmbeddingFunction(EmbeddingFunction[Any]):
+class EmbeddingGemmaEmbeddingFunction(EmbeddingFunction[Any]):
     """
-    ChromaDB embedding function using Nomic Embed Text v2 MoE 8-bit GGUF via llama-cpp.
-    Features hardware acceleration (Apple Silicon Metal) and safe token truncation.
+    ChromaDB embedding function using Google DeepMind's EmbeddingGemma-2 via SentenceTransformers.
+    Features hardware acceleration (Apple Silicon Metal / CUDA / CPU),
+    task instruction prefixes ('task: search result | query: ' and 'title: {title} | text: {content}'),
+    and memory-efficient text-only encoder loading (disabling unused vision/audio towers).
     """
 
     def __init__(
         self,
-        repo_id: str = DEFAULT_GGUF_REPO,
-        filename: str = DEFAULT_GGUF_FILE,
-        model_path: str | None = None,
-        n_ctx: int = 512,
-        n_batch: int = 512,
-        n_ubatch: int = 512,
-        n_gpu_layers: int = -1,
+        model_name: str = DEFAULT_EMBEDDING_MODEL,
+        device: str | None = None,
+        truncate_dim: int | None = None,
+        **kwargs: Any,
     ) -> None:
-        if model_path is None or not os.path.exists(model_path):
-            print(f"Resolving GGUF embedding model ({filename})...")
-            resolved = hf_hub_download(repo_id=repo_id, filename=filename)
-            model_path = str(resolved)
+        if device is None:
+            if torch.cuda.is_available():
+                device = "cuda"
+            elif torch.backends.mps.is_available():
+                device = "mps"
+            else:
+                device = "cpu"
 
-        self.model_path = model_path
-        self.n_ctx = n_ctx
-        self.max_tokens = n_ctx - 16
+        torch_dtype = torch.float32 if device == "cpu" else torch.bfloat16
+        self.model_name = model_name
+        self.device = device
+        self.truncate_dim = truncate_dim
 
-        self.llm = Llama(
-            model_path=model_path,
-            embedding=True,
-            n_ctx=n_ctx,
-            n_batch=n_batch,
-            n_ubatch=n_ubatch,
-            n_gpu_layers=n_gpu_layers,
-            verbose=False,
+        print(f"Loading embedding model '{model_name}' on device '{device}'...")
+        self.model = SentenceTransformer(
+            model_name_or_path=model_name,
+            device=device,
+            model_kwargs={"torch_dtype": torch_dtype},
+            config_kwargs={"vision_config": None, "audio_config": None},
         )
 
     @staticmethod
     def name() -> str:
-        return "nomic_embed_text_v2_moe_gguf"
+        return "embeddinggemma_2"
 
     def _prepare_text(self, text: str) -> str:
-        if text.startswith(("search_document:", "search_query:")):
-            formatted = text
-        else:
-            formatted = f"search_document: {text}"
-
-        tokens = self.llm.tokenize(formatted.encode("utf-8", errors="replace"))
-        if len(tokens) > self.max_tokens:
-            tokens = tokens[: self.max_tokens]
-            formatted = self.llm.detokenize(tokens).decode("utf-8", errors="replace")
-        return formatted
+        if text.startswith(("task:", "title:")):
+            return text
+        return f"title: none | text: {text}"
 
     def __call__(self, input: Any) -> Embeddings:
         processed = [self._prepare_text(str(doc)) for doc in input]
-        res = self.llm.create_embedding(processed)
-        return cast(Embeddings, [item["embedding"] for item in res["data"]])
+        encode_kwargs: dict[str, Any] = {
+            "normalize_embeddings": True,
+            "show_progress_bar": False,
+        }
+        if self.truncate_dim is not None:
+            encode_kwargs["truncate_dim"] = self.truncate_dim
+
+        embeddings = self.model.encode(processed, **encode_kwargs)
+        return cast(Embeddings, [emb.tolist() for emb in embeddings])
+
+
+# Backwards compatibility alias
+NomicGGUFEmbeddingFunction = EmbeddingGemmaEmbeddingFunction
 
 
 class VectorStore:
     def __init__(
         self,
-        model_filename: str = DEFAULT_GGUF_FILE,
+        model_name: str = DEFAULT_EMBEDDING_MODEL,
+        device: str | None = None,
+        truncate_dim: int | None = None,
+        reset: bool = False,
+        model_filename: str | None = None,
         model_path: str | None = None,
     ) -> None:
         VECTORS_DIR.mkdir(parents=True, exist_ok=True)
-        self.embedding_fn = NomicGGUFEmbeddingFunction(
-            filename=model_filename, model_path=model_path
+        self.embedding_fn = EmbeddingGemmaEmbeddingFunction(
+            model_name=model_name,
+            device=device,
+            truncate_dim=truncate_dim,
         )
         self.client = chromadb.PersistentClient(
             path=str(VECTORS_DIR), settings=Settings(anonymized_telemetry=False)
         )
+        if reset:
+            try:
+                self.client.delete_collection("rust_docs")
+            except Exception:
+                pass
+            self.collection = self.client.create_collection(
+                name="rust_docs",
+                embedding_function=self.embedding_fn,
+                metadata={"hnsw:space": "cosine"},
+            )
+            return
+
         try:
             self.collection = self.client.get_collection(
                 name="rust_docs", embedding_function=self.embedding_fn
@@ -117,7 +138,10 @@ class VectorStore:
                         metadata={"hnsw:space": "cosine"},
                     )
                 else:
-                    raise
+                    raise ValueError(
+                        f"Existing 'rust_docs' collection was created with a different embedding function ({e}). "
+                        "Run with '--reset' to re-index the collection with the new embedding model."
+                    ) from e
             else:
                 raise
         except Exception:
@@ -153,7 +177,10 @@ class VectorStore:
             chunk_hash = hashlib.sha256(f"{src}:{lib}:{ver}:{content}".encode()).hexdigest()[:20]
 
         compound_id = f"{lib}_{ver}_{chunk_hash}"
-        doc_text = str(c.get("content", ""))[:20000]
+        raw_content = str(c.get("content", ""))[:20000]
+        title = str(c.get("title", "")).strip()
+        title_prefix = f"title: {title}" if title else "title: none"
+        doc_text = f"{title_prefix} | text: {raw_content}"
         meta: Metadata = {
             "library": lib,
             "version": ver,
@@ -261,8 +288,8 @@ class VectorStore:
 
         formatted_query = (
             query_text
-            if query_text.startswith(("search_query:", "search_document:"))
-            else f"search_query: {query_text}"
+            if query_text.startswith(("task:", "title:"))
+            else f"task: search result | query: {query_text}"
         )
 
         return self.collection.query(
@@ -282,9 +309,7 @@ class VectorStore:
         """
         Specialized RAG query for comparing versions and finding migration/breaking change guidance.
         """
-        query_str = (
-            f"search_query: {library} migration breaking changes upgrade {topic or ''}".strip()
-        )
+        query_str = f"task: search result | query: {library} migration breaking changes upgrade {topic or ''}".strip()
 
         # Query changelogs and docs for the target version
         target_docs = self.collection.query(
@@ -382,12 +407,36 @@ def main() -> None:
         "--index", action="store_true", help="Index all processed chunks into ChromaDB"
     )
     parser.add_argument(
+        "--model",
+        type=str,
+        default=DEFAULT_EMBEDDING_MODEL,
+        help=f"Embedding model name or HF repo (default: {DEFAULT_EMBEDDING_MODEL})",
+    )
+    parser.add_argument(
+        "--device",
+        type=str,
+        default=None,
+        help="Inference device: 'mps', 'cuda', or 'cpu' (default: auto-detect)",
+    )
+    parser.add_argument(
+        "--truncate-dim",
+        type=int,
+        default=None,
+        choices=[128, 256, 512, 768],
+        help="Matryoshka representation truncation dimension (default: 768 full)",
+    )
+    parser.add_argument(
         "--model-file",
         type=str,
-        default=DEFAULT_GGUF_FILE,
-        help=f"GGUF model file name in repo {DEFAULT_GGUF_REPO} (default: {DEFAULT_GGUF_FILE})",
+        default=None,
+        help="Legacy model file name (ignored, preserved for backward compatibility)",
     )
-    parser.add_argument("--model-path", type=str, help="Explicit local path to GGUF model file")
+    parser.add_argument(
+        "--model-path",
+        type=str,
+        default=None,
+        help="Explicit local path or repo ID for embedding model",
+    )
     parser.add_argument(
         "--batch-size", type=int, default=32, help="Batch size for embedding (default: 32)"
     )
@@ -404,10 +453,13 @@ def main() -> None:
     )
 
     args = parser.parse_args()
-    store = VectorStore(model_filename=args.model_file, model_path=args.model_path)
-
-    if args.reset:
-        store.reset()
+    model_target = args.model_path or args.model
+    store = VectorStore(
+        model_name=model_target,
+        device=args.device,
+        truncate_dim=args.truncate_dim,
+        reset=args.reset,
+    )
 
     if args.list_versions:
         _handle_list_versions(store, args.library)
