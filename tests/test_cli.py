@@ -216,3 +216,55 @@ def test_run_training_cli_exception(caplog: Any) -> None:
             run_training_cli(cfg, args, train_fn, logger=logger)
         assert exc_info.value.code == 1
         assert "Training failed with unexpected exception" in caplog.text
+
+
+def test_qwen3_8_4b_configuration_and_targets() -> None:
+    """Verify train_qwen3_8_4b config factory, target modules, and profiles."""
+    from train_qwen3_8_4b import (
+        DEFAULT_MODEL_NAME,
+        DEFAULT_OUTPUT_DIR,
+        HARDWARE_PROFILES,
+        QWEN3_8_4B_TARGET_MODULES,
+        create_qwen3_8_4b_config,
+        train_qwen3_8_4b,
+    )
+
+    assert DEFAULT_MODEL_NAME == "empero-ai/Qwen3.8-4B-Distill"
+    assert DEFAULT_OUTPUT_DIR == "models/qwen3_8_4b_rust_lora"
+    assert len(QWEN3_8_4B_TARGET_MODULES) == 12
+    assert "in_proj_a" in QWEN3_8_4B_TARGET_MODULES
+    assert "q_proj" in QWEN3_8_4B_TARGET_MODULES
+    assert "gate_proj" in QWEN3_8_4B_TARGET_MODULES
+
+    args = argparse.Namespace(
+        model_path=None,
+        output_dir=None,
+        data_file=None,
+        trust_remote_code=False,
+        hardware_profile="mac_native",
+        batch_size=None,
+        gradient_accumulation_steps=None,
+        max_seq_length=None,
+        num_epochs=3,
+        learning_rate=2e-4,
+        load_in_4bit=False,
+        resume=False,
+        resume_from_checkpoint=None,
+    )
+    cfg = create_qwen3_8_4b_config(args)
+    assert cfg.model_path == "empero-ai/Qwen3.8-4B-Distill"
+    assert cfg.model_family == "Qwen3.8-4B"
+    assert cfg.output_dir == "models/qwen3_8_4b_rust_lora"
+    assert cfg.target_modules == QWEN3_8_4B_TARGET_MODULES
+    assert cfg.offload_folder is None
+    assert cfg.gradient_checkpointing is True
+    assert cfg.max_seq_length == 2048
+
+    # Verify pipeline execution call passes allow_mps=True
+    with patch("train_qwen3_8_4b.execute_training_pipeline") as mock_exec:
+        train_qwen3_8_4b(cfg)
+        mock_exec.assert_called_once()
+        _, kwargs = mock_exec.call_args
+        assert kwargs.get("allow_mps") is True
+        assert kwargs.get("min_vram_gb") in (8.0, 12.0)
+
