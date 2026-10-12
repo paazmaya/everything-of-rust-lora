@@ -45,6 +45,7 @@ from lib import (
 # ============================================================================
 
 DEFAULT_MODEL_NAME = "ibm-granite/granite-4.2-8b"
+DEFAULT_OUTPUT_DIR = "models/granite_4.2_8b_rust_lora"
 DEFAULT_HARDWARE_PROFILE = "rtx3090_4090"
 
 HARDWARE_PROFILES: dict[str, dict[str, Any]] = {
@@ -125,7 +126,7 @@ def main() -> None:
     parser = build_arg_parser(
         description="Train LoRA adapter on IBM Granite 4.2 (8B or 3B) for Rust",
         default_model=DEFAULT_MODEL_NAME,
-        default_output_dir="models/granite_4.2_8b_rust_lora",
+        default_output_dir=DEFAULT_OUTPUT_DIR,
         hardware_profiles=HARDWARE_PROFILES,
         default_profile=DEFAULT_HARDWARE_PROFILE,
         default_max_seq_length=4096,
@@ -145,9 +146,7 @@ def main() -> None:
 
     variant = detect_model_variant(args.model_path or DEFAULT_MODEL_NAME)
     default_dir = f"models/granite_4.2_{variant.lower()}_rust_lora"
-    output_dir = (
-        args.output_dir if args.output_dir != "models/granite_4.2_8b_rust_lora" else default_dir
-    )
+    output_dir = args.output_dir if args.output_dir != DEFAULT_OUTPUT_DIR else default_dir
 
     config = TrainingConfig(
         model_path=args.model_path or DEFAULT_MODEL_NAME,

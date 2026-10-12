@@ -4,9 +4,16 @@ import logging
 from typing import Any
 
 from lib.config import (
+    DEFAULT_BENCHMARK_FILE,
+    DEFAULT_CHUNKS_FILE,
+    DEFAULT_DATASETS_DIR,
+    DEFAULT_OUTPUT_DIR,
+    DEFAULT_PROCESSED_DIR,
+    DEFAULT_RAW_DIR,
     DEFAULT_REQUIRED_FIELDS,
     DEFAULT_TARGET_MODULES,
     DEFAULT_TRAIN_FILE,
+    DEFAULT_VAL_FILE,
     TrainingConfig,
     apply_hardware_profile,
 )
@@ -37,8 +44,8 @@ def test_training_config_defaults() -> None:
     assert cfg.lora_bias == "none"
     assert cfg.target_modules == list(DEFAULT_TARGET_MODULES)
     assert cfg.data_file == DEFAULT_TRAIN_FILE
-    assert cfg.output_dir == "models/rust_lora"
-    assert cfg.checkpoint_dir == "models/rust_lora/checkpoints"
+    assert cfg.output_dir == DEFAULT_OUTPUT_DIR
+    assert cfg.checkpoint_dir == f"{DEFAULT_OUTPUT_DIR}/checkpoints"
     assert cfg.save_strategy == "steps"
     assert cfg.save_steps == 50
     assert cfg.save_total_limit == 3
@@ -143,6 +150,13 @@ def test_apply_hardware_profile_no_description_and_4bit_false() -> None:
 
 def test_constants() -> None:
     """Verify module constants."""
+    assert DEFAULT_RAW_DIR == "data/raw"
+    assert DEFAULT_PROCESSED_DIR == "data/processed"
+    assert DEFAULT_CHUNKS_FILE == "data/processed/all_chunks.jsonl"
+    assert DEFAULT_DATASETS_DIR == "data/datasets"
     assert DEFAULT_TRAIN_FILE == "data/datasets/train.jsonl"
+    assert DEFAULT_VAL_FILE == "data/datasets/val.jsonl"
+    assert DEFAULT_BENCHMARK_FILE == "data/datasets/version_eval_benchmark.jsonl"
+    assert DEFAULT_OUTPUT_DIR == "models/rust_lora"
     assert DEFAULT_REQUIRED_FIELDS == ["instruction", "input", "output"]
     assert "q_proj" in DEFAULT_TARGET_MODULES

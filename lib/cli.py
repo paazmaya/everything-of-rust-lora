@@ -8,7 +8,7 @@ import sys
 from collections.abc import Callable
 from typing import Any
 
-from .config import DEFAULT_TRAIN_FILE, TrainingConfig, apply_hardware_profile
+from .config import DEFAULT_OUTPUT_DIR, DEFAULT_TRAIN_FILE, TrainingConfig, apply_hardware_profile
 from .validation import run_preflight_checks
 
 
@@ -36,7 +36,7 @@ Examples:
 def build_arg_parser(
     description: str,
     default_model: str,
-    default_output_dir: str,
+    default_output_dir: str = DEFAULT_OUTPUT_DIR,
     hardware_profiles: dict[str, dict[str, Any]] | None = None,
     default_profile: str | None = None,
     default_max_seq_length: int = 1024,

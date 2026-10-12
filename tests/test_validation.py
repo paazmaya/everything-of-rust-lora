@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import torch
 
-from lib.config import TrainingConfig
+from lib.config import DEFAULT_REQUIRED_FIELDS, DEFAULT_TRAIN_FILE, TrainingConfig
 from lib.validation import (
     check_cuda_available,
     check_dependencies,
@@ -193,7 +193,7 @@ def test_validate_data_file(tmp_path: Any) -> None:
     assert (
         validate_data_file(
             str(missing_fields_file),
-            required_fields=["instruction", "input", "output"],
+            required_fields=DEFAULT_REQUIRED_FIELDS,
             logger=logger,
         )
         is False
@@ -203,6 +203,11 @@ def test_validate_data_file(tmp_path: Any) -> None:
     valid_file = tmp_path / "valid.jsonl"
     valid_file.write_text('{"instruction": "hi", "input": "", "output": "bye"}\n', encoding="utf-8")
     assert validate_data_file(str(valid_file), logger=logger) is True
+
+    # Valid file using default data_path parameter
+    assert DEFAULT_TRAIN_FILE == "data/datasets/train.jsonl"
+    with patch("lib.validation.DEFAULT_TRAIN_FILE", str(valid_file)):
+        assert validate_data_file(logger=logger) is True
 
 
 def test_run_preflight_checks_success(tmp_path: Any) -> None:

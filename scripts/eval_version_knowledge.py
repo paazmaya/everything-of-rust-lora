@@ -18,6 +18,8 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from lib.config import DEFAULT_BENCHMARK_FILE
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
@@ -25,7 +27,7 @@ logging.basicConfig(
 logger = logging.getLogger("rust_lora.version_eval")
 
 BASE_DIR = Path(__file__).parent.parent
-BENCHMARK_FILE = BASE_DIR / "data" / "datasets" / "version_eval_benchmark.jsonl"
+BENCHMARK_FILE = BASE_DIR / DEFAULT_BENCHMARK_FILE
 
 
 def load_benchmark() -> list[dict[str, Any]]:

@@ -21,6 +21,8 @@ from typing import Any
 
 import yaml
 
+from lib.config import DEFAULT_TRAIN_FILE
+
 DEFAULT_ADAPTER_WEIGHTS = "adapter_model.safetensors"
 
 BASE_MODEL_METADATA: dict[str, dict[str, str]] = {
@@ -225,7 +227,7 @@ def build_modelfile_content(
         "",
         "training_economics:",
         f"  summary: {safe_yaml_scalar(base_metadata['training_economics'])}",
-        "  dataset: data/datasets/train.jsonl",
+        f"  dataset: {DEFAULT_TRAIN_FILE}",
         "  instruction: Rust programming, systems, async Rust, embedded Rust, cybersecurity, RustSec advisories, and Kali/LOTL tooling.",
         f"  cutoff_date: {safe_yaml_scalar(cutoff_date)}",
         "",

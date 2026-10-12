@@ -20,10 +20,12 @@ from huggingface_hub import hf_hub_download
 from llama_cpp import Llama
 from tqdm import tqdm
 
+from lib.config import DEFAULT_CHUNKS_FILE, DEFAULT_PROCESSED_DIR
+
 logger = logging.getLogger("rust_lora.vector_store")
 
 BASE_DIR = Path(__file__).parent.parent
-PROCESSED_DIR = BASE_DIR / "data" / "processed"
+PROCESSED_DIR = BASE_DIR / DEFAULT_PROCESSED_DIR
 VECTORS_DIR = BASE_DIR / "data" / "vectors"
 
 DEFAULT_GGUF_REPO = "nomic-ai/nomic-embed-text-v2-moe-GGUF"
@@ -414,7 +416,7 @@ def main() -> None:
     elif args.query:
         _handle_search_query(store, args)
     else:
-        store.index(PROCESSED_DIR / "all_chunks.jsonl", batch_size=args.batch_size)
+        store.index(BASE_DIR / DEFAULT_CHUNKS_FILE, batch_size=args.batch_size)
 
 
 if __name__ == "__main__":

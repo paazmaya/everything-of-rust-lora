@@ -18,9 +18,17 @@ from typing import Any
 import yaml
 from tqdm import tqdm
 
+from lib.config import (
+    DEFAULT_CHUNKS_FILE,
+    DEFAULT_DATASETS_DIR,
+    DEFAULT_PROCESSED_DIR,
+    DEFAULT_TRAIN_FILE,
+    DEFAULT_VAL_FILE,
+)
+
 BASE_DIR = Path(__file__).parent.parent
-PROCESSED_DIR = BASE_DIR / "data" / "processed"
-DATASETS_DIR = BASE_DIR / "data" / "datasets"
+PROCESSED_DIR = BASE_DIR / DEFAULT_PROCESSED_DIR
+DATASETS_DIR = BASE_DIR / DEFAULT_DATASETS_DIR
 
 TARGET_VERSION_RATIO = 0.12  # 12% representation for version & edition knowledge
 TARGET_CYBERSEC_RATIO = 0.08  # 8% representation for cybersecurity, RustSec & LOTL
@@ -541,7 +549,7 @@ def _stratify_and_mix(
 
 def main() -> None:
     DATASETS_DIR.mkdir(parents=True, exist_ok=True)
-    chunks_file = PROCESSED_DIR / "all_chunks.jsonl"
+    chunks_file = BASE_DIR / DEFAULT_CHUNKS_FILE
 
     if not chunks_file.exists():
         print(f"Error: Processed chunks file not found at {chunks_file}")
@@ -575,10 +583,13 @@ def main() -> None:
     train_set = dataset[:split]
     val_set = dataset[split:]
 
-    with open(DATASETS_DIR / "train.jsonl", "w") as f:
+    train_file = BASE_DIR / DEFAULT_TRAIN_FILE
+    val_file = BASE_DIR / DEFAULT_VAL_FILE
+
+    with open(train_file, "w") as f:
         for item in train_set:
             f.write(json.dumps(item) + "\n")
-    with open(DATASETS_DIR / "val.jsonl", "w") as f:
+    with open(val_file, "w") as f:
         for item in val_set:
             f.write(json.dumps(item) + "\n")
 
@@ -592,7 +603,7 @@ def main() -> None:
     print(f"  - Knowledge Cutoff Date: {cutoff_date}")
     print(f"  - Train split (98%): {len(train_set)}")
     print(f"  - Val split (2%): {len(val_set)}")
-    print(f"Saved to {DATASETS_DIR / 'train.jsonl'} and {DATASETS_DIR / 'val.jsonl'}")
+    print(f"Saved to {train_file} and {val_file}")
 
 
 if __name__ == "__main__":

@@ -13,7 +13,7 @@ from lib.cli import (
     build_resume_epilog,
     run_training_cli,
 )
-from lib.config import TrainingConfig
+from lib.config import DEFAULT_OUTPUT_DIR, DEFAULT_TRAIN_FILE, TrainingConfig
 
 
 def test_build_resume_epilog() -> None:
@@ -31,11 +31,11 @@ def test_build_arg_parser_defaults() -> None:
     parser = build_arg_parser(
         description="Test Trainer",
         default_model="base/model",
-        default_output_dir="models/test_out",
     )
     args = parser.parse_args([])
     assert args.model_path == "base/model"
-    assert args.output_dir == "models/test_out"
+    assert args.output_dir == DEFAULT_OUTPUT_DIR
+    assert args.data_file == DEFAULT_TRAIN_FILE
     assert args.dry_run is False
     assert args.hardware_profile is None
     assert args.batch_size is None
@@ -223,7 +223,6 @@ def test_qwen3_8_4b_configuration_and_targets() -> None:
     from train_qwen3_8_4b import (
         DEFAULT_MODEL_NAME,
         DEFAULT_OUTPUT_DIR,
-        HARDWARE_PROFILES,
         QWEN3_8_4B_TARGET_MODULES,
         create_qwen3_8_4b_config,
         train_qwen3_8_4b,
@@ -255,6 +254,7 @@ def test_qwen3_8_4b_configuration_and_targets() -> None:
     assert cfg.model_path == "empero-ai/Qwen3.8-4B-Distill"
     assert cfg.model_family == "Qwen3.8-4B"
     assert cfg.output_dir == "models/qwen3_8_4b_rust_lora"
+    assert cfg.data_file == DEFAULT_TRAIN_FILE
     assert cfg.target_modules == QWEN3_8_4B_TARGET_MODULES
     assert cfg.offload_folder is None
     assert cfg.gradient_checkpointing is True
@@ -267,4 +267,3 @@ def test_qwen3_8_4b_configuration_and_targets() -> None:
         _, kwargs = mock_exec.call_args
         assert kwargs.get("allow_mps") is True
         assert kwargs.get("min_vram_gb") in (8.0, 12.0)
-

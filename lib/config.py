@@ -6,7 +6,14 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any
 
+DEFAULT_RAW_DIR = "data/raw"
+DEFAULT_PROCESSED_DIR = "data/processed"
+DEFAULT_CHUNKS_FILE = "data/processed/all_chunks.jsonl"
+DEFAULT_DATASETS_DIR = "data/datasets"
 DEFAULT_TRAIN_FILE = "data/datasets/train.jsonl"
+DEFAULT_VAL_FILE = "data/datasets/val.jsonl"
+DEFAULT_BENCHMARK_FILE = "data/datasets/version_eval_benchmark.jsonl"
+DEFAULT_OUTPUT_DIR = "models/rust_lora"
 DEFAULT_REQUIRED_FIELDS = ["instruction", "input", "output"]
 DEFAULT_TARGET_MODULES = [
     "q_proj",
@@ -54,7 +61,7 @@ class TrainingConfig:
 
     # Data & Paths
     data_file: str = DEFAULT_TRAIN_FILE
-    output_dir: str = "models/rust_lora"
+    output_dir: str = DEFAULT_OUTPUT_DIR
     checkpoint_dir: str | None = None
     save_strategy: str = "steps"
     save_steps: int = 50

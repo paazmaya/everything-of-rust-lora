@@ -10,6 +10,8 @@ from typing import Any
 import tiktoken
 from tqdm import tqdm
 
+from lib.config import DEFAULT_CHUNKS_FILE, DEFAULT_PROCESSED_DIR, DEFAULT_RAW_DIR
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -18,8 +20,8 @@ logging.basicConfig(
 logger = logging.getLogger("rust_lora.transform")
 
 BASE_DIR = Path(__file__).parent.parent
-RAW_DIR = BASE_DIR / "data" / "raw"
-PROCESSED_DIR = BASE_DIR / "data" / "processed"
+RAW_DIR = BASE_DIR / DEFAULT_RAW_DIR
+PROCESSED_DIR = BASE_DIR / DEFAULT_PROCESSED_DIR
 
 
 def _resolve_source_type(dir_name: str) -> str:
@@ -379,7 +381,7 @@ class DataTransformer:
         seen = set()
         unique = [c for c in all_chunks if not (c["hash"] in seen or seen.add(c["hash"]))]
 
-        with open(self.output_dir / "all_chunks.jsonl", "w") as f:
+        with open(BASE_DIR / DEFAULT_CHUNKS_FILE, "w") as f:
             for c in unique:
                 f.write(json.dumps(c) + "\n")
 

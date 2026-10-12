@@ -4,9 +4,16 @@ Shared library for model fine-tuning across IBM Granite, IFM K2-Horizon, NVIDIA 
 
 from .cli import apply_args_to_config, build_arg_parser, build_resume_epilog, run_training_cli
 from .config import (
+    DEFAULT_BENCHMARK_FILE,
+    DEFAULT_CHUNKS_FILE,
+    DEFAULT_DATASETS_DIR,
+    DEFAULT_OUTPUT_DIR,
+    DEFAULT_PROCESSED_DIR,
+    DEFAULT_RAW_DIR,
     DEFAULT_REQUIRED_FIELDS,
     DEFAULT_TARGET_MODULES,
     DEFAULT_TRAIN_FILE,
+    DEFAULT_VAL_FILE,
     TrainingConfig,
     apply_hardware_profile,
 )
@@ -39,10 +46,17 @@ from .validation import (
 )
 
 __all__ = [
+    "DEFAULT_BENCHMARK_FILE",
+    "DEFAULT_CHUNKS_FILE",
+    "DEFAULT_DATASETS_DIR",
+    "DEFAULT_OUTPUT_DIR",
+    "DEFAULT_PROCESSED_DIR",
+    "DEFAULT_RAW_DIR",
     "DEFAULT_REQUIRED_FIELDS",
     "DEFAULT_RUST_SYSTEM_PROMPT",
     "DEFAULT_TARGET_MODULES",
     "DEFAULT_TRAIN_FILE",
+    "DEFAULT_VAL_FILE",
     "TrainingConfig",
     "apply_args_to_config",
     "apply_hardware_profile",

@@ -14,6 +14,7 @@ from lib.config import TrainingConfig
 from lib.engine import (
     _extract_checkpoint_step,
     _find_latest_checkpoint,
+    _get_default_target_device,
     build_training_arguments,
     cleanup_unsloth_patches,
     create_output_directories,
@@ -21,6 +22,7 @@ from lib.engine import (
     get_latest_checkpoint,
     get_optimal_dtype,
     load_model_and_tokenizer,
+    patch_caching_allocator_warmup,
     rematerialize_meta_adapters,
     resolve_checkpoint_resumption,
     run_sft_training,
@@ -565,3 +567,170 @@ def test_run_sft_training_callable_trainer(tmp_path: Any) -> None:
             run_sft_training(mock_model, mock_tokenizer, mock_dataset, cfg, logger=logger)
             mock_trainer_instance.train.assert_called_once()
 
+
+def test_get_default_target_device() -> None:
+    """Verify default target device selection across MPS, CUDA, and CPU."""
+    # 1. MPS available
+    mock_mps = MagicMock()
+    mock_mps.is_available.return_value = True
+    with patch.object(torch.backends, "mps", mock_mps, create=True):
+        assert _get_default_target_device() == "mps"
+
+    # 2. CUDA available (when MPS is not available)
+    mock_mps.is_available.return_value = False
+    with patch.object(torch.backends, "mps", mock_mps, create=True):
+        with patch("torch.cuda.is_available", return_value=True):
+            assert _get_default_target_device() == "cuda"
+
+    # 3. CPU fallback (neither MPS nor CUDA available)
+    with patch.object(torch.backends, "mps", mock_mps, create=True):
+        with patch("torch.cuda.is_available", return_value=False):
+            assert _get_default_target_device() == "cpu"
+
+
+def test_cleanup_unsloth_patches_edge_cases() -> None:
+    """Verify cleanup_unsloth_patches branches when orig_cuda is None and when current_device is absent."""
+    # 1. orig_cuda is None
+    mock_cuda_prop = MagicMock()
+    mock_cuda_prop._unsloth_mlx_cuda_noop = True
+    mock_cuda_prop._unsloth_original_cuda = None
+    with patch.object(torch.Tensor, "cuda", mock_cuda_prop, create=True):
+        cleanup_unsloth_patches()
+
+    # 2. torch.cuda is None
+    with patch.object(torch, "cuda", None):
+        cleanup_unsloth_patches()
+
+    # 3. torch.cuda._unsloth_mlx_cuda_compat_api is False
+    mock_cuda_mod = MagicMock()
+    mock_cuda_mod._unsloth_mlx_cuda_compat_api = False
+    with patch.object(torch, "cuda", mock_cuda_mod):
+        cleanup_unsloth_patches()
+
+    # 4. torch.cuda without current_device attribute
+    class DummyCuda:
+        _unsloth_mlx_cuda_compat_api = True
+
+    dummy_cuda = DummyCuda()
+    with patch.object(torch, "cuda", dummy_cuda):
+        cleanup_unsloth_patches()
+        assert dummy_cuda._unsloth_mlx_cuda_compat_api is False
+        assert dummy_cuda.device_count() == 0
+
+
+def test_patch_caching_allocator_warmup_no_attr() -> None:
+    """Verify patch_caching_allocator_warmup behaves when modeling_utils has no warmup function."""
+    import transformers.modeling_utils as mu
+
+    orig = getattr(mu, "caching_allocator_warmup", None)
+    try:
+        if hasattr(mu, "caching_allocator_warmup"):
+            delattr(mu, "caching_allocator_warmup")
+        patch_caching_allocator_warmup()
+    finally:
+        if orig is not None:
+            mu.caching_allocator_warmup = orig
+
+
+def test_run_sft_training_legacy_init_params(tmp_path: Any) -> None:
+    """Verify run_sft_training passes legacy parameters when supported by SFTTrainer."""
+    out_dir = str(tmp_path / "out_legacy")
+    cfg = TrainingConfig(
+        model_path="test/model",
+        output_dir=out_dir,
+        wandb_project="test_proj",
+        wandb_entity=None,
+        max_seq_length=512,
+        dataset_num_proc=2,
+    )
+    logger = logging.getLogger("test_engine")
+
+    mock_model = MagicMock()
+    mock_tokenizer = MagicMock()
+    mock_dataset = [{"text": "Sample text"}]
+
+    mock_trainer = MagicMock()
+    mock_trainer.train.return_value = MagicMock(spec=[])
+
+    captured_kwargs: dict[str, Any] = {}
+
+    def mock_trainer_init(*args: Any, **kwargs: Any) -> Any:
+        captured_kwargs.update(kwargs)
+        return mock_trainer
+
+    legacy_params = {"processing_class", "dataset_text_field", "max_seq_length", "dataset_num_proc"}
+    with patch("lib.engine._SFT_INIT_PARAMS", legacy_params):
+        with patch("lib.engine.resolve_checkpoint_resumption", return_value=None):
+            with patch("lib.engine.SFTTrainer", mock_trainer_init):
+                run_sft_training(mock_model, mock_tokenizer, mock_dataset, cfg, logger=logger)
+                assert captured_kwargs.get("dataset_text_field") == "text"
+                assert captured_kwargs.get("max_seq_length") == 512
+                assert captured_kwargs.get("dataset_num_proc") == 2
+                assert os.environ.get("WANDB_PROJECT") == "test_proj"
+
+
+def test_create_output_directories_no_logger(tmp_path: Any) -> None:
+    """Verify create_output_directories succeeds when logger is None."""
+    out_dir = str(tmp_path / "out_no_log")
+    ckpt_dir = str(tmp_path / "ckpt_no_log")
+    create_output_directories(out_dir, ckpt_dir, logger=None)
+    assert os.path.isdir(out_dir)
+    assert os.path.isdir(ckpt_dir)
+
+
+def test_save_training_metadata_no_extra_no_logger(tmp_path: Any) -> None:
+    """Verify save_training_metadata succeeds without extra metadata and without logger."""
+    cfg = TrainingConfig(model_path="test/model")
+    out_dir = str(tmp_path / "meta_out")
+    os.makedirs(out_dir, exist_ok=True)
+    manifest_path = save_training_metadata(out_dir, cfg, extra_metadata=None, logger=None)
+    assert os.path.isfile(manifest_path)
+
+
+def test_load_model_and_tokenizer_gradient_checkpointing_no_enable() -> None:
+    """Verify load_model_and_tokenizer succeeds when gradient_checkpointing is set but enable method is missing."""
+    cfg = TrainingConfig(model_path="test/model", gradient_checkpointing=True)
+    mock_model = MagicMock()
+    del mock_model.gradient_checkpointing_enable
+    mock_model.named_modules.return_value = []
+    mock_tok = MagicMock()
+    with patch("transformers.AutoTokenizer.from_pretrained", return_value=mock_tok):
+        with patch("transformers.AutoModelForCausalLM.from_pretrained", return_value=mock_model):
+            with patch("peft.get_peft_model", return_value=mock_model):
+                model, tokenizer = load_model_and_tokenizer(cfg)
+                assert model is mock_model
+                assert tokenizer is mock_tok
+
+
+def test_resolve_checkpoint_resumption_valid_dir(tmp_path: Any) -> None:
+    """Verify resolve_checkpoint_resumption returns target directory when trainer_state.json exists."""
+    ckpt_dir = tmp_path / "checkpoint-200"
+    ckpt_dir.mkdir()
+    (ckpt_dir / "trainer_state.json").write_text("{}")
+    cfg = TrainingConfig(model_path="test/model", resume_from_checkpoint=str(ckpt_dir))
+    logger = logging.getLogger("test_engine")
+    resolved = resolve_checkpoint_resumption(cfg, checkpoint_dir=str(tmp_path), logger=logger)
+    assert resolved == str(ckpt_dir)
+
+
+def test_find_latest_checkpoint_ignores_invalid_entries(tmp_path: Any) -> None:
+    """Verify _find_latest_checkpoint ignores non-checkpoint files and directories."""
+    (tmp_path / "notes.txt").write_text("info")
+    (tmp_path / "random_folder").mkdir()
+    valid_ckpt = tmp_path / "checkpoint-50"
+    valid_ckpt.mkdir()
+    (valid_ckpt / "trainer_state.json").write_text("{}")
+
+    latest = _find_latest_checkpoint(str(tmp_path))
+    assert latest == str(valid_ckpt)
+
+
+def test_execute_training_pipeline_preflight_success() -> None:
+    """Verify execute_training_pipeline runs cleanly when preflight checks pass."""
+    cfg = TrainingConfig(model_path="test/model")
+    with patch("lib.engine.run_preflight_checks", return_value=True):
+        with patch("lib.engine.load_model_and_tokenizer", return_value=("m", "t")):
+            with patch("lib.engine.load_and_prepare_dataset", return_value="d"):
+                with patch("lib.engine.run_sft_training") as mock_train:
+                    execute_training_pipeline(cfg, prompt_formatter_fn=lambda x: x)
+                    mock_train.assert_called_once()

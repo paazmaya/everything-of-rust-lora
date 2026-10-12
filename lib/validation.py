@@ -9,7 +9,7 @@ from typing import Any
 
 import torch
 
-from .config import DEFAULT_REQUIRED_FIELDS, TrainingConfig
+from .config import DEFAULT_REQUIRED_FIELDS, DEFAULT_TRAIN_FILE, TrainingConfig
 
 _logger = logging.getLogger("rust_lora.validation")
 
@@ -123,7 +123,7 @@ def check_dependencies(
 
 
 def validate_data_file(
-    data_path: str,
+    data_path: str = DEFAULT_TRAIN_FILE,
     required_fields: list[str] | None = None,
     logger: logging.Logger | None = None,
 ) -> bool:

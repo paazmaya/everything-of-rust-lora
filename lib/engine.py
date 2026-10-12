@@ -13,13 +13,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-# Suppress known upstream third-party deprecation warnings
-warnings.filterwarnings("ignore", category=FutureWarning, module=r"trl(\..*)?")
-warnings.filterwarnings("ignore", category=FutureWarning, module=r"huggingface_hub(\..*)?")
-warnings.filterwarnings("ignore", message=r".*BestOfNSampler.*", category=FutureWarning)
-warnings.filterwarnings("ignore", message=r".*HF_HUB_ENABLE_HF_TRANSFER.*", category=FutureWarning)
-warnings.filterwarnings("ignore", message=r".*torch_dtype.*is deprecated.*", category=UserWarning)
-
 import torch
 from transformers import TrainingArguments
 from trl.trainer.sft_trainer import SFTTrainer
@@ -27,6 +20,13 @@ from trl.trainer.sft_trainer import SFTTrainer
 from .config import TrainingConfig
 from .dataset import load_and_prepare_dataset
 from .validation import run_preflight_checks
+
+# Suppress known upstream third-party deprecation warnings
+warnings.filterwarnings("ignore", category=FutureWarning, module=r"trl(\..*)?")
+warnings.filterwarnings("ignore", category=FutureWarning, module=r"huggingface_hub(\..*)?")
+warnings.filterwarnings("ignore", message=r".*BestOfNSampler.*", category=FutureWarning)
+warnings.filterwarnings("ignore", message=r".*HF_HUB_ENABLE_HF_TRANSFER.*", category=FutureWarning)
+warnings.filterwarnings("ignore", message=r".*torch_dtype.*is deprecated.*", category=UserWarning)
 
 DEFAULT_ENGINE_LOGGER = "rust_lora.engine"
 
