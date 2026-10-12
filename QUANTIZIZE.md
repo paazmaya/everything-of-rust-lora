@@ -580,6 +580,37 @@ llama-server \
 
 ---
 
+### Model 6: Amazon ALoDLM-8B (Standard Causal Backbone Pipeline)
+
+- **Trainer:** [train_alodlm.py](train_alodlm.py)
+- **Documentation:** [ALODLM.md](ALODLM.md)
+- **Base Model:** `amazon/ALoDLM-8B`
+- **Native Context:** 40,960 tokens
+
+```bash
+# Step 1: Export merged weights with bfloat16 staging
+uv run python scripts/11_export_unsloth.py \
+    --model models/alodlm_8b_rust_lora \
+    --base amazon/ALoDLM-8B \
+    --mode merged-hf \
+    --save-dtype bfloat16 \
+    --output-dir models/alodlm_8b_merged
+
+# Step 2: Convert to GGUF
+python3 external/llama.cpp/convert_hf_to_gguf.py \
+    models/alodlm_8b_merged \
+    --outfile models/alodlm_8b_merged/alodlm-8b-f16.gguf \
+    --outtype f16
+
+# Step 3: Quantize with imatrix to Q4_K_M
+llama-quantize \
+    models/alodlm_8b_merged/alodlm-8b-f16.gguf \
+    models/alodlm_8b_Q4_K_M.gguf \
+    Q4_K_M
+```
+
+---
+
 ## 5. Showcase: Extreme $IQ2\_XS$ Merge with MTP for Unsloth Studio
 
 This section details how to create an ultra-compact **$IQ2\_XS$ (2-bit importance matrix quantized) merged model with Multi-Token Prediction (MTP)** using the uncensored community base:

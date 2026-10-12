@@ -51,5 +51,7 @@ echo "   - train_k2_horizon.py (IFM K2-Horizon 3.7B - recommended for coding age
 echo "   - train_granite.py (IBM Granite 4.2 8B)"
 echo "   - train_qwen.py (Qwen 3.5 4B)"
 echo "   - train_qwen3_8.py (Qwen 3.8 27B)"
+echo "   - train_qwen3_8_4b.py (Qwen 3.8 4B Distill)"
 echo "   - train_nemotron3_nano.py (Nemotron 3 Nano 4B)"
+echo "   - train_alodlm.py (Amazon ALoDLM-8B)"
 echo "========================================"

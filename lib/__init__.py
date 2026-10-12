@@ -1,5 +1,5 @@
 """
-Shared library for model fine-tuning across IBM Granite, IFM K2-Horizon, NVIDIA Nemotron, and Qwen.
+Shared library for model fine-tuning across Amazon ALoDLM, IBM Granite, IFM K2-Horizon, NVIDIA Nemotron, and Qwen.
 """
 
 from .cli import apply_args_to_config, build_arg_parser, build_resume_epilog, run_training_cli

@@ -11,7 +11,7 @@ This project contains the complete pipeline to train a specialized LoRA adapter 
 2. **Transformation** (Script 06): Cleans, chunks, and deduplicates the data.
 3. **Vector/Graph Storage** (Script 07): Stores data in ChromaDB for easy 6-month incremental updates.
 4. **Dataset Creation** (Script 08): Converts chunks into Alpaca instruction-response format.
-5. **Training** (`train_k2_horizon.py`, `train_granite.py`, `train_qwen.py`, `train_qwen3_8.py`, `train_nemotron3_nano.py`): Trains LoRA using Unsloth or Transformers/PEFT.
+5. **Training** ([train_k2_horizon.py](train_k2_horizon.py), [train_granite.py](train_granite.py), [train_qwen.py](train_qwen.py), [train_qwen3_8.py](train_qwen3_8.py), [train_qwen3_8_4b.py](train_qwen3_8_4b.py), [train_nemotron3_nano.py](train_nemotron3_nano.py), [train_alodlm.py](train_alodlm.py)): Trains LoRA using Unsloth or Transformers/PEFT.
 6. **Agent Serving** (`serve_coding_agent.py`): Serves base model + LoRA over an OpenAI-compatible API for coding agents.
 7. **Export** (Script 09): Packages the trained LoRA adapter with metadata and a `Modelfile`.
 8. **Merge + GGUF** (Script 10): Merges the adapter with the base model and exports a runnable GGUF bundle for Ollama.
@@ -388,6 +388,18 @@ All model recipes share a common core engine in [lib/](lib/) with standardized p
   - **VRAM:** ~12GB (RTX 4070), scales with hardware profile
   - **Prompt Format:** ChatML-compatible with Rust expert persona
   - **Key Features:** Inline hardware profiles, checkpointing, validation pipeline, W&B integration, dry-run mode
+
+- [train_alodlm.py](train_alodlm.py) (Amazon ALoDLM-8B) — See [ALODLM.md](ALODLM.md):
+  - **Rank (r):** 16
+  - **Alpha:** 16
+  - **Target Modules:** `q_proj`, `k_proj`, `v_proj`, `o_proj`, `gate_proj`, `up_proj`, `down_proj`
+  - **Optimizer:** AdamW 8-bit on CUDA, AdamW torch on MPS/CPU
+  - **Scheduler:** Cosine
+  - **Batch Size:** 1 per device, gradient accumulation 8 (configurable via hardware profiles)
+  - **Sequence Length:** 1024 (macOS) / 2048 (CUDA default)
+  - **VRAM/RAM:** ~16GB unified RAM (Mac) or 12GB–24GB VRAM (4-bit QLoRA default on CUDA)
+  - **Prompt Format:** Native ChatML instruction format
+  - **Key Features:** Qwen3-8B causal backbone alignment for adaptively looped diffusion modeling, dry-run preflight checks, resumable checkpointing
 
 ## Phase 4: Serving with AI Coding Agents
 
