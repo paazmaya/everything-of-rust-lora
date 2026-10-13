@@ -60,19 +60,12 @@ class DataTransformer:
         except Exception:
             self.tokenizer = None
 
-        # Boilerplate patterns to detect and remove
+        # Patterns indicative of pure marketing/splash pages with no actual documentation
         self.boilerplate_patterns = [
-            r"©\s*20\d{2}",  # Copyright notices
-            r"copyright",
-            r"all rights reserved",
-            r"follow us on",
-            r"subscribe",
-            r"sign up for",
-            r"terms of service",
-            r"privacy policy",
-            r"disclaimer",
-            r"made with.*by",
-            r"powered by",
+            r"sign up for (our )?newsletter",
+            r"subscribe to (our )?(newsletter|updates)",
+            r"please enable javascript",
+            r"cookie preferences.*accept all",
         ]
 
         # Statistics tracking
@@ -91,6 +84,16 @@ class DataTransformer:
 
     def has_boilerplate(self, text: str) -> bool:
         """Check if text contains boilerplate patterns indicating low-quality content."""
+        # Never reject documents that contain Rust code or definitions
+        if "```" in text or re.search(
+            r"\b(pub\s+)?(fn|struct|enum|trait|impl|type|const|static)\b", text
+        ):
+            return False
+
+        # Only check short documents that might be landing/error/splash pages
+        if len(text) > 500:
+            return False
+
         text_lower = text.lower()
         for pattern in self.boilerplate_patterns:
             if re.search(pattern, text_lower, re.IGNORECASE):
@@ -98,28 +101,44 @@ class DataTransformer:
         return False
 
     def is_likely_nav_or_footer(self, text: str) -> bool:
-        """Detect if content is primarily navigation or footer (high link density)."""
-        # Count markdown links
-        links = len(re.findall(r"\[[^\]]*\]\([^\)]*\)", text))
-        # Count words
-        words = len(text.split())
-
-        if words < 50:  # Too short to judge
+        """Detect if content is primarily navigation or footer (high link density without substantive code or text)."""
+        # If it contains code blocks or Rust definitions, it's documentation/code, not nav
+        if "```" in text or re.search(
+            r"\b(pub\s+)?(fn|struct|enum|trait|impl|type|const|static)\b", text
+        ):
             return False
 
-        # If more than 30% is links, likely navigation
-        link_density = links / max(words / 5, 1)  # Rough: links count as ~5 words
-        return link_density > 0.3
+        text_without_links = re.sub(r"\[([^\]]*)\]\([^\)]*\)", r"\1", text)
+        words = len(text_without_links.split())
 
-    def validate_content(self, doc_data: dict[str, Any]) -> tuple[bool, str | None]:
+        if words < 40:
+            return False
+
+        links = len(re.findall(r"\[[^\]]*\]\([^\)]*\)", text))
+        # If links outnumber words by a huge margin (e.g. > 60% of words are links) and no code/definitions
+        return (links / max(words, 1)) > 0.6
+
+    def validate_content(
+        self, doc_data: dict[str, Any], source_type: str | None = None
+    ) -> tuple[bool, str | None]:
         """Validate content and return (is_valid, skip_reason)."""
         content = self.clean(
             doc_data.get("content", "")
             or doc_data.get("question_body", "") + doc_data.get("answer_body", "")
         )
 
+        effective_source_type = doc_data.get("source_type") or source_type
         is_exempt_doc = (
-            doc_data.get("source_type") in ["official_releases", "rustc_releases", "cybersec"]
+            effective_source_type
+            in [
+                "official_docs",
+                "official_releases",
+                "rustc_releases",
+                "cybersec",
+                "api_docs",
+                "esp_rs",
+                "best_practices",
+            ]
             or doc_data.get("source")
             in [
                 "rustc_releases",
@@ -135,8 +154,8 @@ class DataTransformer:
             or bool(doc_data.get("metadata", {}).get("is_changelog"))
         )
 
-        # Check minimum length (stricter than before)
-        min_len = 80 if is_exempt_doc else 200
+        # Check minimum length
+        min_len = 80
         if len(content) < min_len:
             self.skipped_too_short += 1
             return False, "content_too_short"
@@ -150,7 +169,7 @@ class DataTransformer:
             self.skipped_invalid += 1
             return False, "missing_url"
 
-        # Release notes, changelogs, and security advisories contain links to CVEs, PRs/issues, and credits
+        # Check for boilerplate and navigation on non-exempt documents
         if not is_exempt_doc:
             # Check for boilerplate
             if self.has_boilerplate(content):
@@ -297,7 +316,7 @@ class DataTransformer:
         content = self.clean(
             doc.get("content", "") or doc.get("question_body", "") + doc.get("answer_body", "")
         )
-        comp_key = f"{effective_source_type}:{library}:{version}:{content}"
+        comp_key = f"{effective_source_type}:{library}:{version}:{title}:{content}"
         chunk_hash = hashlib.sha256(comp_key.encode()).hexdigest()[:20]
         cutoff_date = doc.get("cutoff_date") or meta.get("cutoff_date")
 
@@ -339,7 +358,7 @@ class DataTransformer:
                 with open(fp) as f:
                     doc: dict[str, Any] = json.load(f)
 
-                is_valid, skip_reason = self.validate_content(doc)
+                is_valid, skip_reason = self.validate_content(doc, source_type=source_type)
                 if not is_valid:
                     logger.debug(f"Skipped {fp.name}: {skip_reason}")
                     continue
