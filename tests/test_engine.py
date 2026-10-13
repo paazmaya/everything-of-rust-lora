@@ -320,6 +320,24 @@ def test_load_model_and_tokenizer_fallback_transformers_peft(tmp_path: Any) -> N
                         mock_causal.assert_called_once()
 
 
+def test_load_model_and_tokenizer_explicit_device() -> None:
+    """Verify load_model_and_tokenizer maps explicitly specified device."""
+    cfg = TrainingConfig(model_path="test/model", device="cpu")
+    mock_tokenizer = MagicMock()
+    mock_tokenizer.pad_token = "<eos>"
+    mock_base_model = MagicMock()
+    mock_peft_model = MagicMock()
+
+    with patch.dict(sys.modules, {"unsloth": None}):
+        with patch("transformers.AutoTokenizer.from_pretrained", return_value=mock_tokenizer):
+            with patch(
+                "transformers.AutoModelForCausalLM.from_pretrained", return_value=mock_base_model
+            ) as mock_causal:
+                with patch("peft.get_peft_model", return_value=mock_peft_model):
+                    load_model_and_tokenizer(cfg)
+                    assert mock_causal.call_args[1]["device_map"] == {"": "cpu"}
+
+
 def test_run_sft_training(tmp_path: Any) -> None:
     """Verify run_sft_training manages output dirs, wandb env, trainer loop, and model saving."""
     out_dir = str(tmp_path / "out")

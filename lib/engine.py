@@ -260,6 +260,29 @@ def save_training_metadata(
     return manifest_path
 
 
+def resolve_device_map(config: TrainingConfig) -> str | dict[str, Any]:
+    """Resolve optimal device mapping strategy for AutoModelForCausalLM.
+
+    On Apple Silicon MPS without disk offload or 4-bit quantization, directs layers
+    straight to MPS memory to prevent Accelerate from spilling layers to disk/meta.
+    """
+    if config.device and config.device != "auto":
+        return {"": config.device}
+
+    if (
+        sys.platform == "darwin"
+        and torch.backends.mps.is_available()
+        and not config.offload_folder
+        and not config.load_in_4bit
+    ):
+        os.environ.setdefault("PYTORCH_MPS_HIGH_WATERMARK_RATIO", "0.0")
+        if hasattr(torch, "mps") and hasattr(torch.mps, "empty_cache"):
+            torch.mps.empty_cache()
+        return {"": "mps"}
+
+    return "auto"
+
+
 def load_model_and_tokenizer(
     config: TrainingConfig,
     logger: logging.Logger | None = None,
@@ -343,7 +366,7 @@ def load_model_and_tokenizer(
     model_kwargs: dict[str, Any] = {
         "trust_remote_code": config.trust_remote_code,
         "dtype": dtype,
-        "device_map": "auto",
+        "device_map": resolve_device_map(config),
     }
 
     if config.offload_folder:

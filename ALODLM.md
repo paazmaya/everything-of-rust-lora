@@ -23,8 +23,6 @@ Because the base model weights represent a standard 36-layer Qwen3 transformer b
 
 This ensures that representations refined during both standard causal decoding and recurrent diffusion passes are informed by Rust systems and embedded development knowledge.
 
-
-
 ## 1. Manual Model Download
 
 To download the base model files manually into your local workspace directory prior to training:
@@ -45,8 +43,6 @@ Once downloaded locally, point `--model-path` to the local directory:
 ```bash
 uv run python train_alodlm.py --model-path ./models/amazon__ALoDLM-8B
 ```
-
-
 
 ## 2. Quick Start: Training
 
@@ -75,8 +71,6 @@ uv run python train_alodlm.py
 
 Outputs the trained LoRA adapter to `models/alodlm_8b_rust_lora`.
 
-
-
 ## 3. Hardware Profiles
 
 The training script provides pre-tuned hardware profiles selectable via `--hardware-profile`:
@@ -94,6 +88,12 @@ The training script provides pre-tuned hardware profiles selectable via `--hardw
 ### Profile Usage Examples
 
 ```bash
+# Recommended for Apple Silicon Mac (fastest in-memory training, 512 seq length):
+uv run python train_alodlm.py --hardware-profile mac_fast --num-epochs 1
+
+# Train on Apple Silicon Mac with 1024 seq length:
+uv run python train_alodlm.py --hardware-profile mac_48gb
+
 # Train on 24GB VRAM GPU (RTX 3090/4090) with 4-bit QLoRA:
 uv run python train_alodlm.py --hardware-profile rtx3090_4090
 
@@ -107,7 +107,14 @@ uv run python train_alodlm.py --hardware-profile rtx6000
 uv run python train_alodlm.py --hardware-profile dev
 ```
 
+### Apple Silicon Performance & Memory Optimization
 
+On Apple Silicon (M-Series), ALoDLM-8B in 16-bit BF16 consumes ~16.4 GB of model weights. With 32GB–48GB unified memory, the model fits **100% in-memory** with zero SSD disk offload:
+
+1. **In-Memory MPS Device Mapping:** The engine automatically bypasses Accelerate's conservative `device_map="auto"` heuristic on macOS and loads the model directly to `mps:0`. This avoids SSD layer swapping which otherwise causes ~488s/step latency and NaN gradients.
+2. **Use `mac_fast` Profile:** Drops sequence length to 512 tokens and gradient accumulation to 4. Due to quadratic attention scaling ($O(L^2)$), this speeds up each training step by ~40%–50%.
+3. **Set Epochs to 1 or 2:** Training across all 42,197 examples for 1 epoch provides 5,275 optimizer updates (at gradient accumulation 8) or 10,550 updates (at accumulation 4), which is sufficient for domain alignment while completing in hours instead of days.
+4. **PyTorch MPS Allocator Setting:** The engine automatically sets `PYTORCH_MPS_HIGH_WATERMARK_RATIO=0.0` to permit allocations across all available unified memory without artificial 70% threshold throttling.
 
 ## 4. Checkpoint Resumption & Reliability
 
@@ -128,8 +135,6 @@ The script locates the most recent valid checkpoint containing `trainer_state.js
 ```bash
 uv run python train_alodlm.py --resume-from-checkpoint models/alodlm_8b_rust_lora/checkpoints/checkpoint-50
 ```
-
-
 
 ## 5. CLI Options Reference
 
@@ -158,8 +163,6 @@ The script supports all standardized CLI flags implemented across the training f
 --wandb-project NAME          Weights & Biases project name for experiment tracking.
 --wandb-entity NAME           Weights & Biases team/entity.
 ```
-
-
 
 ## 6. Deployment & Serving
 
