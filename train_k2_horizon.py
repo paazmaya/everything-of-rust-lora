@@ -25,6 +25,7 @@ Usage:
     uv run python train_k2_horizon.py --model-path /path/to/K2-Horizon-3.7B
 """
 
+import sys
 from typing import Any
 
 from lib import (
@@ -45,7 +46,8 @@ from lib import (
 
 DEFAULT_MODEL_NAME = "IFM/K2-Horizon-3.7B"
 DEFAULT_OUTPUT_DIR = "models/k2_horizon_rust_lora"
-DEFAULT_HARDWARE_PROFILE = "rtx3090_4090"
+# Windows workstation has a 12GB RTX 4070 Ti
+DEFAULT_HARDWARE_PROFILE = "rtx4070" if sys.platform == "win32" else "rtx3090_4090"
 TRUST_REMOTE_CODE = True
 
 HARDWARE_PROFILES: dict[str, dict[str, Any]] = {

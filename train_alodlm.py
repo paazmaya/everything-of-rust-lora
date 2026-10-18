@@ -57,7 +57,9 @@ DEFAULT_MODEL_NAME = "amazon/ALoDLM-8B"
 DEFAULT_OUTPUT_DIR = "models/alodlm_8b_rust_lora"
 
 IS_MACOS = sys.platform == "darwin"
-DEFAULT_HARDWARE_PROFILE = "mac_48gb" if IS_MACOS else "rtx3090_4090"
+IS_WINDOWS = sys.platform == "win32"
+# Windows workstation has a 12GB RTX 4070 Ti
+DEFAULT_HARDWARE_PROFILE = "mac_48gb" if IS_MACOS else "rtx4070" if IS_WINDOWS else "rtx3090_4090"
 
 # ALoDLM-8B uses a 36-layer Qwen3 causal backbone with full attention across all layers.
 # Target projections:

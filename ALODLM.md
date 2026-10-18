@@ -69,6 +69,8 @@ Run with the default profile (`mac_48gb` on Apple Silicon macOS, `rtx3090_4090` 
 uv run python train_alodlm.py
 ```
 
+> **12 GB GPUs (RTX 4070 / 4070 Ti / 3060):** on Windows the default profile is `rtx4070` (1024-token sequences, 4-bit QLoRA). On Linux the default `rtx3090_4090` profile assumes 24 GB VRAM and fails with `Unsloth: No or negligible GPU memory available for fused cross entropy.` on 12 GB cards, so pass `--hardware-profile rtx4070` explicitly there. Close other GPU-heavy apps (browsers, Docker Desktop, etc.) to free VRAM.
+
 Outputs the trained LoRA adapter to `models/alodlm_8b_rust_lora`.
 
 ## 3. Hardware Profiles

@@ -26,6 +26,7 @@ Usage:
 """
 
 import re
+import sys
 from typing import Any
 
 from lib import (
@@ -46,7 +47,8 @@ from lib import (
 
 DEFAULT_MODEL_NAME = "ibm-granite/granite-4.2-8b"
 DEFAULT_OUTPUT_DIR = "models/granite_4.2_8b_rust_lora"
-DEFAULT_HARDWARE_PROFILE = "rtx3090_4090"
+# Windows workstation has a 12GB RTX 4070 Ti
+DEFAULT_HARDWARE_PROFILE = "rtx4070" if sys.platform == "win32" else "rtx3090_4090"
 
 HARDWARE_PROFILES: dict[str, dict[str, Any]] = {
     "rtx4070": {

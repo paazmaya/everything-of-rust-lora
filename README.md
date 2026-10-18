@@ -138,13 +138,13 @@ Generate a token at: https://github.com/settings/tokens (requires `repo` and `re
 
    ```
    Final Dataset Summary:
-     - Total chunks processed: 37769
-     - Total samples: 43059
-     - Version & Edition representation: 11.0%
-     - Cybersecurity & LOTL representation: 8.0%
-     - Knowledge Cutoff Date: 2026-10-11
-     - Train split (98%): 42197
-     - Val split (2%): 862
+   - Total chunks processed: 59099
+   - Total samples: 69384
+   - Version & Edition representation: 11.0%
+   - Cybersecurity & LOTL representation: 8.0%
+   - Knowledge Cutoff Date: 2026-10-11
+   - Train split (98%): 67996
+   - Val split (2%): 1388
    ```
 
 5. **Evaluate Version & Edition Knowledge:**
