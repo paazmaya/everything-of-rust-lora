@@ -78,24 +78,41 @@ def evaluate_model(
     adapter_path: str | None,
     items: list[dict[str, Any]],
     device: str = "auto",
+    load_in_4bit: bool = True,
+    batch_size: int = 4,
+    max_new_tokens: int = 256,
+    output_file: Path | None = None,
 ) -> None:
     """Evaluate model inference on the benchmark items."""
     logger.info(f"Loading model for evaluation: {model_path} (adapter: {adapter_path})")
 
     try:
         import torch
-        from transformers import AutoModelForCausalLM, AutoTokenizer
+        from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
     except ImportError:
         logger.error("transformers or torch not available for inference evaluation.")
         return
 
+    use_cuda = torch.cuda.is_available()
+    load_kwargs: dict[str, Any] = {"trust_remote_code": True}
+    if use_cuda and load_in_4bit:
+        # Matches QLoRA training and keeps the whole model on the GPU (no CPU offload)
+        load_kwargs["quantization_config"] = BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_quant_type="nf4",
+            bnb_4bit_compute_dtype=torch.bfloat16,
+        )
+        load_kwargs["device_map"] = {"": 0}
+        logger.info("Loading base model in 4-bit (NF4) on GPU 0")
+    else:
+        load_kwargs["dtype"] = torch.bfloat16 if use_cuda else torch.float32
+        load_kwargs["device_map"] = device
+
     tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
-    model = AutoModelForCausalLM.from_pretrained(
-        model_path,
-        dtype=torch.bfloat16 if torch.cuda.is_available() else torch.float32,
-        device_map=device,
-        trust_remote_code=True,
-    )
+    tokenizer.padding_side = "left"
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+    model = AutoModelForCausalLM.from_pretrained(model_path, **load_kwargs)
 
     if adapter_path:
         from peft import PeftModel
@@ -109,46 +126,65 @@ def evaluate_model(
     results: list[dict[str, Any]] = []
 
     print("\nRunning benchmark evaluation...")
-    for idx, item in enumerate(items, 1):
-        question = item["question"]
-        expected = item.get("expected_keywords", [])
+    batch_size = max(1, batch_size)
+    for start in range(0, len(items), batch_size):
+        batch = items[start : start + batch_size]
+        prompts = [
+            "<|im_start|>system\nYou are an expert Rust programmer with exact knowledge of Rust editions, rustc releases, and API stability.<|im_end|>\n"
+            f"<|im_start|>user\n{item['question']}<|im_end|>\n<|im_start|>assistant\n"
+            for item in batch
+        ]
 
-        prompt = (
-            f"<|im_start|>system\nYou are an expert Rust programmer with exact knowledge of Rust editions, rustc releases, and API stability.<|im_end|>\n"
-            f"<|im_start|>user\n{question}<|im_end|>\n<|im_start|>assistant\n"
-        )
-
-        inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+        inputs = tokenizer(prompts, return_tensors="pt", padding=True).to(model.device)
         with torch.no_grad():
             output_tokens = model.generate(
                 **inputs,
-                max_new_tokens=256,
-                temperature=0.1,
+                max_new_tokens=max_new_tokens,
                 do_sample=False,
+                pad_token_id=tokenizer.pad_token_id,
             )
 
-        resp = tokenizer.decode(
-            output_tokens[0][inputs["input_ids"].shape[1] :], skip_special_tokens=True
-        ).strip()
-        score, matched = score_response(resp, expected)
-        total_score += score
+        prompt_len = inputs["input_ids"].shape[1]
+        for offset, item in enumerate(batch):
+            idx = start + offset + 1
+            question = item["question"]
+            expected = item.get("expected_keywords", [])
+            resp = tokenizer.decode(
+                output_tokens[offset][prompt_len:], skip_special_tokens=True
+            ).strip()
+            score, matched = score_response(resp, expected)
+            total_score += score
 
-        results.append(
-            {
-                "id": item.get("id"),
-                "question": question,
-                "response": resp,
-                "score": score,
-                "matched_keywords": matched,
-                "expected_keywords": expected,
-            }
-        )
-        print(f"[{idx}/{len(items)}] Score: {score:.2f} | Question: {question[:50]}...")
+            results.append(
+                {
+                    "id": item.get("id"),
+                    "type": item.get("type"),
+                    "question": question,
+                    "response": resp,
+                    "reference_answer": item.get("reference_answer"),
+                    "score": score,
+                    "matched_keywords": matched,
+                    "expected_keywords": expected,
+                }
+            )
+            print(f"[{idx}/{len(items)}] Score: {score:.2f} | Question: {question[:50]}...")
 
     avg_score = total_score / len(items) if items else 0.0
     print("\n" + "=" * 60)
     print(f" EVALUATION RESULT: Overall Accuracy / Recall: {avg_score * 100:.1f}%")
     print("=" * 60)
+
+    if output_file:
+        payload = {
+            "model_path": model_path,
+            "adapter_path": adapter_path,
+            "load_in_4bit": bool(use_cuda and load_in_4bit),
+            "average_score": avg_score,
+            "results": results,
+        }
+        output_file.parent.mkdir(parents=True, exist_ok=True)
+        output_file.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+        print(f"Saved per-question responses to: {output_file}")
 
 
 def main() -> None:
@@ -164,6 +200,23 @@ def main() -> None:
     parser.add_argument(
         "--adapter-path", type=str, default=None, help="Path to LoRA adapter weights."
     )
+    parser.add_argument(
+        "--no-4bit",
+        action="store_true",
+        help="Load the base model in bf16 instead of 4-bit (needs enough VRAM for the full model).",
+    )
+    parser.add_argument(
+        "--batch-size", type=int, default=4, help="Questions generated per batch [default: 4]."
+    )
+    parser.add_argument(
+        "--max-new-tokens", type=int, default=256, help="Max generated tokens per answer."
+    )
+    parser.add_argument(
+        "--output-file",
+        type=Path,
+        default=Path("version_eval_results.json"),
+        help="JSON file for per-question responses and scores [default: version_eval_results.json].",
+    )
     args = parser.parse_args()
 
     items = load_benchmark()
@@ -173,7 +226,15 @@ def main() -> None:
     if args.benchmark_only or not args.model_path:
         run_benchmark_summary(items)
     else:
-        evaluate_model(args.model_path, args.adapter_path, items)
+        evaluate_model(
+            args.model_path,
+            args.adapter_path,
+            items,
+            load_in_4bit=not args.no_4bit,
+            batch_size=args.batch_size,
+            max_new_tokens=args.max_new_tokens,
+            output_file=args.output_file,
+        )
 
 
 if __name__ == "__main__":

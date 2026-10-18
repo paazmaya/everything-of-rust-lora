@@ -205,3 +205,9 @@ alodlm-generate \
   --tau 0.4 \
   --prompt "Write an asynchronous Rust actor pattern using tokio channels."
 ```
+
+## Testing
+
+```powershell
+uv run python scripts/eval_version_knowledge.py --model-path H:\amazon__ALoDLM-8B\ --adapter-path .\models\alodlm_8b_rust_lora\checkpoints\checkpoint-7500\
+```
