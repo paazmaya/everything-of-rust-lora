@@ -33,8 +33,8 @@ BASE_MODEL_METADATA: dict[str, dict[str, str]] = {
         "source_url": "https://huggingface.co/ibm-granite/granite-4.2-8b-GGUF",
         "training_economics": (
             "LoRA rank=64, alpha=128, optimizer=AdamW 8-bit, scheduler=cosine, "
-            "batch_size=1, gradient_accumulation_steps=8 (effective=8), epochs=3, "
-            "VRAM≈16GB, training time≈2-3 hours on a 24GB GPU. "
+            "batch_size=1, gradient_accumulation_steps=8 (effective=8), epochs=1 by default, "
+            "VRAM≈16GB. "
             "Supports post-training SVD rank truncation (r=64 -> r=16) for 75% smaller adapters."
         ),
         "notes": (
@@ -51,7 +51,7 @@ BASE_MODEL_METADATA: dict[str, dict[str, str]] = {
         "source_url": "https://huggingface.co/Qwen/Qwen3.5-4B",
         "training_economics": (
             "LoRA rank=16, alpha=16, optimizer=AdamW 8-bit, scheduler=cosine, "
-            "batch_size=1, gradient_accumulation_steps=4 (effective=4), epochs=3, "
+            "batch_size=1, gradient_accumulation_steps=4 (effective=4), epochs=1 by default, "
             "VRAM≈12GB, best used with bf16/16-bit LoRA training."
         ),
         "notes": (
@@ -69,7 +69,7 @@ BASE_MODEL_METADATA: dict[str, dict[str, str]] = {
         "source_url": "https://huggingface.co/Qwen/Qwen3.8-27B",
         "training_economics": (
             "LoRA rank=16, alpha=16, optimizer=AdamW (torch/8-bit), scheduler=cosine, "
-            "batch_size=1, gradient_accumulation_steps=16, epochs=3, "
+            "batch_size=1, gradient_accumulation_steps=16, epochs=1 by default, "
             "supports Apple Silicon MPS with offload and 24-80GB CUDA workstations."
         ),
         "notes": (
@@ -86,7 +86,7 @@ BASE_MODEL_METADATA: dict[str, dict[str, str]] = {
         "source_url": "https://huggingface.co/unsloth/NVIDIA-Nemotron-3-Nano-4B-GGUF",
         "training_economics": (
             "LoRA rank=16, alpha=16, optimizer=AdamW 8-bit, scheduler=cosine, "
-            "batch_size=1, gradient_accumulation_steps=4 (effective=4), epochs=3, "
+            "batch_size=1, gradient_accumulation_steps=4 (effective=4), epochs=1 by default, "
             "VRAM≈12GB, recommended bf16/16-bit LoRA."
         ),
         "notes": (
@@ -102,7 +102,7 @@ BASE_MODEL_METADATA: dict[str, dict[str, str]] = {
         "source_url": "https://huggingface.co/IFM/K2-Horizon-3.7B",
         "training_economics": (
             "LoRA rank=16, alpha=16, optimizer=AdamW 8-bit, scheduler=cosine, "
-            "batch_size=1, gradient_accumulation_steps=4 (effective=4), epochs=3, "
+            "batch_size=1, gradient_accumulation_steps=4 (effective=4), epochs=1 by default, "
             "VRAM≈12-24GB, dense 3.7B model with native 512K context."
         ),
         "notes": (

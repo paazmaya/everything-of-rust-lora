@@ -139,7 +139,7 @@ Configurations are managed in [train_qwen3_8_4b.py](train_qwen3_8_4b.py):
 - **Precision:** `bfloat16` (or `float32` fallback if MPS unsupported)
 - **LoRA Parameters:** $r=16$, $\alpha=16$, dropout $0.0$, bias `"none"`
 - **Learning Rate:** $2 \times 10^{-4}$ with cosine scheduler and 10 warmup steps
-- **Epochs:** 3 epochs over [data/datasets/train.jsonl](data/datasets/train.jsonl)
+- **Epochs:** 1 epoch over [data/datasets/train.jsonl](data/datasets/train.jsonl)
 - **Prompt Format:** Native ChatML format (`<|im_start|>`, `<|im_end|>`) with Rust system prompt
 
 ## 4. Exporting & Deployment

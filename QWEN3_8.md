@@ -164,7 +164,7 @@ options:
   --gradient-accumulation-steps
                         Number of gradient accumulation steps
   --max-seq-length      Maximum sequence length in tokens
-  --num-epochs          Number of training epochs (default: 3)
+  --num-epochs          Number of training epochs (default: 1)
   --learning-rate       Optimizer learning rate (default: 0.0002)
   --load-in-4bit        Force 4-bit quantization (QLoRA)
   --data-file           Path to training dataset JSONL file

@@ -29,7 +29,7 @@ def test_training_config_defaults() -> None:
     assert cfg.max_seq_length == 1024
     assert cfg.batch_size == 1
     assert cfg.gradient_accumulation_steps == 4
-    assert cfg.num_epochs == 3
+    assert cfg.num_epochs == 1
     assert cfg.learning_rate == 2e-4
     assert cfg.warmup_steps == 10
     assert cfg.weight_decay == 0.01

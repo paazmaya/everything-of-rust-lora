@@ -96,7 +96,7 @@ Configurations are defined inline directly in `train_qwen.py`:
 
 - **Model ID:** `Qwen/Qwen3.5-4B`
 - **Precision:** `bfloat16` (or `float16` if bf16 unsupported)
-- **Epochs:** `3`
+- **Epochs:** `1`
 - **Learning Rate:** `2e-4` with cosine decay and 10 warmup steps
 - **LoRA Hyperparameters:**
   - Rank ($r$): `16`
@@ -116,7 +116,7 @@ options:
   --gradient-accumulation-steps
                         Number of gradient accumulation steps
   --max-seq-length      Maximum sequence length in tokens
-  --num-epochs          Number of training epochs (default: 3)
+  --num-epochs          Number of training epochs (default: 1)
   --learning-rate       Optimizer learning rate (default: 0.0002)
   --load-in-4bit        Force 4-bit quantization (QLoRA)
   --data-file           Path to training JSONL dataset

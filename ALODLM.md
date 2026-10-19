@@ -115,7 +115,7 @@ On Apple Silicon (M-Series), ALoDLM-8B in 16-bit BF16 consumes ~16.4 GB of model
 
 1. **In-Memory MPS Device Mapping:** The engine automatically bypasses Accelerate's conservative `device_map="auto"` heuristic on macOS and loads the model directly to `mps:0`. This avoids SSD layer swapping which otherwise causes ~488s/step latency and NaN gradients.
 2. **Use `mac_fast` Profile:** Drops sequence length to 512 tokens and gradient accumulation to 4. Due to quadratic attention scaling ($O(L^2)$), this speeds up each training step by ~40%–50%.
-3. **Set Epochs to 1 or 2:** Training across all 42,197 examples for 1 epoch provides 5,275 optimizer updates (at gradient accumulation 8) or 10,550 updates (at accumulation 4), which is sufficient for domain alignment while completing in hours instead of days.
+3. **Start with One Epoch (Default):** Whether one epoch is sufficient depends on the data and training settings. Inspect checkpoint probe answers and the full benchmark before increasing `--num-epochs`; a lower training loss alone does not establish better factual knowledge.
 4. **PyTorch MPS Allocator Setting:** The engine automatically sets `PYTORCH_MPS_HIGH_WATERMARK_RATIO=0.0` to permit allocations across all available unified memory without artificial 70% threshold throttling.
 
 ## 4. Checkpoint Resumption & Reliability
@@ -152,7 +152,8 @@ The script supports all standardized CLI flags implemented across the training f
 --batch-size INT              Per-device training batch size.
 --gradient-accumulation-steps INT  Number of gradient accumulation steps.
 --max-seq-length INT          Maximum sequence length in tokens.
---num-epochs INT              Number of training epochs [default: 3].
+--num-epochs INT              Number of training epochs [default: 1].
+--no-checkpoint-benchmark     Disable the default baseline and four-prompt checkpoint probes.
 --learning-rate FLOAT         Optimizer learning rate [default: 2e-4].
 --load-in-4bit                Force 4-bit NF4 quantization (QLoRA).
 --resume                      Automatically detect and resume from the latest valid checkpoint.
@@ -207,6 +208,14 @@ alodlm-generate \
 ```
 
 ## Testing
+
+Training automatically runs four fixed prompts before training and after every
+checkpoint save, using the live model and the same training ChatML format.
+Results are appended to `models/alodlm_8b_rust_lora/benchmark_history.jsonl`
+(or the selected output directory), outside checkpoint rotation. Resumed runs
+append a `resume_baseline` with their loaded step and a new run ID.
+These probes monitor development; use the full paired evaluation below to assess
+the adapter. Set `--no-checkpoint-benchmark` to opt out.
 
 ```powershell
 uv run python scripts/eval_version_knowledge.py --benchmark-only

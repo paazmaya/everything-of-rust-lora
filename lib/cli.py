@@ -42,7 +42,7 @@ def build_arg_parser(
     default_max_seq_length: int = 1024,
     default_batch_size: int = 1,
     default_grad_accum: int = 4,
-    default_num_epochs: int = 3,
+    default_num_epochs: int = 1,
     default_learning_rate: float = 2e-4,
     default_load_in_4bit: bool = False,
     epilog: str | None = None,
@@ -152,6 +152,12 @@ def build_arg_parser(
         help="Checkpoint save strategy ('steps', 'epoch', or 'no') [default: steps].",
     )
     parser.add_argument(
+        "--checkpoint-benchmark",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Run four fixed benchmark prompts before training and at each checkpoint [default: enabled].",
+    )
+    parser.add_argument(
         "--resume",
         action="store_true",
         help="Automatically resume training from the latest checkpoint found in checkpoint directory.",
@@ -211,6 +217,7 @@ def apply_args_to_config(
         "save_steps",
         "save_total_limit",
         "save_strategy",
+        "checkpoint_benchmark",
         "resume_from_checkpoint",
         "offload_folder",
         "wandb_project",

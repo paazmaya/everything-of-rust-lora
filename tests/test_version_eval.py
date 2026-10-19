@@ -7,8 +7,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 import torch
 
+from lib import version_eval as evaluation
 from lib.dataset import DEFAULT_RUST_SYSTEM_PROMPT, format_chatml_prompts
-from scripts import eval_version_knowledge as evaluation
 
 
 @pytest.fixture
@@ -257,3 +257,211 @@ def test_mocked_batched_inference_uses_training_chatml(benchmark):
     tokenizer.decode.assert_any_call([7, 9], skip_special_tokens=True)
     tokenizer.decode.assert_any_call([8, 9], skip_special_tokens=True)
     assert report["generation"]["system_prompt"] == DEFAULT_RUST_SYSTEM_PROMPT
+
+
+def test_cli_modes_and_output_safety(tmp_path, benchmark, monkeypatch, capsys):
+    def run(*args):
+        monkeypatch.setattr("sys.argv", ["eval_version_knowledge.py", *map(str, args)])
+        evaluation.main()
+
+    run("--benchmark-only")
+    assert json.loads(capsys.readouterr().out)["questions"] == 22
+    run()
+    assert json.loads(capsys.readouterr().out)["reference_facts_validated"] is True
+    base_path = tmp_path / "base.json"
+    payload = {
+        "model_path": "test-model",
+        "adapter_path": None,
+        "generation": {},
+        "packages": {},
+        "load_in_4bit": False,
+        "results": [
+            {
+                "id": item["id"],
+                "type": item["type"],
+                "question": item["question"],
+                "response": item["reference_answer"],
+                **evaluation.score_item(item["reference_answer"], item),
+            }
+            for item in benchmark
+        ],
+    }
+    with patch.object(evaluation, "evaluate_model", return_value=payload) as inference:
+        run("--model-path", "test-model", "--output-file", base_path)
+        inference.assert_called_once()
+    base = json.loads(base_path.read_text())
+    assert base["summary"]["rubric_pass_count"] == 22
+    assert len(base["benchmark_ids"]) == 22
+    with pytest.raises(FileExistsError):
+        run("--model-path", "test-model", "--output-file", base_path)
+    adapter_path = tmp_path / "adapter.json"
+    evaluation.write_report(adapter_path, {**base, "adapter_path": "checkpoint"})
+    comparison_path = tmp_path / "comparison.json"
+    run("--compare-files", base_path, adapter_path, "--output-file", comparison_path)
+    assert len(json.loads(comparison_path.read_text())["paired_changes"]) == 22
+    rescored = tmp_path / "rescored.json"
+    run("--rescore-file", base_path, "--output-file", rescored)
+    assert json.loads(rescored.read_text())["summary"]["rubric_pass_count"] == 22
+    for name in ("train", "val"):
+        (tmp_path / f"{name}.jsonl").write_text(
+            json.dumps(
+                {
+                    "instruction": "unrelated",
+                    "input": "",
+                    "output": "unrelated",
+                }
+            )
+            + "\n"
+        )
+    audit_path = tmp_path / "audit.json"
+    run("--audit-dataset-dir", tmp_path, "--output-file", audit_path)
+    assert json.loads(audit_path.read_text())["train"]["rows"] == 1
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        ["--batch-size", "0"],
+        ["--max-new-tokens", "0"],
+        ["--rescore-file", "old.json", "--model-path", "model"],
+        ["--rescore-file", "old.json", "--benchmark-only"],
+        ["--adapter-path", "checkpoint"],
+    ],
+)
+def test_cli_rejects_invalid_options(args, monkeypatch):
+    monkeypatch.setattr("sys.argv", ["eval_version_knowledge.py", *args])
+    with pytest.raises(SystemExit):
+        evaluation.main()
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        ["--compare-files", "a.json", "b.json", "--model-path", "model"],
+        ["--audit-dataset-dir", "data", "--model-path", "model"],
+    ],
+)
+def test_cli_rejects_conflicting_modes(args, monkeypatch):
+    monkeypatch.setattr("sys.argv", ["eval_version_knowledge.py", *args])
+    with pytest.raises(ValueError):
+        evaluation.main()
+
+
+def test_legacy_diagnostic_and_bad_saved_rows(benchmark):
+    assert evaluation.score_response("OnceLock", ["OnceLock", "1.70.0"]) == (0.5, ["OnceLock"])
+    assert evaluation.score_response("text", []) == (0.0, [])
+    for saved in (
+        {"results": [None]},
+        {"results": [{"id": "item"}]},
+    ):
+        with pytest.raises(ValueError):
+            evaluation.rescore(saved, benchmark)
+
+
+@pytest.mark.parametrize(
+    "replacement",
+    [
+        {"id": ""},
+        {"question_revision": 0},
+        {"facts": [{"id": "", "any_of": ["Rust"]}]},
+        {"facts": [{"id": "x", "any_of": ["Rust"]}, {"id": "x", "any_of": ["Rust"]}]},
+        {"type": "reverse_lookup", "answer_version": "1.80"},
+        {"type": "msrv_check", "decision": "perhaps"},
+        {"forbidden": "text"},
+        {"context_versions": ["nonsense"]},
+        {"required_version": "1.80"},
+    ],
+)
+def test_more_invalid_rubric_fields(tmp_path, benchmark, replacement):
+    path = tmp_path / "invalid.jsonl"
+    path.write_text(json.dumps({**benchmark[0], **replacement}))
+    with pytest.raises(ValueError):
+        evaluation.load_benchmark(path)
+
+
+def test_benchmark_nonobject_and_empty_lines(tmp_path):
+    path = tmp_path / "invalid.jsonl"
+    path.write_text("\nnull\n")
+    with pytest.raises(ValueError, match="expected an object"):
+        evaluation.load_benchmark(path)
+
+
+def test_offline_legacy_scores_and_question_mismatches(benchmark):
+    old = {
+        "results": [
+            {
+                "id": i["id"],
+                "question": i["question"],
+                "response": i["reference_answer"],
+                "expected_keywords": ["Rust"],
+            }
+            for i in benchmark
+        ]
+    }
+    results = evaluation.rescore(old, benchmark)
+    assert all("legacy_keyword_recall" in r for r in results)
+    results = [
+        {
+            "id": "x",
+            "question": "one",
+            "type": "reverse_lookup",
+            "rubric_pass": False,
+            "fact_coverage": 0.0,
+            "review_reasons": [],
+        },
+    ]
+    base = {
+        "benchmark_sha256": "hash",
+        "benchmark_ids": ["x"],
+        "rubric_version": 2,
+        "model_path": "model",
+        "generation": {},
+        "packages": {},
+        "load_in_4bit": False,
+        "adapter_path": None,
+        "results": results,
+    }
+    adapter = copy.deepcopy(base)
+    adapter["adapter_path"] = "checkpoint"
+    adapter["results"][0]["question"] = "two"
+    with pytest.raises(ValueError, match="Question mismatch"):
+        evaluation.compare_reports(base, adapter)
+    adapter = copy.deepcopy(base)
+    with pytest.raises(ValueError, match="base report"):
+        evaluation.compare_reports(base, adapter)
+
+
+def test_gpu_adapter_loading_and_truncation(benchmark):
+    tokenizer = MagicMock(eos_token_id=9, pad_token_id=None)
+    tokenizer.decode.return_value = "Rust 1.70.0"
+    model = MagicMock(device="cpu")
+    inputs = MagicMock()
+    inputs.__getitem__.return_value.shape = [1, 3]
+    tokenizer.return_value.to.return_value = inputs
+    tokens = MagicMock()
+    tokens.__getitem__.return_value.__getitem__.return_value.tolist.return_value = [7] * 2
+    model.generate.return_value = tokens
+    item = next(i for i in benchmark if i["id"] == "reverse_oncelock")
+    with (
+        patch("torch.cuda.is_available", return_value=True),
+        patch("transformers.BitsAndBytesConfig") as quantization,
+        patch("transformers.AutoTokenizer.from_pretrained", return_value=tokenizer),
+        patch("transformers.AutoModelForCausalLM.from_pretrained", return_value=model) as load,
+        patch("peft.PeftModel.from_pretrained", return_value=model) as adapter,
+    ):
+        report = evaluation.evaluate_model("model", "checkpoint", [item], max_new_tokens=2)
+    assert report["load_in_4bit"] is True
+    assert load.call_args.kwargs["device_map"] == {"": 0}
+    quantization.assert_called_once()
+    adapter.assert_called_once_with(model, "checkpoint")
+    assert report["results"][0]["rubric_pass"] is False
+    assert "output_token_limit" in report["results"][0]["review_reasons"]
+    tokenizer.eos_token_id = None
+    with (
+        patch("torch.cuda.is_available", return_value=False),
+        patch("transformers.AutoTokenizer.from_pretrained", return_value=tokenizer),
+    ):
+        with pytest.raises(ValueError, match="EOS"):
+            evaluation.evaluate_model("model", None, [item])
+    with pytest.raises(ValueError, match="Nonempty"):
+        evaluation.evaluate_model("model", None, [])

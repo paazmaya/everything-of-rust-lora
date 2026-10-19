@@ -32,7 +32,7 @@ Uses RTX 4070 hardware profile with default settings:
 - Gradient accumulation: 4
 - Max sequence length: 1024
 - Learning rate: 2e-4
-- Epochs: 3
+- Epochs: 1
 - VRAM: ~12GB
 
 ## Hardware Profiles
@@ -92,7 +92,7 @@ The training script defines all defaults and hardware profiles inline in [train_
 **Training Hyperparameters**
 
 - `max_seq_length`: Tokens per sample (default `1024`)
-- `num_epochs`: Training epochs (default `3`)
+- `num_epochs`: Training epochs (default `1`)
 - `learning_rate`: Adam learning rate (default `2e-4`)
 - `warmup_steps`: Linear warmup steps (default `10`)
 - `weight_decay`: L2 regularization (default `0.01`)
@@ -132,7 +132,7 @@ uv run python train_nemotron3_nano.py
 ```
 
 ✅ Checks CUDA, GPU memory, dependencies, data schema
-✅ Trains for 3 epochs with batch size 1, gradient accumulation 4
+✅ Trains for 1 epoch by default with batch size 1, gradient accumulation 4
 ✅ Saves checkpoints every 50 steps
 ✅ Final model saved to `models/nemotron3_nano_rust_lora/`
 ✅ Training metadata saved to `models/nemotron3_nano_rust_lora/manifest.json`
@@ -313,7 +313,7 @@ models/nemotron3_nano_rust_lora/
   "variant": "3-Nano",
   "config": {
     "training": {
-      "num_epochs": 3,
+      "num_epochs": 1,
       "learning_rate": 0.0002,
       "batch_size": 1,
       "gradient_accumulation_steps": 4,

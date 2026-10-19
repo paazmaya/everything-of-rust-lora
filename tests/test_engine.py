@@ -347,6 +347,7 @@ def test_run_sft_training(tmp_path: Any) -> None:
         wandb_project="test_proj",
         wandb_entity="test_ent",
         resume=True,
+        checkpoint_benchmark=False,
     )
     logger = logging.getLogger("test_engine")
 
@@ -374,7 +375,7 @@ def test_run_sft_training(tmp_path: Any) -> None:
 def test_run_sft_training_no_resume(tmp_path: Any) -> None:
     """Verify run_sft_training without resumption."""
     out_dir = str(tmp_path / "out_clean")
-    cfg = TrainingConfig(model_path="test/model", output_dir=out_dir)
+    cfg = TrainingConfig(model_path="test/model", output_dir=out_dir, checkpoint_benchmark=False)
     logger = logging.getLogger("test_engine")
 
     mock_model = MagicMock()
@@ -417,6 +418,7 @@ def test_execute_training_pipeline() -> None:
                         dataset="mock_dataset",
                         config=cfg,
                         logger=logger,
+                        prompt_formatter_fn=mock_prep.call_args.kwargs["prompt_formatter_fn"],
                     )
 
 
@@ -566,7 +568,7 @@ def test_build_training_arguments_fallback() -> None:
 def test_run_sft_training_callable_trainer(tmp_path: Any) -> None:
     """Verify run_sft_training handles callable non-type SFTTrainer with processing_class."""
     out_dir = str(tmp_path / "out_callable")
-    cfg = TrainingConfig(model_path="test/model", output_dir=out_dir)
+    cfg = TrainingConfig(model_path="test/model", output_dir=out_dir, checkpoint_benchmark=False)
     logger = logging.getLogger("test_engine")
 
     mock_model = MagicMock()
@@ -660,6 +662,7 @@ def test_run_sft_training_legacy_init_params(tmp_path: Any) -> None:
         wandb_entity=None,
         max_seq_length=512,
         dataset_num_proc=2,
+        checkpoint_benchmark=False,
     )
     logger = logging.getLogger("test_engine")
 

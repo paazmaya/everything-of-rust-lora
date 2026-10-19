@@ -17,8 +17,9 @@ import torch
 from transformers import TrainingArguments
 from trl.trainer.sft_trainer import SFTTrainer
 
+from .checkpoint_benchmark import CheckpointBenchmarkCallback, PromptFormatter
 from .config import TrainingConfig
-from .dataset import load_and_prepare_dataset
+from .dataset import format_chatml_prompts, load_and_prepare_dataset
 from .validation import run_preflight_checks
 
 # Suppress known upstream third-party deprecation warnings
@@ -244,6 +245,7 @@ def save_training_metadata(
         "gradient_accumulation_steps": config.gradient_accumulation_steps,
         "learning_rate": config.learning_rate,
         "num_epochs": config.num_epochs,
+        "checkpoint_benchmark": config.checkpoint_benchmark,
         "lora_r": config.lora_r,
         "lora_alpha": config.lora_alpha,
         "load_in_4bit": config.load_in_4bit,
@@ -540,6 +542,7 @@ def execute_training_pipeline(
         dataset=dataset,
         config=config,
         logger=log,
+        prompt_formatter_fn=prompt_formatter_fn,
     )
 
 
@@ -549,6 +552,7 @@ def run_sft_training(
     dataset: Any,
     config: TrainingConfig,
     logger: logging.Logger | None = None,
+    prompt_formatter_fn: PromptFormatter = format_chatml_prompts,
 ) -> None:
     """Run supervised fine-tuning using SFTTrainer and save trained weights."""
     log = logger or logging.getLogger(DEFAULT_ENGINE_LOGGER)
@@ -590,6 +594,16 @@ def run_sft_training(
         sft_kwargs["dataset_num_proc"] = config.dataset_num_proc
 
     trainer = SFTTrainer(**sft_kwargs)
+    if config.checkpoint_benchmark:
+        trainer.add_callback(
+            CheckpointBenchmarkCallback(
+                config,
+                tokenizer,
+                prompt_formatter_fn,
+                trainer.accelerator,
+                log,
+            )
+        )
 
     log.info("=" * 80)
     log.info(f"STARTING {config.model_family.upper()} LORA TRAINING")

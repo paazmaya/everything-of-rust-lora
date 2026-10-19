@@ -40,7 +40,7 @@ class TrainingConfig:
     max_seq_length: int = 1024
     batch_size: int = 1
     gradient_accumulation_steps: int = 4
-    num_epochs: int = 3
+    num_epochs: int = 1
     learning_rate: float = 2e-4
     warmup_steps: int = 10
     weight_decay: float = 0.01
@@ -66,6 +66,7 @@ class TrainingConfig:
     save_strategy: str = "steps"
     save_steps: int = 50
     save_total_limit: int = 3
+    checkpoint_benchmark: bool = True
     resume: bool = False
     resume_from_checkpoint: str | None = None
     dataset_num_proc: int = 2

@@ -41,7 +41,7 @@ def test_build_arg_parser_defaults() -> None:
     assert args.batch_size is None
     assert args.gradient_accumulation_steps is None
     assert args.max_seq_length is None
-    assert args.num_epochs == 3
+    assert args.num_epochs == 1
     assert args.learning_rate == 2e-4
     assert args.load_in_4bit is False
     assert args.resume is False
@@ -70,6 +70,20 @@ def test_build_arg_parser_with_profiles() -> None:
     assert args.num_epochs == 5
     assert args.learning_rate == 1e-4
     assert args.load_in_4bit is True
+
+
+def test_checkpoint_benchmark_defaults_and_optout() -> None:
+    parser = build_arg_parser(description="Test", default_model="base/model")
+    config = apply_args_to_config(TrainingConfig(model_path="base/model"), parser.parse_args([]))
+    assert config.checkpoint_benchmark is True
+    assert config.num_epochs == 1
+    config = apply_args_to_config(
+        config, parser.parse_args(["--no-checkpoint-benchmark", "--num-epochs", "2"])
+    )
+    assert config.checkpoint_benchmark is False
+    assert config.num_epochs == 2
+    config = apply_args_to_config(config, parser.parse_args(["--checkpoint-benchmark"]))
+    assert config.checkpoint_benchmark is True
 
 
 def test_apply_args_to_config_basic() -> None:

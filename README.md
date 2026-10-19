@@ -242,7 +242,47 @@ Uses the base HuggingFace model (`ibm-granite/granite-4.2-8b`) or a local model 
    - **Default per-device batch size:** `1`
    - **Default gradient accumulation:** `8`
    - **VRAM Requirement:** ~16GB (fits on RTX 3090/4090 or free Colab tier).
-   - **Time:** ~2-3 hours for 3 epochs on 50k+ samples.
+   - **Default epochs:** `1`; increase only if validation and benchmark trends justify it.
+
+### Automatic checkpoint probes
+
+All training scripts default to **one epoch** and run four fixed development
+benchmark prompts before training and after every checkpoint save. The probes
+cover release features, version lookup, edition changes, and MSRV compatibility.
+They use the live model (no second copy or checkpoint reload), the trainer's own
+prompt format, greedy decoding, and a 256-token limit per answer, one at a time.
+
+Each event logs its rubric-pass count and appends the full answers, required-fact
+scores, token counts, finish reasons, step, epoch, benchmark hash, and prompts to
+`<output-dir>/benchmark_history.jsonl`. This history is outside the rotating
+checkpoint directories. Resuming appends a new run ID and a `resume_baseline` for
+the loaded checkpoint; it does not pretend those weights are an untrained base
+model. A normal baseline measures the initialized training model, including its
+adapter. Training modes, cache configuration, and Python/NumPy/PyTorch RNG states
+are restored after probing, including when generation fails.
+
+```bash
+# Default: one epoch, probes enabled
+uv run python train_alodlm.py
+
+# Explicitly override either default
+uv run python train_alodlm.py --num-epochs 2 --no-checkpoint-benchmark
+```
+
+One epoch is a starting point, not a guarantee that a LoRA has learned enough.
+`--num-epochs` is the total training target, not additional epochs on resume; to
+continue a checkpoint already at one epoch, explicitly set a higher target.
+Use the probe trend to investigate regressions, not to automatically choose a
+best checkpoint or stop training. Keep the full benchmark for milestone checks:
+these four prompts are a development monitor, not an independent final test.
+Probes add generation overhead at each save; increasing `--save-steps` reduces
+that frequency. With `--save-strategy no`, only the baseline runs.
+
+CPU, MPS, CUDA, and ordinary DDP are supported; distributed workers wait while
+rank zero generates and writes history. Sharded/other distributed strategies
+(including FSDP and DeepSpeed) require `--no-checkpoint-benchmark` for now.
+Invalid/missing benchmarks and inference/history-write failures stop the run
+explicitly rather than silently dropping monitoring.
 
 ### Option B: Training Qwen 3.5 4B Instruct
 
@@ -317,7 +357,7 @@ The Nemotron 3 Nano training script provides production-grade features including
 - **Sequence Length:** 1024
 - **Learning Rate:** 2e-4
 - **Warmup Steps:** 10
-- **Epochs:** 3
+- **Epochs:** 1
 - **VRAM:** ~12GB
 
 **Advanced: Custom hyperparameters:**

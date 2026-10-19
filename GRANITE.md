@@ -108,7 +108,7 @@ uv run python train_granite.py --model-path /models/granite-4.2-3b
 All configurations are defined inline directly in `train_granite.py`, eliminating external YAML dependencies:
 
 - **Model ID:** `ibm-granite/granite-4.2-8b`
-- **Epochs:** `3`
+- **Epochs:** `1`
 - **Learning Rate:** `2e-4` (cosine scheduler with 10 warmup steps)
 - **Optimizer:** `adamw_8bit` with weight decay `0.01`
 - **LoRA Hyperparameters:**
@@ -129,7 +129,7 @@ options:
   --gradient-accumulation-steps
                         Number of gradient accumulation steps
   --max-seq-length      Maximum sequence length in tokens
-  --num-epochs          Number of training epochs (default: 3)
+  --num-epochs          Number of training epochs (default: 1)
   --learning-rate       Optimizer learning rate (default: 0.0002)
   --load-in-4bit        Force 4-bit quantization (QLoRA)
   --data-file           Path to training JSONL dataset
