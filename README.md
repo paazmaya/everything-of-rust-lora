@@ -134,27 +134,60 @@ Generate a token at: https://github.com/settings/tokens (requires `repo` and `re
    uv run python scripts/08_create_dataset.py
    ```
 
-   _Outputs `data/datasets/train.jsonl` and `val.jsonl` in Alpaca format with version-grounded instructions, consecutive minor version diffs, edition guides, and 10-15% stratified boost._
+   Outputs `data/datasets/train.jsonl` and `val.jsonl` in Alpaca format. A seeded
+   source-document/version split keeps related chunks, micro-QA derivatives, and
+   equivalent outputs together **before training-only oversampling**. Validation
+   is unreplicated; the approximate 2% target is measured before boosting, so its
+   final fraction can be lower. Actual counts, category distributions, checksums,
+   and zero-overlap checks are recorded in `data/datasets/split_manifest.json`;
+   row-aligned provenance is stored in `*.provenance.jsonl` sidecars.
 
-   ```
-   Final Dataset Summary:
-   - Total chunks processed: 59099
-   - Total samples: 69384
-   - Version & Edition representation: 11.0%
-   - Cybersecurity & LOTL representation: 8.0%
-   - Knowledge Cutoff Date: 2026-10-11
-   - Train split (98%): 67996
-   - Val split (2%): 1388
+   Existing generated files are preserved under `data/datasets/backups/` before
+   replacement. Regeneration uses the current local corpus, not necessarily the
+   dataset used by a historical checkpoint.
+
+   ```bash
+   uv run python scripts/08_create_dataset.py --seed 3407
+   uv run python scripts/08_create_dataset.py --verify-only
    ```
 
 5. **Evaluate Version & Edition Knowledge:**
+
    ```bash
-   # Inspect benchmark questions:
+   # Validate the source-backed benchmark and its reference rubrics:
    uv run python scripts/eval_version_knowledge.py --benchmark-only
 
-   # Run benchmark evaluation on base model or trained LoRA adapter:
-   uv run python scripts/eval_version_knowledge.py --model-path Qwen/Qwen3.5-4B --adapter-path models/qwen3_5_4b_rust_lora
+   # Evaluate both models using identical settings:
+   uv run python scripts/eval_version_knowledge.py --model-path Qwen/Qwen3.5-4B --output-file eval_base.json
+   uv run python scripts/eval_version_knowledge.py --model-path Qwen/Qwen3.5-4B --adapter-path models/qwen3_5_4b_rust_lora --output-file eval_adapter.json
+   uv run python scripts/eval_version_knowledge.py --compare-files eval_base.json eval_adapter.json --output-file eval_comparison.json
+
+   # Rescore saved answers without loading weights:
+   uv run python scripts/eval_version_knowledge.py --rescore-file eval_checkpoint7500.json --output-file eval_checkpoint7500_rescored.json
+
+   # Check exact benchmark question/reference overlap with local datasets:
+   uv run python scripts/eval_version_knowledge.py --audit-dataset-dir data/datasets --output-file benchmark_overlap.json
    ```
+
+   Version 2 reports **rubric pass rate** separately from **partial fact coverage**.
+   Reverse lookup requires the requested stabilization version; MSRV checks require
+   an explicit yes/no decision and, where needed to explain incompatibility, the
+   stabilization version. Correct answers need not repeat context from the question.
+   Bounded aliases accept
+   `1.80` and `1.80.0` without rewarding echoed API names. Known contradictions,
+   ambiguous negations, and token-limit completions prevent automatic passes.
+   Deterministic checks cannot verify every extra claim or paraphrase: review the
+   saved responses, even when the required facts pass. Historical substring
+   keyword recall is not accuracy and is not comparable to the new rubric.
+
+   Changed questions require fresh generation and are excluded from offline
+   rescore denominators. The 22-question suite measures **in-domain version,
+   edition, and MSRV knowledge**, not general Rust coding ability or unseen-source
+   generalization. Exact overlap checks do not rule out paraphrases.
+   Evaluation uses the same explicit ChatML/system prompt as training, including
+   ALoDLM's no-chat-template case. Reports record generation settings, stop reasons,
+   benchmark hashes, and package versions; mismatched paired runs are rejected.
+   Output reports are never overwritten: choose a new output path for each run.
 
 ## Versioning & Migration Architecture
 

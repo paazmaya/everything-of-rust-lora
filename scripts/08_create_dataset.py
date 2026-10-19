@@ -9,11 +9,17 @@ Features multi-angle prompt synthesis for:
 5. Stratified sampling boosting version knowledge to 10-15% of the total dataset mix.
 """
 
+import argparse
+import hashlib
 import json
 import random
 import re
+import shutil
+import tempfile
+from collections import Counter
 from pathlib import Path
 from typing import Any
+from urllib.parse import urldefrag
 
 import yaml
 from tqdm import tqdm
@@ -22,8 +28,6 @@ from lib.config import (
     DEFAULT_CHUNKS_FILE,
     DEFAULT_DATASETS_DIR,
     DEFAULT_PROCESSED_DIR,
-    DEFAULT_TRAIN_FILE,
-    DEFAULT_VAL_FILE,
 )
 
 BASE_DIR = Path(__file__).parent.parent
@@ -32,6 +36,7 @@ DATASETS_DIR = BASE_DIR / DEFAULT_DATASETS_DIR
 
 TARGET_VERSION_RATIO = 0.12  # 12% representation for version & edition knowledge
 TARGET_CYBERSEC_RATIO = 0.08  # 8% representation for cybersecurity, RustSec & LOTL
+RNG = random.Random(3407)
 
 
 def get_cutoff_date() -> str:
@@ -127,25 +132,25 @@ def _format_edition_docs(version: str, title: str) -> tuple[str, str]:
             f"Explain the Rust 2015 Edition, its foundational stability guarantees, and how '{title}' applies to Rust 1.0.",
             f"What does the Rust 2015 Edition establish regarding '{title}' and backwards compatibility?",
         ]
-        return random.choice(templates), f"Edition: 2015\nTopic: {title}"
+        return RNG.choice(templates), f"Edition: 2015\nTopic: {title}"
     elif version == "2018":
         templates = [
             f"Explain the language changes, module system improvements, and idioms introduced in the Rust 2018 Edition regarding '{title}'.",
             f"How did Rust 2018 evolve from Rust 2015 in terms of '{title}' and developer ergonomics?",
         ]
-        return random.choice(templates), f"Edition: 2018\nTopic: {title}"
+        return RNG.choice(templates), f"Edition: 2018\nTopic: {title}"
     elif version == "2021":
         templates = [
             f"Explain the Rust 2021 Edition updates, prelude changes, closure disjoint captures, and migration guidelines for '{title}'.",
             f"What are the key behavioral changes and upgrade instructions in Rust 2021 regarding '{title}'?",
         ]
-        return random.choice(templates), f"Edition: 2021\nTopic: {title}"
+        return RNG.choice(templates), f"Edition: 2021\nTopic: {title}"
     elif version == "2024":
         templates = [
             f"Explain the Rust 2024 Edition changes, language features, breaking modifications, and transition strategies for '{title}'.",
             f"What changes in compiler semantics, syntax, and standard prelude were introduced in Rust 2024 for '{title}'?",
         ]
-        return random.choice(templates), f"Edition: 2024\nTopic: {title}"
+        return RNG.choice(templates), f"Edition: 2024\nTopic: {title}"
     else:
         return (
             "Explain this Rust concept or standard library feature based on official Rust documentation.",
@@ -168,7 +173,7 @@ def _format_version_diff(from_ver: str, to_ver: str, title: str) -> tuple[str, s
             f"Compiler: rustc\nUpgrade: {from_ver} -> {to_ver}",
         ),
     ]
-    return random.choice(templates)
+    return RNG.choice(templates)
 
 
 def _format_rustc_release(
@@ -234,7 +239,7 @@ def _format_rustsec_advisory(
         f"Explain the unsoundness or security flaw reported in {adv_id} ({cve_str}) affecting crate '{library}'.",
         f"What version range of crate '{library}' is affected by {adv_id}, and how can developers mitigate it?",
     ]
-    instruction = random.choice(templates)
+    instruction = RNG.choice(templates)
     input_text = (
         f"Crate: {library}\n"
         f"Advisory ID: {adv_id}\n"
@@ -255,7 +260,7 @@ def _format_kali_tool(library: str, meta: dict[str, Any], cutoff_date: str) -> t
         f"What are the available command-line options, flags, and practical usage examples for '{tool}' in Kali Linux?",
         f"How is the CLI tool '{tool}' used in penetration testing, and what network or host artifacts does it generate?",
     ]
-    instruction = random.choice(templates)
+    instruction = RNG.choice(templates)
     input_text = f"Tool: {tool}\nEcosystem: Kali Linux\nCategory: {cat}"
     if synopsis:
         input_text += f"\nSynopsis: {synopsis}"
@@ -272,7 +277,7 @@ def _format_lotl(library: str, meta: dict[str, Any], cutoff_date: str) -> tuple[
         f"How is '{bin_name}' used in living-off-the-land operations on {platform}, and how do defenders detect and log this activity?",
         f"Analyze the dual-use security risks of the built-in binary '{bin_name}' on {platform} from both red team and blue team perspectives.",
     ]
-    instruction = random.choice(templates)
+    instruction = RNG.choice(templates)
     input_text = f"Binary/Utility: {bin_name}\nPlatform: {platform}\nType: {lotl_type}\nKnowledge Cutoff Date: {cutoff_date}"
     return instruction, input_text
 
@@ -283,7 +288,7 @@ def _format_rust_hardening(title: str, cutoff_date: str) -> tuple[str, str]:
         f"What are the best practices for '{title}' to prevent vulnerabilities and undefined behavior in Rust?",
         f"How do compiler flags and verification tools ensure soundness and security for '{title}' in Rust?",
     ]
-    instruction = random.choice(templates)
+    instruction = RNG.choice(templates)
     input_text = f"Security Topic: {title}\nDomain: Rust Hardening & Soundness\nKnowledge Cutoff Date: {cutoff_date}"
     return instruction, input_text
 
@@ -484,6 +489,10 @@ def _extract_all_samples(
             chunk: dict[str, Any] = json.loads(line)
             formatted, is_ver, is_cyber = format_alpaca(chunk, cutoff_date)
             if formatted:
+                formatted["_group"] = source_group(chunk)
+                formatted["_category"] = (
+                    "cybersec" if is_cyber else "version" if is_ver else "general"
+                )
                 if is_cyber:
                     cybersec_samples.append(formatted)
                 elif is_ver:
@@ -499,15 +508,22 @@ def _extract_all_samples(
                         "instruction": mp["instruction"],
                         "input": mp["input"],
                         "output": mp["output"],
+                        "_group": source_group(chunk),
+                        "_category": "version",
                     }
                 )
 
-    # Inject targeted cutoff calibration Q&A pairs (replicated across batches)
+    # Calibration replicas belong only to training, never to validation.
     cutoff_pairs = generate_cutoff_qa_pairs(cutoff_date)
     for cp in cutoff_pairs:
-        # Replicate 25 times each for strong weight grounding
-        for _ in range(25):
-            cybersec_samples.append(dict(cp))
+        cybersec_samples.append(
+            {
+                **cp,
+                "_group": "cutoff-calibration",
+                "_category": "cybersec",
+                "_train_only": "true",
+            }
+        )
 
     return general_samples, version_samples, cybersec_samples, total_chunks
 
@@ -526,7 +542,9 @@ def _stratify_and_mix(
         print(
             f"Applying stratified boost: scaling version samples from {len(version_samples)} to {target_version_count} (~{TARGET_VERSION_RATIO * 100:.1f}% mix)..."
         )
-        boosted_version_samples = random.choices(version_samples, k=target_version_count)
+        boosted_version_samples = version_samples + RNG.choices(
+            version_samples, k=target_version_count - len(version_samples)
+        )
     else:
         boosted_version_samples = version_samples
 
@@ -540,70 +558,287 @@ def _stratify_and_mix(
         print(
             f"Applying stratified boost: scaling cybersec samples from {len(cybersec_samples)} to {target_cyber_count} (~{TARGET_CYBERSEC_RATIO * 100:.1f}% mix)..."
         )
-        boosted_cybersec_samples = random.choices(cybersec_samples, k=target_cyber_count)
+        boosted_cybersec_samples = cybersec_samples + RNG.choices(
+            cybersec_samples, k=target_cyber_count - len(cybersec_samples)
+        )
     else:
         boosted_cybersec_samples = cybersec_samples
 
     return boosted_version_samples, boosted_cybersec_samples
 
 
+def digest(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def source_group(chunk: dict[str, Any]) -> str:
+    meta = chunk.get("metadata", {})
+    if not isinstance(meta, dict):
+        meta = {}
+    source = str(chunk.get("source_type") or "unknown")
+    library = str(chunk.get("library") or meta.get("library") or meta.get("crate_name") or "")
+    version = str(chunk.get("version") or meta.get("version") or "current")
+    url = str(chunk.get("url") or meta.get("url") or "")
+    # Fragments identify sections, not independent source documents.
+    document = (
+        urldefrag(url)[0] if url else str(meta.get("document_id") or meta.get("source_file") or "")
+    )
+    if not document:
+        # Without document identity, keep the entire source/library/version
+        # together rather than pretend independent chunks are safe holdouts.
+        document = "unknown-document"
+    return digest(json.dumps([source, library, version, document]))
+
+
+def output_key(sample: dict[str, str]) -> str:
+    return digest(re.sub(r"\s+", "", sample["output"]).casefold())
+
+
+def record_key(sample: dict[str, str]) -> str:
+    return digest(json.dumps([sample[k] for k in ("instruction", "input", "output")]))
+
+
+def connected_groups(samples: list[dict[str, str]]) -> dict[str, list[dict[str, str]]]:
+    parents: dict[str, str] = {}
+
+    def find(group: str) -> str:
+        parents.setdefault(group, group)
+        root = group
+        while parents[root] != root:
+            root = parents[root]
+        while parents[group] != group:
+            next_group = parents[group]
+            parents[group] = root
+            group = next_group
+        return root
+
+    outputs: dict[str, str] = {}
+    for sample in samples:
+        sample.setdefault("_source_group", sample["_group"])
+        group = find(sample["_group"])
+        key = output_key(sample)
+        if key in outputs:
+            parents[find(outputs[key])] = find(group)
+        else:
+            outputs[key] = group
+    grouped: dict[str, list[dict[str, str]]] = {}
+    for sample in samples:
+        sample["_group"] = find(sample["_group"])
+        grouped.setdefault(sample["_group"], []).append(sample)
+    return grouped
+
+
+def split_groups(
+    samples: list[dict[str, str]],
+    validation_ratio: float = 0.02,
+) -> tuple[list[dict[str, str]], list[dict[str, str]]]:
+    """Keep source derivatives and equivalent outputs in connected groups."""
+    if not samples or not 0 < validation_ratio < 1:
+        raise ValueError("Nonempty samples and a validation ratio between 0 and 1 required")
+    grouped = connected_groups(samples)
+    groups = sorted(grouped)
+    RNG.shuffle(groups)
+    totals = Counter(s["_category"] for s in samples if not s.get("_train_only"))
+    targets = {category: count * validation_ratio for category, count in totals.items()}
+    selected: Counter[str] = Counter()
+    train, val = [], []
+    for group in groups:
+        rows = grouped[group]
+        counts = Counter(s["_category"] for s in rows)
+        before = sum(abs(selected[c] - target) for c, target in targets.items())
+        after = sum(abs(selected[c] + counts[c] - target) for c, target in targets.items())
+        if not any(s.get("_train_only") for s in rows) and after < before:
+            val.extend(rows)
+            selected.update(counts)
+        else:
+            train.extend(rows)
+    # Validation should not contain repeated answers, even within one split.
+    unique_val = {output_key(s): s for s in val}
+    val = list(unique_val.values())
+    if not train or not val:
+        raise ValueError("Source grouping cannot produce nonempty train and validation splits")
+    audit_splits(train, val)
+    return train, val
+
+
+def audit_splits(
+    train: list[dict[str, str]],
+    val: list[dict[str, str]],
+) -> dict[str, int]:
+    checks = {
+        "exact_record_overlap": len({record_key(s) for s in train} & {record_key(s) for s in val}),
+        "normalized_output_overlap": len(
+            {output_key(s) for s in train} & {output_key(s) for s in val}
+        ),
+        "provenance_group_overlap": len({s["_group"] for s in train} & {s["_group"] for s in val}),
+        "validation_calibration_rows": sum(bool(s.get("_train_only")) for s in val),
+    }
+    if any(checks.values()):
+        raise ValueError(f"Unsafe dataset split: {checks}")
+    return checks
+
+
+def verify_dataset(directory: Path) -> dict[str, int]:
+    """Verify published/staged bytes and provenance, not only in-memory records."""
+    manifest = json.loads((directory / "split_manifest.json").read_text(encoding="utf-8"))
+    identities: dict[str, dict[str, set[str]]] = {}
+    for name in ("train", "val"):
+        path = directory / f"{name}.jsonl"
+        with path.open("rb") as f:
+            if hashlib.file_digest(f, "sha256").hexdigest() != manifest["splits"][name]["sha256"]:
+                raise ValueError(f"{name}: dataset checksum mismatch")
+        keys: dict[str, set[str]] = {
+            "record": set(),
+            "output": set(),
+            "group": set(),
+            "source_group": set(),
+        }
+        counts: Counter[str] = Counter()
+        rows = 0
+        with (
+            path.open(encoding="utf-8") as data,
+            (directory / f"{name}.provenance.jsonl").open(encoding="utf-8") as provenance,
+        ):
+            for line, identity in zip(data, provenance, strict=True):
+                row, meta = json.loads(line), json.loads(identity)
+                if set(row) != {"instruction", "input", "output"}:
+                    raise ValueError(f"{name}: incompatible Alpaca schema")
+                record, output = record_key(row), output_key(row)
+                if record != meta["record_sha256"] or output != meta["output_sha256"]:
+                    raise ValueError(f"{name}: provenance does not match dataset row")
+                if name == "val" and meta["training_only"]:
+                    raise ValueError("Training-only calibration leaked into validation")
+                keys["record"].add(record)
+                keys["output"].add(output)
+                keys["group"].add(meta["group"])
+                keys["source_group"].add(meta["source_group"])
+                counts[meta["category"]] += 1
+                rows += 1
+        expected = manifest["splits"][name]
+        if (
+            rows != expected["rows"]
+            or dict(counts) != expected["categories"]
+            or len(keys["group"]) != expected["groups"]
+        ):
+            raise ValueError(f"{name}: manifest counts mismatch")
+        if name == "val" and len(keys["output"]) != rows:
+            raise ValueError("Repeated validation outputs")
+        identities[name] = keys
+    checks = {
+        key + "_overlap": len(identities["train"][key] & identities["val"][key])
+        for key in identities["train"]
+    }
+    if any(checks.values()):
+        raise ValueError(f"Published datasets overlap: {checks}")
+    return checks
+
+
+def generate_dataset(
+    chunks_file: Path,
+    output_dir: Path,
+    cutoff_date: str,
+    seed: int = 3407,
+) -> dict[str, Any]:
+    RNG.seed(seed)
+    general, version, cybersec, total_chunks = _extract_all_samples(chunks_file, cutoff_date)
+    train, val = split_groups(general + version + cybersec)
+    general_train = [s for s in train if s["_category"] == "general"]
+    version_train = [s for s in train if s["_category"] == "version"]
+    cyber_train = [s for s in train if s["_category"] == "cybersec"]
+    calibration = [s for s in cyber_train if s.get("_train_only")]
+    cyber_train += [dict(s) for s in calibration for _ in range(24)]
+    version_train, cyber_train = _stratify_and_mix(general_train, version_train, cyber_train)
+    train = general_train + version_train + cyber_train
+    RNG.shuffle(train)
+    RNG.shuffle(val)
+    checks = audit_splits(train, val)
+    with chunks_file.open("rb") as source:
+        input_sha256 = hashlib.file_digest(source, "sha256").hexdigest()
+    manifest: dict[str, Any] = {
+        "schema_version": 2,
+        "seed": seed,
+        "cutoff_date": cutoff_date,
+        "input_sha256": input_sha256,
+        "input_chunks": total_chunks,
+        "validation_target_before_boost": 0.02,
+        "lineage": "Regenerated local corpus; not evidence of checkpoint-7500 training lineage.",
+        "checks": checks,
+        "splits": {},
+    }
+    output_dir.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="rust-lora-datasets-", dir=output_dir.parent) as temp:
+        stage = Path(temp)
+        for name, rows in (("train", train), ("val", val)):
+            path = stage / f"{name}.jsonl"
+            with path.open("w", encoding="utf-8") as f:
+                for row in rows:
+                    f.write(
+                        json.dumps({k: row[k] for k in ("instruction", "input", "output")}) + "\n"
+                    )
+            with (stage / f"{name}.provenance.jsonl").open("w", encoding="utf-8") as f:
+                for row in rows:
+                    f.write(
+                        json.dumps(
+                            {
+                                "group": row["_group"],
+                                "source_group": row["_source_group"],
+                                "category": row["_category"],
+                                "training_only": bool(row.get("_train_only")),
+                                "record_sha256": record_key(row),
+                                "output_sha256": output_key(row),
+                            }
+                        )
+                        + "\n"
+                    )
+            manifest["splits"][name] = {
+                "rows": len(rows),
+                "groups": len({s["_group"] for s in rows}),
+                "categories": dict(sorted(Counter(s["_category"] for s in rows).items())),
+                "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+            }
+        manifest["actual_validation_fraction"] = len(val) / (len(train) + len(val))
+        (stage / "split_manifest.json").write_text(
+            json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
+        )
+        verify_dataset(stage)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        names = (
+            "train.jsonl",
+            "val.jsonl",
+            "train.provenance.jsonl",
+            "val.provenance.jsonl",
+            "split_manifest.json",
+        )
+        existing = [output_dir / name for name in names if (output_dir / name).exists()]
+        if existing:
+            snapshot_id = digest(
+                "".join(hashlib.sha256(p.read_bytes()).hexdigest() for p in existing)
+            )[:16]
+            backup = output_dir / "backups" / snapshot_id
+            backup.mkdir(parents=True, exist_ok=True)
+            for path in existing:
+                destination = backup / path.name
+                if destination.exists() and destination.read_bytes() != path.read_bytes():
+                    raise FileExistsError(f"Snapshot collision: {destination}")
+                shutil.copy2(path, destination)
+            print(f"Preserved previous dataset artifacts: {backup}")
+        for name in names:
+            (stage / name).replace(output_dir / name)
+    print(json.dumps(manifest, indent=2))
+    return manifest
+
+
 def main() -> None:
-    DATASETS_DIR.mkdir(parents=True, exist_ok=True)
-    chunks_file = BASE_DIR / DEFAULT_CHUNKS_FILE
-
-    if not chunks_file.exists():
-        print(f"Error: Processed chunks file not found at {chunks_file}")
-        return
-
-    cutoff_date = get_cutoff_date()
-    print(
-        f"Creating Alpaca dataset with version-aware & cybersec-aware instruction prompts (Cutoff: {cutoff_date})..."
-    )
-    (
-        general_samples,
-        version_samples,
-        cybersec_samples,
-        total_chunks,
-    ) = _extract_all_samples(chunks_file, cutoff_date)
-
-    print(
-        f"\nInitial extraction: {len(general_samples)} general samples, "
-        f"{len(version_samples)} version/edition samples, "
-        f"{len(cybersec_samples)} cybersecurity samples."
-    )
-
-    boosted_version_samples, boosted_cybersec_samples = _stratify_and_mix(
-        general_samples, version_samples, cybersec_samples
-    )
-
-    dataset = general_samples + boosted_version_samples + boosted_cybersec_samples
-    random.shuffle(dataset)
-
-    split = int(0.98 * len(dataset))
-    train_set = dataset[:split]
-    val_set = dataset[split:]
-
-    train_file = BASE_DIR / DEFAULT_TRAIN_FILE
-    val_file = BASE_DIR / DEFAULT_VAL_FILE
-
-    with open(train_file, "w") as f:
-        for item in train_set:
-            f.write(json.dumps(item) + "\n")
-    with open(val_file, "w") as f:
-        for item in val_set:
-            f.write(json.dumps(item) + "\n")
-
-    final_version_ratio = len(boosted_version_samples) / max(len(dataset), 1)
-    final_cyber_ratio = len(boosted_cybersec_samples) / max(len(dataset), 1)
-    print("\nFinal Dataset Summary:")
-    print(f"  - Total chunks processed: {total_chunks}")
-    print(f"  - Total samples: {len(dataset)}")
-    print(f"  - Version & Edition representation: {final_version_ratio * 100:.1f}%")
-    print(f"  - Cybersecurity & LOTL representation: {final_cyber_ratio * 100:.1f}%")
-    print(f"  - Knowledge Cutoff Date: {cutoff_date}")
-    print(f"  - Train split (98%): {len(train_set)}")
-    print(f"  - Val split (2%): {len(val_set)}")
-    print(f"Saved to {train_file} and {val_file}")
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--seed", type=int, default=3407)
+    parser.add_argument("--chunks-file", type=Path, default=BASE_DIR / DEFAULT_CHUNKS_FILE)
+    parser.add_argument("--output-dir", type=Path, default=DATASETS_DIR)
+    parser.add_argument("--verify-only", action="store_true")
+    args = parser.parse_args()
+    if args.verify_only:
+        print(json.dumps(verify_dataset(args.output_dir), indent=2))
+    else:
+        generate_dataset(args.chunks_file, args.output_dir, get_cutoff_date(), args.seed)
 
 
 if __name__ == "__main__":

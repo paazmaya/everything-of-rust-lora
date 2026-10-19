@@ -219,5 +219,10 @@ __marimo__/
 
 # Generated during usage
 data*/
+!data/
+data/*
+!data/datasets/
+data/datasets/*
+!data/datasets/version_eval_benchmark.jsonl
 unsloth_compiled_cache/
 models/

@@ -209,5 +209,28 @@ alodlm-generate \
 ## Testing
 
 ```powershell
-uv run python scripts/eval_version_knowledge.py --model-path H:\amazon__ALoDLM-8B\ --adapter-path .\models\alodlm_8b_rust_lora\checkpoints\checkpoint-7500\
+uv run python scripts/eval_version_knowledge.py --benchmark-only
+uv run python scripts/eval_version_knowledge.py --model-path H:\amazon__ALoDLM-8B\ --batch-size 4 --max-new-tokens 256 --output-file eval_base_v2.json
+uv run python scripts/eval_version_knowledge.py --model-path H:\amazon__ALoDLM-8B\ --adapter-path .\models\alodlm_8b_rust_lora\checkpoints\checkpoint-7500\ --batch-size 4 --max-new-tokens 256 --output-file eval_checkpoint7500_v2.json
+uv run python scripts/eval_version_knowledge.py --compare-files eval_base_v2.json eval_checkpoint7500_v2.json --output-file eval_comparison_v2.json
 ```
+
+The evaluator uses the training ChatML format and system prompt explicitly: the
+ALoDLM tokenizer may have no `chat_template`. Both runs must use identical settings.
+If answers hit the token limit, inspect the saved finish reasons and rerun **both**
+models with the same larger `--max-new-tokens` and new output paths.
+
+For an existing report, no weights are needed to rescore unchanged questions:
+
+```powershell
+uv run python scripts/eval_version_knowledge.py --rescore-file eval_checkpoint7500.json --output-file eval_checkpoint7500_rescored.json
+```
+
+Version 2 replaces substring recall with required-fact rubrics and separate partial
+coverage. Automated passes do not certify every additional claim; inspect responses
+for hallucinations. Five clarified questions differ from the original benchmark
+and need fresh inference. Historical reports without generation metadata cannot
+establish truncation or a base-versus-adapter improvement/regression. Check the
+checkpoint's own `trainer_state.json` to confirm its epoch count; the directory's
+step number alone is insufficient. Regenerated local splits are not evidence of
+the dataset used by this checkpoint.

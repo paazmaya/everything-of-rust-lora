@@ -160,7 +160,39 @@ To ensure that the fine-tuned LoRA adapter truly internalizes version milestones
 3. **Edition Migration Directives**: "Explain the Rust 2024 Edition changes, language features, breaking modifications, and transition strategies regarding '{title}'."
 4. **MSRV Compatibility Guidance**: "Can I use `let-else` syntax if my crate targets MSRV 1.64.0?"
 5. **Stratified Boost (10-15%)**: Oversamples version-critical records to comprise 10–15% of `data/datasets/train.jsonl`.
-6. **Benchmark Validation**: Evaluated via `scripts/eval_version_knowledge.py` against `data/datasets/version_eval_benchmark.jsonl`.
+6. **Benchmark Validation**: Evaluated via `scripts/eval_version_knowledge.py` against the tracked, source-backed `data/datasets/version_eval_benchmark.jsonl`. Version 2 separates strict rubric passes from partial fact coverage; substring keyword recall in historical reports is not accuracy. Changed questions require fresh inference rather than rescoring answers to a different question.
+
+### Reproducible holdouts and evaluation boundaries
+
+`08_create_dataset.py --seed 3407` groups source documents by source, library,
+version, and fragment-free URL. Missing document identity conservatively groups
+the source/library/version cohort. Equivalent normalized outputs connect groups
+across sources or versions, without discarding the training examples' version
+context. All derivatives, including micro-QA, remain in the same split.
+
+The approximately 98/2 split happens **before** training boosts. Validation answers
+are deduplicated, and cutoff calibration replicas are training-only. Consequently,
+final split sizes and category proportions are reported, not promised to be exact.
+Alpaca rows remain `instruction`/`input`/`output`; provenance sidecars retain source
+and connected-group identity. `split_manifest.json` records the input corpus hash,
+seed, split hashes, category counts, and overlap checks. Generation verifies staged
+files before publication and preserves previous outputs under `backups/`.
+
+```bash
+uv run python scripts/08_create_dataset.py --verify-only
+uv run python scripts/eval_version_knowledge.py --benchmark-only
+uv run python scripts/eval_version_knowledge.py --audit-dataset-dir data/datasets --output-file benchmark_overlap.json
+```
+
+The verifier requires zero exact-record, normalized-output, source-group, and
+connected-group overlap. This is not an assertion that every paraphrase is absent.
+The version benchmark intentionally tests learned facts from the training domain:
+document/reference contamination and factual coverage are different concepts.
+Use identical benchmark hashes, prompts, quantization, generation settings, and
+package versions for paired base/adapter comparisons. Do not infer historical
+checkpoint data lineage from a newly regenerated dataset. The current training
+engine does not pass `val.jsonl` to SFTTrainer; the held-out file and factual
+benchmark are separate evaluation surfaces.
 
 ```bash
 # Compare versions and fetch upgrade notes
