@@ -16,6 +16,7 @@ from lib.checkpoint_benchmark import (
     MAX_NEW_TOKENS,
     PROBE_IDS,
     CheckpointBenchmarkCallback,
+    _release_inference_memory,
     format_probe_prompt,
     isolated_inference,
 )
@@ -109,6 +110,22 @@ def assert_values_equal(left, right):
     assert torch.equal(left[2], right[2])
 
 
+def test_release_inference_memory_clears_cuda_cache_only_for_cuda():
+    with (
+        patch("lib.checkpoint_benchmark.gc.collect") as collect,
+        patch("lib.checkpoint_benchmark.torch.cuda.empty_cache") as empty_cache,
+    ):
+        _release_inference_memory(torch.device("cuda"))
+        collect.assert_called_once_with()
+        empty_cache.assert_called_once_with()
+
+        collect.reset_mock()
+        empty_cache.reset_mock()
+        _release_inference_memory(torch.device("cpu"))
+        collect.assert_called_once_with()
+        empty_cache.assert_not_called()
+
+
 def test_baseline_and_every_save_append_history(setup_probe):
     callback, args, state, model, tokenizer, accelerator = setup_probe
     control = TrainerControl()
@@ -174,6 +191,21 @@ def test_inference_preserves_initial_eval_and_mps_state():
         restore.assert_called_once_with(rng)
     assert not model.training
     assert model.config.use_cache is True
+
+
+def test_inference_rearms_gradient_checkpointing_for_training_models():
+    model = ProbeModel()
+    model.gradient_checkpointing = "unsloth"
+    calls = []
+
+    def for_training(use_gradient_checkpointing):
+        calls.append(use_gradient_checkpointing)
+
+    model.for_training = for_training
+    with isolated_inference(model, torch.device("cpu")):
+        model.gradient_checkpointing = False
+    assert model.gradient_checkpointing == "unsloth"
+    assert calls == ["unsloth"]
 
 
 def test_resume_baseline_appends_and_keeps_old_run(setup_probe):

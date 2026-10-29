@@ -1,0 +1,578 @@
+{
+  "model_path": "H:\\amazon__ALoDLM-8B\\",
+  "adapter_path": null,
+  "load_in_4bit": true,
+  "generation": {
+    "batch_size": 4,
+    "max_new_tokens": 256,
+    "do_sample": false,
+    "num_beams": 1,
+    "eos_token_id": 151645,
+    "prompt_format": "training_chatml",
+    "system_prompt": "You are an expert Rust programmer, specializing in systems programming, async Rust, ESP32 embedded development, and popular Rust libraries.",
+    "device": "cuda:0"
+  },
+  "packages": {
+    "torch": "2.10.0+cu130",
+    "transformers": "5.19.0",
+    "peft": "0.19.1"
+  },
+  "results": [
+    {
+      "id": "diff_1.80_1.81",
+      "type": "consecutive_diff",
+      "question": "Describe Rust 1.81's changes to Error trait availability, sorting implementations, lint expectations, and lint reasons.",
+      "question_revision": 2,
+      "reference_answer": "Rust 1.81 stabilized core::error::Error, introduced new sort implementations, and stabilized #[expect(lint)] and lint reasons.",
+      "response": "<think>\n\n</think>\n\n# Rust 1.81 Release Notes: Key Changes\n\n## Error Trait Availability\n\nRust 1.81 introduces a new feature that makes the `Error` trait more accessible. Previously, the `Error` trait was only available through the `std::error` module, which was not always convenient for users. In this release, the `Error` trait is now available through the `std::error::Error` module, making it easier for users to access and use the trait.\n\n## Sorting Implementations\n\nRust 1.81 also includes several changes to the sorting implementations. The `sort` and `sort_by` methods for slices and arrays have been updated to use a more efficient algorithm. This should result in faster sorting times for large datasets.\n\n## Lint Expectations\n\nRust 1.81 includes several changes to lint expectations. The `clippy::all` lint is now enabled by default, which means that all clippy lints will be checked by default. Additionally, the `clippy::pedantic` lint is now enabled by default, which means that all pedantic lints will be checked by default.\n\n## Lint Reasons\n\nRust 1.81 also includes several changes",
+      "generated_tokens": 256,
+      "finish_reason": "length",
+      "rubric_pass": false,
+      "fact_coverage": 0.5,
+      "matched_facts": [
+        "lint_expect",
+        "lint_reasons"
+      ],
+      "missing_facts": [
+        "error",
+        "sorting"
+      ],
+      "contradictions": [],
+      "review_reasons": [
+        "output_token_limit"
+      ]
+    },
+    {
+      "id": "diff_1.79_1.80",
+      "type": "consecutive_diff",
+      "question": "Which thread-safe and single-threaded lazy-initialization types were stabilized in Rust 1.80.0?",
+      "question_revision": 2,
+      "reference_answer": "Rust 1.80 stabilized std::sync::LazyLock for thread-safe lazy initialization and std::cell::LazyCell for single-threaded lazy initialization.",
+      "response": "<think>\n\n</think>\n\nIn Rust 1.80.0, the following thread-safe and single-threaded lazy-initialization types were stabilized:\n\n1. **`std::sync::Lazy`**  \n   A thread-safe lazy initialization type that ensures the value is computed exactly once, even in a multi-threaded context. It is part of the `std::sync` module and requires the `lazy` feature in the `std` crate.\n\n2. **`std::cell::LazyCell`**  \n   A single-threaded lazy initialization type that provides thread-safe access to a lazily initialized value. It is part of the `std::cell` module and also requires the `lazy` feature in the `std` crate.\n\nThese types were stabilized to provide more flexible and efficient lazy initialization options, with `Lazy` being suitable for concurrent environments and `LazyCell` optimized for single-threaded use.",
+      "generated_tokens": 185,
+      "finish_reason": "eos",
+      "rubric_pass": false,
+      "fact_coverage": 0.5,
+      "matched_facts": [
+        "cell"
+      ],
+      "missing_facts": [
+        "lock"
+      ],
+      "contradictions": [],
+      "review_reasons": []
+    },
+    {
+      "id": "diff_1.74_1.75",
+      "type": "consecutive_diff",
+      "question": "What major language feature was stabilized in Rust 1.75.0 for asynchronous programming?",
+      "question_revision": 1,
+      "reference_answer": "Rust 1.75 stabilized async fn in traits and return-position impl Trait in traits (RPITIT).",
+      "response": "<think>\n\n</think>\n\nThe major language feature stabilized in Rust 1.75.0 for asynchronous programming is **`async`/`await` support for `Result` and `Option`**. This allows you to use `await` directly on `Result` and `Option` types, simplifying error handling and optional value unwrapping in asynchronous code. For example:\n\n```rust\nasync fn example() -> Result<(), String> {\n    let result = async {\n        // Simulate an async operation that returns a Result\n        Ok::<_, String>(\"success\")\n    }.await;\n\n    // Now you can await the Result directly\n    if let Err(e) = result.await {\n        eprintln!(\"Error: {}\", e);\n    }\n\n    Ok(())\n}\n```\n\nThis stabilization reduces boilerplate by avoiding the need to manually convert `Result`/`Option` to futures (e.g., using `map_err` or `ok`). It aligns with Rust's goal of making async code more ergonomic and expressive.",
+      "generated_tokens": 208,
+      "finish_reason": "eos",
+      "rubric_pass": false,
+      "fact_coverage": 0.0,
+      "matched_facts": [],
+      "missing_facts": [
+        "async_traits"
+      ],
+      "contradictions": [],
+      "review_reasons": [
+        "no_required_facts"
+      ]
+    },
+    {
+      "id": "diff_1.64_1.65",
+      "type": "consecutive_diff",
+      "question": "What two landmark language features were stabilized in Rust 1.65.0?",
+      "question_revision": 1,
+      "reference_answer": "Rust 1.65 stabilized let-else statements and Generic Associated Types (GATs).",
+      "response": "<think>\n\n</think>\n\nIn Rust 1.65.0, two landmark language features were stabilized:\n\n1. **`#[track_caller]` Attribute**  \n   This attribute allows you to annotate functions that log errors or other messages. When used, it automatically captures the caller's name and line number, making it easier to trace where the error originated. This is particularly useful for logging frameworks like `tracing` or `log`, where you want to avoid manually passing the caller's context.\n\n2. **`#[track_span]` Attribute**  \n   This attribute is designed for use with the `tracing` crate. It automatically captures the current span (a hierarchical context for tracing) and includes it in log messages, providing rich contextual information about the execution flow. This simplifies the process of correlating logs with specific spans in distributed systems or complex codebases.\n\nThese features enhance Rust's capabilities for error handling and structured logging, aligning with the language's focus on safety and developer ergonomics.",
+      "generated_tokens": 206,
+      "finish_reason": "eos",
+      "rubric_pass": false,
+      "fact_coverage": 0.0,
+      "matched_facts": [],
+      "missing_facts": [
+        "let_else",
+        "gat"
+      ],
+      "contradictions": [],
+      "review_reasons": [
+        "no_required_facts"
+      ]
+    },
+    {
+      "id": "diff_1.38_1.39",
+      "type": "consecutive_diff",
+      "question": "What language feature for concurrency was introduced in Rust 1.39.0?",
+      "question_revision": 1,
+      "reference_answer": "Rust 1.39 stabilized async/await, including async fn and .await syntax.",
+      "response": "<think>\n\n</think>\n\nThe concurrency feature introduced in Rust 1.39.0 is **`async`/`await` support for `std::io::Read` and `std::io::Write`**. This allowed asynchronous I/O operations using the `async`/`await` syntax, enabling non-blocking file and network I/O in the standard library. \n\n### Key Details:\n- **Version**: Rust 1.39.0 (released October 2019).\n- **Feature**: Async I/O for `std::io::Read` and `std::io::Write` traits.\n- **Purpose**: Simplified asynchronous file/network operations without external crates.\n- **Usage**: Use `#[async_trait]` (from the `async-trait` crate) to define async methods for `Read`/`Write` traits.\n\nThis update laid the groundwork for more advanced async I/O in Rust, later expanded with the `tokio` runtime and async file operations in Rust 1.60.",
+      "generated_tokens": 211,
+      "finish_reason": "eos",
+      "rubric_pass": false,
+      "fact_coverage": 1.0,
+      "matched_facts": [
+        "async",
+        "await"
+      ],
+      "missing_facts": [],
+      "contradictions": [
+        "unexpected_release_version"
+      ],
+      "review_reasons": []
+    },
+    {
+      "id": "diff_1.25_1.26",
+      "type": "consecutive_diff",
+      "question": "Which Rust 1.26 features let functions return unnamed trait implementations and let main propagate errors with the ? operator?",
+      "question_revision": 2,
+      "reference_answer": "Rust 1.26 introduced return-position impl Trait and main returning Result.",
+      "response": "<think>\n\n</think>\n\nThe Rust 1.26 release introduced two key features that align with your question:\n\n1. **Unnamed Trait Implementations**  \n   This feature allows you to implement a trait for a type **without explicitly naming the trait** in the `impl` block. For example:\n   ```rust\n   // Before (explicit trait name):\n   impl Iterator for MyIterator { ... }\n\n   // After (unnamed trait implementation):\n   impl MyIterator {\n       fn next(&mut self) -> Option<Self::Item> { ... }\n   }\n   ```\n   This reduces boilerplate when implementing traits like `Iterator`, `Future`, or `Send` by letting the compiler infer the trait name from the type.\n\n2. **`?` Operator for Error Propagation in `main`**  \n   The `?` operator was extended to work in `main` functions, allowing you to propagate errors directly. For example:\n   ```rust\n   fn main() -> Result<(), Box<dyn Error>> {\n       let result = do_something()?;\n       Ok(())\n   }\n   ```\n   This simplifies error handling in `main` by avoiding the need to manually return `Err` or chain `Result` values.\n\nThese features were introduced in **Rust",
+      "generated_tokens": 256,
+      "finish_reason": "length",
+      "rubric_pass": false,
+      "fact_coverage": 0.5,
+      "matched_facts": [
+        "main_result"
+      ],
+      "missing_facts": [
+        "impl_trait"
+      ],
+      "contradictions": [],
+      "review_reasons": [
+        "output_token_limit"
+      ]
+    },
+    {
+      "id": "reverse_oncelock",
+      "type": "reverse_lookup",
+      "question": "In which Rust version was std::sync::OnceLock stabilized in the standard library?",
+      "question_revision": 1,
+      "reference_answer": "Rust 1.70.0.",
+      "response": "<think>\n\n</think>\n\nThe `std::sync::OnceLock` type was stabilized in the **Rust 1.70.0** release, which was announced on **October 10, 2022**. It is part of the standard library's synchronization utilities, designed to provide thread-safe lazy initialization with a `OnceLock<T>` that ensures the value is initialized exactly once, even in a concurrent environment.",
+      "generated_tokens": 89,
+      "finish_reason": "eos",
+      "rubric_pass": true,
+      "fact_coverage": 1.0,
+      "matched_facts": [
+        "version"
+      ],
+      "missing_facts": [],
+      "contradictions": [],
+      "review_reasons": []
+    },
+    {
+      "id": "reverse_lazylock",
+      "type": "reverse_lookup",
+      "question": "In which Rust version was std::sync::LazyLock stabilized?",
+      "question_revision": 1,
+      "reference_answer": "Rust 1.80.0.",
+      "response": "<think>\n\n</think>\n\nThe `std::sync::LazyLock` was stabilized in **Rust 1.70.0**, released on **October 12, 2022**. It is part of the `std` prelude and provides a thread-safe, lazy initialization mechanism similar to `lazy_static`, but with improved safety and performance. \n\n### Key Details:\n- **Stability**: Added in Rust 1.70.0 (October 2022).\n- **Purpose**: Enables thread-safe lazy initialization of static variables.\n- **Usage**: \n  ```rust\n  use std::sync::LazyLock;\n\n  static HELLO: LazyLock<String> = LazyLock::new(|| {\n      println!(\"Initializing...\");\n      \"Hello, world!\".to_string()\n  });\n\n  fn main() {\n      println!(\"{}\", HELLO);\n  }\n  ```\n- **Why Use It?**: Replaces `lazy_static` with a built-in, more efficient and safer alternative.",
+      "generated_tokens": 205,
+      "finish_reason": "eos",
+      "rubric_pass": false,
+      "fact_coverage": 0.0,
+      "matched_facts": [],
+      "missing_facts": [
+        "version"
+      ],
+      "contradictions": [
+        "unexpected_answer_version"
+      ],
+      "review_reasons": [
+        "conflicting_stabilization_claim",
+        "no_required_facts"
+      ]
+    },
+    {
+      "id": "reverse_let_else",
+      "type": "reverse_lookup",
+      "question": "Which Rust version stabilized let-else syntax (e.g. let Some(x) = val else { ... })?",
+      "question_revision": 1,
+      "reference_answer": "Rust 1.65.0.",
+      "response": "<think>\n\n</think>\n\nThe `let-else` syntax, which allows for concise error handling or early returns in match-like patterns, was **stabilized in Rust 1.70.0** (released in **December 2022**). \n\n### Key Details:\n- **Stable Rust Version**: 1.70.0\n- **Release Date**: December 2022\n- **Syntax Example**:\n  ```rust\n  let Some(x) = val else {\n      return; // or handle the error\n  };\n  // Proceed with `x`\n  ```\n\nThis feature simplifies code by avoiding nested `if let` blocks, making it easier to handle cases where a pattern match fails. For more details, see the [official Rust release notes](https://blog.rust-lang.org/2022/12/06/rust-1.70.0.html).",
+      "generated_tokens": 193,
+      "finish_reason": "eos",
+      "rubric_pass": false,
+      "fact_coverage": 0.0,
+      "matched_facts": [],
+      "missing_facts": [
+        "version"
+      ],
+      "contradictions": [
+        "unexpected_answer_version"
+      ],
+      "review_reasons": [
+        "conflicting_stabilization_claim",
+        "no_required_facts"
+      ]
+    },
+    {
+      "id": "reverse_gat",
+      "type": "reverse_lookup",
+      "question": "In which Rust version were Generic Associated Types (GATs) stabilized?",
+      "question_revision": 1,
+      "reference_answer": "Rust 1.65.0.",
+      "response": "<think>\n\n</think>\n\nGeneric Associated Types (GATs) were stabilized in **Rust 1.61.0**, released on **May 18, 2022**. This version introduced the `#![feature(generic_associated_types)]` nightly flag, which was later stabilized in the 1.61.0 release. GATs allow associated types to be parameterized over generic type parameters, enabling more expressive and flexible trait bounds.",
+      "generated_tokens": 97,
+      "finish_reason": "eos",
+      "rubric_pass": false,
+      "fact_coverage": 0.0,
+      "matched_facts": [],
+      "missing_facts": [
+        "version"
+      ],
+      "contradictions": [
+        "unexpected_answer_version"
+      ],
+      "review_reasons": [
+        "conflicting_stabilization_claim",
+        "no_required_facts"
+      ]
+    },
+    {
+      "id": "reverse_async_fn_trait",
+      "type": "reverse_lookup",
+      "question": "In which version of Rust was native async fn in traits stabilized?",
+      "question_revision": 1,
+      "reference_answer": "Rust 1.75.0.",
+      "response": "<think>\n\n</think>\n\nThe native async functions in traits were stabilized in **Rust 1.66.0** (released on **May 17, 2022**). This feature allows async functions to be declared directly in traits, enabling them to be implemented for types that may not have a `Send` or `Async` trait bound, while still supporting async operations. \n\nFor example:\n```rust\ntrait MyTrait {\n    async fn my_async_method(&self);\n}\n\nimpl MyTrait for i32 {\n    async fn my_async_method(&self) {\n        // Async logic here\n    }\n}\n```\n\nThis change simplifies async trait implementations and aligns with Rust's async/await syntax.",
+      "generated_tokens": 149,
+      "finish_reason": "eos",
+      "rubric_pass": false,
+      "fact_coverage": 0.0,
+      "matched_facts": [],
+      "missing_facts": [
+        "version"
+      ],
+      "contradictions": [
+        "unexpected_answer_version"
+      ],
+      "review_reasons": [
+        "conflicting_stabilization_claim",
+        "no_required_facts"
+      ]
+    },
+    {
+      "id": "reverse_black_box",
+      "type": "reverse_lookup",
+      "question": "In which Rust version was std::hint::black_box stabilized?",
+      "question_revision": 1,
+      "reference_answer": "Rust 1.66.0.",
+      "response": "<think>\n\n</think>\n\nThe `std::hint::black_box` function was stabilized in **Rust 1.50.0** (released on **March 10, 2021**). \n\n### Key Details:\n- **Purpose**: Used to prevent the Rust compiler from optimizing away variables, ensuring they are included in profiling or benchmarking results.\n- **Stability**: Added in the **2021 edition** of Rust (which became the default edition in Rust 1.50.0).\n- **Documentation**: [Rust Reference](https://doc.rust-lang.org/std/hint/fn.black_box.html)\n\nThis function is part of the standard library's `hint` module and is widely used in benchmarks to ensure accurate measurements.",
+      "generated_tokens": 158,
+      "finish_reason": "eos",
+      "rubric_pass": false,
+      "fact_coverage": 0.0,
+      "matched_facts": [],
+      "missing_facts": [
+        "version"
+      ],
+      "contradictions": [
+        "unexpected_answer_version"
+      ],
+      "review_reasons": [
+        "conflicting_stabilization_claim",
+        "no_required_facts"
+      ]
+    },
+    {
+      "id": "reverse_pin",
+      "type": "reverse_lookup",
+      "question": "When was std::pin::Pin stabilized in the standard library?",
+      "question_revision": 1,
+      "reference_answer": "Rust 1.33.0.",
+      "response": "<think>\n\n</think>\n\nThe `std::pin` module, including the `Pin` type, was stabilized in the **Rust 1.63.0 release** on **March 10, 2022**. This version introduced the `Pin` type as part of the standard library's async/await support, enabling safe ownership of non-`Send` types in async contexts.",
+      "generated_tokens": 84,
+      "finish_reason": "eos",
+      "rubric_pass": false,
+      "fact_coverage": 0.0,
+      "matched_facts": [],
+      "missing_facts": [
+        "version"
+      ],
+      "contradictions": [
+        "unexpected_answer_version"
+      ],
+      "review_reasons": [
+        "no_required_facts"
+      ]
+    },
+    {
+      "id": "reverse_future",
+      "type": "reverse_lookup",
+      "question": "In which Rust version was the std::future::Future trait stabilized?",
+      "question_revision": 1,
+      "reference_answer": "Rust 1.36.0.",
+      "response": "<think>\n\n</think>\n\nThe `std::future::Future` trait was stabilized in **Rust 1.32.0**, released on **May 15, 2019**. This version introduced the `Future` trait as part of the standard library, enabling async/await syntax and foundational async programming in Rust.",
+      "generated_tokens": 70,
+      "finish_reason": "eos",
+      "rubric_pass": false,
+      "fact_coverage": 0.0,
+      "matched_facts": [],
+      "missing_facts": [
+        "version"
+      ],
+      "contradictions": [
+        "unexpected_answer_version"
+      ],
+      "review_reasons": [
+        "conflicting_stabilization_claim",
+        "no_required_facts"
+      ]
+    },
+    {
+      "id": "edition_2015",
+      "type": "edition_guide",
+      "question": "What is the Rust 2015 edition and what was its core theme?",
+      "question_revision": 1,
+      "reference_answer": "The foundational edition that began with Rust 1.0, with stability as its theme.",
+      "response": "<think>\n\n</think>\n\nThe Rust 2015 edition refers to the first stable version of the Rust programming language released in 2015. It was designed to provide a stable and consistent foundation for Rust development, with a focus on safety, performance, and concurrency.\n\nThe core theme of the Rust 2015 edition was to provide a stable and consistent foundation for Rust development, with a focus on safety, performance, and concurrency. This edition introduced several new features and improvements, including:\n\n  1. Improved error handling: The edition introduced a new error handling system that made it easier to handle errors in Rust programs.\n\n  2. Improved concurrency: The edition introduced new concurrency primitives, such as channels and futures, that made it easier to write concurrent Rust programs.\n\n  3. Improved performance: The edition introduced new optimizations and improvements to the Rust compiler, which made Rust programs faster and more efficient.\n\n  4. Improved safety: The edition introduced new safety features, such as the `unsafe` keyword and the `const` keyword, that made it easier to write safe Rust programs.\n\n  5. Improved consistency: The edition introduced new language features and improvements that made the Rust language more consistent and easier to learn.\n\n\n\n\nOverall, the Rust",
+      "generated_tokens": 256,
+      "finish_reason": "length",
+      "rubric_pass": false,
+      "fact_coverage": 0.0,
+      "matched_facts": [],
+      "missing_facts": [
+        "foundation",
+        "stability"
+      ],
+      "contradictions": [],
+      "review_reasons": [
+        "no_required_facts",
+        "output_token_limit"
+      ]
+    },
+    {
+      "id": "edition_2018",
+      "type": "edition_guide",
+      "question": "In Rust 2018, is extern crate generally required, and how did use-path resolution change?",
+      "question_revision": 2,
+      "reference_answer": "extern crate is no longer generally required. Paths in use declarations work the same as other paths.",
+      "response": "<think>\n\n</think>\n\nIn Rust 2018, the `extern crate` statement was **not required** for importing crates. Here's how path resolution changed:\n\n### 1. **Removal of `extern crate`**\n   - **Before (pre-2018):**  \n     You had to explicitly declare a crate with `extern crate`:\n     ```rust\n     extern crate serde;\n     use serde::Serialize;\n     ```\n   - **After 2018 (and later):**  \n     The `extern crate` statement was **deprecated** and removed. You could directly use the crate without declaring it:\n     ```rust\n     use serde::Serialize; // No need for `extern crate serde;`\n     ```\n\n### 2. **Path Resolution Changes**\n   - **`use` Path Resolution:**  \n     The compiler automatically resolves paths from the crate root. For example:\n     ```rust\n     use crate::my_module::MyStruct; // Resolves to `crate::my_module::MyStruct`\n     ```\n   - **`mod` vs. `use` Paths:**  \n     - `mod my_module;` (module declaration) and `use my_module;` (import) are now **se",
+      "generated_tokens": 256,
+      "finish_reason": "length",
+      "rubric_pass": false,
+      "fact_coverage": 0.5,
+      "matched_facts": [
+        "extern_crate"
+      ],
+      "missing_facts": [
+        "paths"
+      ],
+      "contradictions": [],
+      "review_reasons": [
+        "output_token_limit"
+      ]
+    },
+    {
+      "id": "edition_2021_closures",
+      "type": "edition_guide",
+      "question": "How did closure variable capturing change in the Rust 2021 Edition?",
+      "question_revision": 1,
+      "reference_answer": "Closures use disjoint capture: they capture only the fields they use rather than the entire struct.",
+      "response": "<think>\n\n</think>\n\nThe Rust 2021 edition introduced several improvements to closure variable capturing, primarily through the **`move` keyword** and **`Copy` trait handling**, making closures more flexible and efficient. Here's a breakdown of the key changes:\n\n---\n\n### 1. **`move` Keyword: Explicit Capture**\n   - **Before (2018 Edition):**  \n     The `move` keyword was required to force a closure to take ownership of captured variables.  \n     Example:\n     ```rust\n     let x = 5;\n     let add = move |y| x + y; // Explicitly captures `x` by value\n     ```\n\n   - **After (2021 Edition):**  \n     The `move` keyword is **optional**. If you want a closure to take ownership of variables, you can omit `move` and rely on the closure's signature to enforce it.  \n     Example:\n     ```rust\n     let x = 5;\n     let add = |y| x + y; // Implicitly captures `x` by value if needed\n     ```\n\n---\n\n### 2. **Automatic `Copy` Handling**\n   - **Before:**  \n     If a closure captured variables",
+      "generated_tokens": 256,
+      "finish_reason": "length",
+      "rubric_pass": false,
+      "fact_coverage": 0.0,
+      "matched_facts": [],
+      "missing_facts": [
+        "capture"
+      ],
+      "contradictions": [],
+      "review_reasons": [
+        "no_required_facts",
+        "output_token_limit"
+      ]
+    },
+    {
+      "id": "edition_2021_prelude",
+      "type": "edition_guide",
+      "question": "What traits were added to the standard library prelude in Rust 2021?",
+      "question_revision": 1,
+      "reference_answer": "TryInto, TryFrom, and FromIterator.",
+      "response": "<think>\n\n</think>\n\nThe Rust 2021 edition introduced several traits to the `prelude` in the standard library, streamlining common use cases. Here's a breakdown of the key additions:\n\n### 1. **`From` and `TryFrom`**\n   - **Purpose**: Simplify type conversions.\n   - **Usage**: `From` for lossless conversions (e.g., `String::from(\"hello\")`), `TryFrom` for fallible conversions (e.g., `Vec::try_from([1, 2, 3])`).\n\n### 2. **`PartialEq` and `Eq`**\n   - **Purpose**: Enable equality checks.\n   - **Usage**: `PartialEq` for partial equality (e.g., `a == b`), `Eq` for total ordering (e.g., `a == b` implies `a < b`).\n\n### 3. **`PartialOrd` and `Ord`**\n   - **Purpose**: Support ordering comparisons.\n   - **Usage**: `PartialOrd` for partial ordering (e.g., `a < b`), `Ord` for total ordering (e.g., `a < b` guarantees `a <= b`).\n\n### 4.",
+      "generated_tokens": 256,
+      "finish_reason": "length",
+      "rubric_pass": false,
+      "fact_coverage": 0.3333333333333333,
+      "matched_facts": [
+        "try_from"
+      ],
+      "missing_facts": [
+        "try_into",
+        "from_iterator"
+      ],
+      "contradictions": [],
+      "review_reasons": [
+        "output_token_limit"
+      ]
+    },
+    {
+      "id": "edition_2024_overview",
+      "type": "edition_guide",
+      "question": "In Rust 2024, describe the changes to never-type fallback, extern blocks, the gen keyword, and RPIT lifetime capture.",
+      "question_revision": 2,
+      "reference_answer": "Never type fallback changes from () to !. Extern blocks require unsafe extern. The gen keyword is reserved. RPIT implicitly captures all in-scope generic parameters, including lifetimes.",
+      "response": "<think>\n\n</think>\n\n# Rust 2024: Key Changes\n\n## Never-Type Fallback\n\nIn Rust 2024, the never-type fallback mechanism has been refined to provide more predictable behavior when encountering unhandled errors. The `!` type, representing the never type, now has more explicit fallback semantics:\n\n1. **Explicit Error Handling**: The compiler will now enforce explicit error handling for all `!`-returning functions, reducing the risk of silent failures.\n2. **Improved Error Propagation**: The error propagation mechanism has been enhanced to provide clearer error messages and more granular control over error handling.\n3. **Fallback Behavior**: When encountering unhandled `!` types, the compiler will now provide more informative fallback options, such as suggesting alternative error handling patterns.\n\n## Extern Blocks\n\nThe extern blocks in Rust 2024 have seen several improvements to enhance their usability and safety:\n\n1. **Simplified Syntax**: The syntax for defining extern blocks has been simplified, making it more intuitive and less error-prone.\n2. **Improved Type Inference**: The compiler's type inference for extern blocks has been enhanced, reducing the need for explicit type annotations in many cases.\n3. **Enhanced Safety**: The safety guarantees for extern",
+      "generated_tokens": 256,
+      "finish_reason": "length",
+      "rubric_pass": false,
+      "fact_coverage": 0.0,
+      "matched_facts": [],
+      "missing_facts": [
+        "never",
+        "extern",
+        "gen",
+        "capture"
+      ],
+      "contradictions": [],
+      "review_reasons": [
+        "no_required_facts",
+        "output_token_limit"
+      ]
+    },
+    {
+      "id": "msrv_lazylock",
+      "type": "msrv_check",
+      "question": "If my crate's MSRV is 1.75.0, can I use std::sync::LazyLock from the standard library?",
+      "question_revision": 1,
+      "reference_answer": "No. LazyLock requires Rust 1.80 or later.",
+      "response": "<think>\n\n</think>\n\nNo, you cannot use `std::sync::LazyLock` if your crate's **Minimum Supported Rust Version (MSRV)** is **1.75.0**. Here's why:\n\n1. **`LazyLock` was introduced in Rust 1.76.0** (2023-09-13). It is part of the standard library's `std::sync` module and requires the compiler version to be at least **1.76.0**.\n\n2. **MSRV 1.75.0** means your crate is compatible with Rust versions up to **1.75.0**, which predates the introduction of `LazyLock`. Using it would break compatibility with older Rust versions.\n\n---\n\n### What to do instead:\n- **Upgrade your MSRV to 1.76.0+** if you need `LazyLock` (recommended for new projects).\n- For older Rust versions, use workarounds like:\n  - `lazy_static` crate (for static variables).\n  - `once_cell` crate (for thread-safe lazy initialization).\n  - Manual `Mutex`/`Once` combinations.\n\nExample of a compatible alternative:\n```rust\nuse std::",
+      "generated_tokens": 256,
+      "finish_reason": "length",
+      "rubric_pass": false,
+      "fact_coverage": 0.0,
+      "matched_facts": [],
+      "missing_facts": [
+        "version"
+      ],
+      "contradictions": [
+        "missing_required_stabilization_version"
+      ],
+      "review_reasons": [
+        "conflicting_stabilization_claim",
+        "explicit_yes_no_required",
+        "multiple_decisions",
+        "no_required_facts",
+        "output_token_limit"
+      ]
+    },
+    {
+      "id": "msrv_let_else",
+      "type": "msrv_check",
+      "question": "Can I use let-else syntax (let Some(x) = val else { return; }) in a library targeting an MSRV of 1.60.0?",
+      "question_revision": 1,
+      "reference_answer": "No. let-else requires Rust 1.65 or later.",
+      "response": "<think>\n\n</think>\n\nYes, you can use the `let-else` syntax in a library targeting an MSRV of **1.60.0**, but with a **small caveat**:\n\n1. **`let-else` is stable since Rust 1.60.0** (released in 2021), so it’s available if you’re targeting this version or later.\n2. **The syntax `let Some(x) = val else { return; }` is valid** because `else` blocks are allowed after pattern bindings in Rust 1.60+.\n\n### Example:\n```rust\nfn process(val: Option<i32>) {\n    let Some(x) = val else {\n        return; // This is valid in Rust 1.60+\n    };\n    // Use `x`\n}\n```\n\n### Key Notes:\n- **No `#[feature]` attribute needed**—`let-else` is stable.\n- Ensure your `Cargo.toml` specifies `edition = \"2021\"` (required for `let-else`).\n- If your library’s users might target older Rust versions, consider compatibility, but for your library itself, 1.60+ is sufficient.\n\n### For",
+      "generated_tokens": 256,
+      "finish_reason": "length",
+      "rubric_pass": false,
+      "fact_coverage": 0.0,
+      "matched_facts": [],
+      "missing_facts": [
+        "version"
+      ],
+      "contradictions": [
+        "missing_required_stabilization_version"
+      ],
+      "review_reasons": [
+        "explicit_yes_no_required",
+        "multiple_decisions",
+        "no_required_facts",
+        "output_token_limit"
+      ]
+    },
+    {
+      "id": "msrv_core_error",
+      "type": "msrv_check",
+      "question": "Can a no_std crate use core::error::Error on Rust 1.81.0?",
+      "question_revision": 1,
+      "reference_answer": "Yes.",
+      "response": "<think>\n\n</think>\n\nYes, a `no_std` crate can use `core::error::Error` in Rust 1.81.0, but with important caveats:\n\n1. **`core` vs. `std`**:  \n   The `core` prelude includes `error::Error` (as of Rust 1.56+), so you can use it directly. However, **`no_std` crates cannot use `std` types** (e.g., `std::error::Error`), so you must use `core::error::Error` explicitly.\n\n2. **`no_std` Compatibility**:  \n   `core::error::Error` is part of the `core` prelude, which is included in `no_std` builds. No special configuration is needed.\n\n3. **Limitations**:  \n   - `core::error::Error` is a trait bound (`Error: ?Sized`) and requires compatible types (e.g., `Box<dyn Error>` or `&dyn Error`).\n   - You cannot use `std`-specific types (e.g., `std::error::Error`), which are unavailable in `no_std`.\n\n**Example Usage**:\n```rust\n#![no_std]\n#![",
+      "generated_tokens": 256,
+      "finish_reason": "length",
+      "rubric_pass": false,
+      "fact_coverage": 0.0,
+      "matched_facts": [],
+      "missing_facts": [],
+      "contradictions": [
+        "unexpected_release_version"
+      ],
+      "review_reasons": [
+        "explicit_yes_no_required",
+        "multiple_decisions",
+        "output_token_limit"
+      ]
+    }
+  ],
+  "rubric_version": 2,
+  "benchmark_ids": [
+    "diff_1.80_1.81",
+    "diff_1.79_1.80",
+    "diff_1.74_1.75",
+    "diff_1.64_1.65",
+    "diff_1.38_1.39",
+    "diff_1.25_1.26",
+    "reverse_oncelock",
+    "reverse_lazylock",
+    "reverse_let_else",
+    "reverse_gat",
+    "reverse_async_fn_trait",
+    "reverse_black_box",
+    "reverse_pin",
+    "reverse_future",
+    "edition_2015",
+    "edition_2018",
+    "edition_2021_closures",
+    "edition_2021_prelude",
+    "edition_2024_overview",
+    "msrv_lazylock",
+    "msrv_let_else",
+    "msrv_core_error"
+  ],
+  "benchmark_sha256": "b61fa3a0d5d950f91976d98d997775bc0e2015a1a0f64b6e4af757028ae17f12",
+  "summary": {
+    "count": 22,
+    "rubric_pass_count": 1,
+    "rubric_pass_rate": 0.045454545454545456,
+    "average_fact_coverage": 0.19696969696969696,
+    "review_count": 19,
+    "requires_regeneration": 0,
+    "categories": {
+      "consecutive_diff": {
+        "count": 6,
+        "rubric_pass_count": 0,
+        "rubric_pass_rate": 0.0,
+        "average_fact_coverage": 0.4166666666666667,
+        "review_count": 4
+      },
+      "edition_guide": {
+        "count": 5,
+        "rubric_pass_count": 0,
+        "rubric_pass_rate": 0.0,
+        "average_fact_coverage": 0.16666666666666666,
+        "review_count": 5
+      },
+      "msrv_check": {
+        "count": 3,
+        "rubric_pass_count": 0,
+        "rubric_pass_rate": 0.0,
+        "average_fact_coverage": 0.0,
+        "review_count": 3
+      },
+      "reverse_lookup": {
+        "count": 8,
+        "rubric_pass_count": 1,
+        "rubric_pass_rate": 0.125,
+        "average_fact_coverage": 0.125,
+        "review_count": 7
+      }
+    },
+    "limitations": "Rubric passes are not semantic truth guarantees; inspect extra claims and paraphrases manually."
+  }
+}

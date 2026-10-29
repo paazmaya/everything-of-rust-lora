@@ -1,0 +1,214 @@
+{
+  "base": {
+    "count": 22,
+    "rubric_pass_count": 1,
+    "rubric_pass_rate": 0.045454545454545456,
+    "average_fact_coverage": 0.19696969696969696,
+    "review_count": 19,
+    "requires_regeneration": 0,
+    "categories": {
+      "consecutive_diff": {
+        "count": 6,
+        "rubric_pass_count": 0,
+        "rubric_pass_rate": 0.0,
+        "average_fact_coverage": 0.4166666666666667,
+        "review_count": 4
+      },
+      "edition_guide": {
+        "count": 5,
+        "rubric_pass_count": 0,
+        "rubric_pass_rate": 0.0,
+        "average_fact_coverage": 0.16666666666666666,
+        "review_count": 5
+      },
+      "msrv_check": {
+        "count": 3,
+        "rubric_pass_count": 0,
+        "rubric_pass_rate": 0.0,
+        "average_fact_coverage": 0.0,
+        "review_count": 3
+      },
+      "reverse_lookup": {
+        "count": 8,
+        "rubric_pass_count": 1,
+        "rubric_pass_rate": 0.125,
+        "average_fact_coverage": 0.125,
+        "review_count": 7
+      }
+    },
+    "limitations": "Rubric passes are not semantic truth guarantees; inspect extra claims and paraphrases manually."
+  },
+  "adapter": {
+    "count": 22,
+    "rubric_pass_count": 1,
+    "rubric_pass_rate": 0.045454545454545456,
+    "average_fact_coverage": 0.1590909090909091,
+    "review_count": 19,
+    "requires_regeneration": 0,
+    "categories": {
+      "consecutive_diff": {
+        "count": 6,
+        "rubric_pass_count": 0,
+        "rubric_pass_rate": 0.0,
+        "average_fact_coverage": 0.25,
+        "review_count": 5
+      },
+      "edition_guide": {
+        "count": 5,
+        "rubric_pass_count": 0,
+        "rubric_pass_rate": 0.0,
+        "average_fact_coverage": 0.1,
+        "review_count": 4
+      },
+      "msrv_check": {
+        "count": 3,
+        "rubric_pass_count": 1,
+        "rubric_pass_rate": 0.3333333333333333,
+        "average_fact_coverage": 0.5,
+        "review_count": 2
+      },
+      "reverse_lookup": {
+        "count": 8,
+        "rubric_pass_count": 0,
+        "rubric_pass_rate": 0.0,
+        "average_fact_coverage": 0.0,
+        "review_count": 8
+      }
+    },
+    "limitations": "Rubric passes are not semantic truth guarantees; inspect extra claims and paraphrases manually."
+  },
+  "paired_changes": [
+    {
+      "id": "diff_1.80_1.81",
+      "type": "consecutive_diff",
+      "rubric_pass_delta": 0,
+      "fact_coverage_delta": -0.5
+    },
+    {
+      "id": "diff_1.79_1.80",
+      "type": "consecutive_diff",
+      "rubric_pass_delta": 0,
+      "fact_coverage_delta": -0.5
+    },
+    {
+      "id": "diff_1.74_1.75",
+      "type": "consecutive_diff",
+      "rubric_pass_delta": 0,
+      "fact_coverage_delta": 0.0
+    },
+    {
+      "id": "diff_1.64_1.65",
+      "type": "consecutive_diff",
+      "rubric_pass_delta": 0,
+      "fact_coverage_delta": 0.0
+    },
+    {
+      "id": "diff_1.38_1.39",
+      "type": "consecutive_diff",
+      "rubric_pass_delta": 0,
+      "fact_coverage_delta": 0.0
+    },
+    {
+      "id": "diff_1.25_1.26",
+      "type": "consecutive_diff",
+      "rubric_pass_delta": 0,
+      "fact_coverage_delta": 0.0
+    },
+    {
+      "id": "reverse_oncelock",
+      "type": "reverse_lookup",
+      "rubric_pass_delta": -1,
+      "fact_coverage_delta": -1.0
+    },
+    {
+      "id": "reverse_lazylock",
+      "type": "reverse_lookup",
+      "rubric_pass_delta": 0,
+      "fact_coverage_delta": 0.0
+    },
+    {
+      "id": "reverse_let_else",
+      "type": "reverse_lookup",
+      "rubric_pass_delta": 0,
+      "fact_coverage_delta": 0.0
+    },
+    {
+      "id": "reverse_gat",
+      "type": "reverse_lookup",
+      "rubric_pass_delta": 0,
+      "fact_coverage_delta": 0.0
+    },
+    {
+      "id": "reverse_async_fn_trait",
+      "type": "reverse_lookup",
+      "rubric_pass_delta": 0,
+      "fact_coverage_delta": 0.0
+    },
+    {
+      "id": "reverse_black_box",
+      "type": "reverse_lookup",
+      "rubric_pass_delta": 0,
+      "fact_coverage_delta": 0.0
+    },
+    {
+      "id": "reverse_pin",
+      "type": "reverse_lookup",
+      "rubric_pass_delta": 0,
+      "fact_coverage_delta": 0.0
+    },
+    {
+      "id": "reverse_future",
+      "type": "reverse_lookup",
+      "rubric_pass_delta": 0,
+      "fact_coverage_delta": 0.0
+    },
+    {
+      "id": "edition_2015",
+      "type": "edition_guide",
+      "rubric_pass_delta": 0,
+      "fact_coverage_delta": 0.5
+    },
+    {
+      "id": "edition_2018",
+      "type": "edition_guide",
+      "rubric_pass_delta": 0,
+      "fact_coverage_delta": -0.5
+    },
+    {
+      "id": "edition_2021_closures",
+      "type": "edition_guide",
+      "rubric_pass_delta": 0,
+      "fact_coverage_delta": 0.0
+    },
+    {
+      "id": "edition_2021_prelude",
+      "type": "edition_guide",
+      "rubric_pass_delta": 0,
+      "fact_coverage_delta": -0.3333333333333333
+    },
+    {
+      "id": "edition_2024_overview",
+      "type": "edition_guide",
+      "rubric_pass_delta": 0,
+      "fact_coverage_delta": 0.0
+    },
+    {
+      "id": "msrv_lazylock",
+      "type": "msrv_check",
+      "rubric_pass_delta": 0,
+      "fact_coverage_delta": 0.0
+    },
+    {
+      "id": "msrv_let_else",
+      "type": "msrv_check",
+      "rubric_pass_delta": 0,
+      "fact_coverage_delta": 0.5
+    },
+    {
+      "id": "msrv_core_error",
+      "type": "msrv_check",
+      "rubric_pass_delta": 1,
+      "fact_coverage_delta": 1.0
+    }
+  ]
+}

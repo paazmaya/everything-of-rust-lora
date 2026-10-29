@@ -1,5 +1,6 @@
 """Small, state-isolated development probes using the live training model."""
 
+import gc
 import hashlib
 import json
 import logging
@@ -36,6 +37,12 @@ MAX_NEW_TOKENS = 256
 PromptFormatter = Callable[[dict[str, list[str]]], dict[str, list[str]]]
 
 
+def _release_inference_memory(device: torch.device) -> None:
+    gc.collect()
+    if device.type == "cuda":
+        torch.cuda.empty_cache()
+
+
 def format_probe_prompt(question: str, formatter: PromptFormatter) -> str:
     marker = "__RUST_LORA_BENCHMARK_ANSWER__"
     text = formatter(
@@ -58,6 +65,16 @@ def isolated_inference(model: Any, device: torch.device) -> Iterator[None]:
     numpy_rng = np.random.get_state()
     mps_rng = torch.mps.get_rng_state() if device.type == "mps" else None
     module_modes = [(module, module.training) for module in model.modules()]
+    # Unsloth's generate() disables gradient checkpointing and only re-arms it when the model
+    # was in training mode on entry; we enter in eval mode, so restore it ourselves or the next
+    # training step keeps every activation and exhausts VRAM.
+    checkpointing = [
+        (module, module.gradient_checkpointing)
+        for module in model.modules()
+        if hasattr(module, "gradient_checkpointing")
+    ]
+    checkpointing_mode = next((mode for _, mode in checkpointing if mode), False)
+    was_training = model.training
     cache = model.config.use_cache
     cuda_devices = list(range(torch.cuda.device_count())) if torch.cuda.is_available() else []
     try:
@@ -67,8 +84,12 @@ def isolated_inference(model: Any, device: torch.device) -> Iterator[None]:
             yield
     finally:
         model.config.use_cache = cache
+        if was_training and hasattr(model, "for_training"):
+            model.for_training(use_gradient_checkpointing=checkpointing_mode)
         for module, training in module_modes:
             module.training = training
+        for module, mode in checkpointing:
+            module.gradient_checkpointing = mode
         random.setstate(python_rng)
         np.random.set_state(numpy_rng)
         if mps_rng is not None:
@@ -196,6 +217,8 @@ class CheckpointBenchmarkCallback(TrainerCallback):
                     result["review_reasons"].append("output_token_limit")
                     result["rubric_pass"] = False
                 results.append(result)
+                del tokens, inputs
+        _release_inference_memory(device)
         report = {
             "run_id": self.run_id,
             "timestamp": datetime.now(UTC).isoformat(),

@@ -1,0 +1,556 @@
+{
+  "model_path": "H:\\amazon__ALoDLM-8B\\",
+  "adapter_path": ".\\models\\alodlm_8b_rust_lora\\",
+  "load_in_4bit": true,
+  "generation": {
+    "batch_size": 4,
+    "max_new_tokens": 256,
+    "do_sample": false,
+    "num_beams": 1,
+    "eos_token_id": 151645,
+    "prompt_format": "training_chatml",
+    "system_prompt": "You are an expert Rust programmer, specializing in systems programming, async Rust, ESP32 embedded development, and popular Rust libraries.",
+    "device": "cuda:0"
+  },
+  "packages": {
+    "torch": "2.10.0+cu130",
+    "transformers": "5.19.0",
+    "peft": "0.19.1"
+  },
+  "results": [
+    {
+      "id": "diff_1.80_1.81",
+      "type": "consecutive_diff",
+      "question": "Describe Rust 1.81's changes to Error trait availability, sorting implementations, lint expectations, and lint reasons.",
+      "question_revision": 2,
+      "reference_answer": "Rust 1.81 stabilized core::error::Error, introduced new sort implementations, and stabilized #[expect(lint)] and lint reasons.",
+      "response": "- [The `Error` trait is now available on stable.](https://github.com/rust-lang/rust/pull/121469)\n  This includes the `context` method, which requires the `std` feature of the `smallvec` crate.\n- [The `Reverse` implementation for `(A, B)` now uses tuple reversal rather than type reversal.](https://github.com/rust-lang/rust/pull/122744)\n- [The `From<&mut T>` implementation for `Rc<T>` and `Arc<T>` now uses `Clone::clone` rather than performing a raw pointer copy.](https://github.com/rust-lang/rust/pull/123044)\n- [The `Debug` implementation for `ExitCode` is now more user friendly.](https://github.com/rust-lang/rust/pull/123062)\n- [The `PartialEq` implementation for `&str` now prefers an exact match over a substring match.](https://github.com/rust-lang/rust/pull/123102)\n- [The `PartialEq` implementation for `&str` against `char` is now much",
+      "generated_tokens": 256,
+      "finish_reason": "length",
+      "rubric_pass": false,
+      "fact_coverage": 0.0,
+      "matched_facts": [],
+      "missing_facts": [
+        "error",
+        "sorting",
+        "lint_expect",
+        "lint_reasons"
+      ],
+      "contradictions": [],
+      "review_reasons": [
+        "no_required_facts",
+        "output_token_limit"
+      ]
+    },
+    {
+      "id": "diff_1.79_1.80",
+      "type": "consecutive_diff",
+      "question": "Which thread-safe and single-threaded lazy-initialization types were stabilized in Rust 1.80.0?",
+      "question_revision": 2,
+      "reference_answer": "Rust 1.80 stabilized std::sync::LazyLock for thread-safe lazy initialization and std::cell::LazyCell for single-threaded lazy initialization.",
+      "response": "In Rust 1.80.0, `std::sync::OnceLock` was stabilized as a thread-safe lazy-initialization type, and `std::cell::OnceCell` was stabilized as a single-threaded lazy-initialization type.",
+      "generated_tokens": 51,
+      "finish_reason": "eos",
+      "rubric_pass": false,
+      "fact_coverage": 0.0,
+      "matched_facts": [],
+      "missing_facts": [
+        "lock",
+        "cell"
+      ],
+      "contradictions": [],
+      "review_reasons": [
+        "no_required_facts"
+      ]
+    },
+    {
+      "id": "diff_1.74_1.75",
+      "type": "consecutive_diff",
+      "question": "What major language feature was stabilized in Rust 1.75.0 for asynchronous programming?",
+      "question_revision": 1,
+      "reference_answer": "Rust 1.75 stabilized async fn in traits and return-position impl Trait in traits (RPITIT).",
+      "response": "In Rust 1.75.0, the language specification was updated to support `async fn` in [function-like procedural macros](https://doc.rust-lang.org/1.75.0/reference/procedural-macros.html#function-like-macros). This allows macros to expand to `async fn` definitions, which is particularly useful in crates like `leptos` and `rocket` for server functions.",
+      "generated_tokens": 90,
+      "finish_reason": "eos",
+      "rubric_pass": false,
+      "fact_coverage": 0.0,
+      "matched_facts": [],
+      "missing_facts": [
+        "async_traits"
+      ],
+      "contradictions": [],
+      "review_reasons": [
+        "no_required_facts"
+      ]
+    },
+    {
+      "id": "diff_1.64_1.65",
+      "type": "consecutive_diff",
+      "question": "What two landmark language features were stabilized in Rust 1.65.0?",
+      "question_revision": 1,
+      "reference_answer": "Rust 1.65 stabilized let-else statements and Generic Associated Types (GATs).",
+      "response": "- [Stabilize `#[cfg(target_has_atomic = \"...\")]` for each integer size.](https://github.com/rust-lang/rust/pull/102075/)\n- [Stabilize `#[cfg(target_has_atomic = \"...\")]` for pointers.](https://github.com/rust-lang/rust/pull/102075/)",
+      "generated_tokens": 79,
+      "finish_reason": "eos",
+      "rubric_pass": false,
+      "fact_coverage": 0.0,
+      "matched_facts": [],
+      "missing_facts": [
+        "let_else",
+        "gat"
+      ],
+      "contradictions": [],
+      "review_reasons": [
+        "no_required_facts"
+      ]
+    },
+    {
+      "id": "diff_1.38_1.39",
+      "type": "consecutive_diff",
+      "question": "What language feature for concurrency was introduced in Rust 1.39.0?",
+      "question_revision": 1,
+      "reference_answer": "Rust 1.39 stabilized async/await, including async fn and .await syntax.",
+      "response": "Rust 1.39.0 introduced the `async`/`await` keywords for asynchronous code.\n\n* [The `async`/`await` keywords are now stable.][async]\n* [The `#[await]` attribute is now stable.][await]\n* [The `#[async]` and `#[unsafe(async)]` attributes are now stable.][async]\n* [The `#[rustc_async]` attribute is now stable.][async]\n\n[async]: https://github.com/rust-lang/rust/pull/63083/\n[await]: https://github.com/rust-lang/rust/pull/63084/\n[async-await]: https://github.com/rust-lang/rust/pull/63085/\n[async-impl]: https://github.com/rust-lang/rust/pull/63086/\n[async-impl-trait]: https://github.com/rust-lang/rust/pull/63087/\n[async-impl-trait-2]: https://github.com/rust-lang/rust/pull/63088/\n[async-impl-trait-3]: https://github.com/rust-lang/rust/p",
+      "generated_tokens": 256,
+      "finish_reason": "length",
+      "rubric_pass": false,
+      "fact_coverage": 1.0,
+      "matched_facts": [
+        "async",
+        "await"
+      ],
+      "missing_facts": [],
+      "contradictions": [],
+      "review_reasons": [
+        "output_token_limit"
+      ]
+    },
+    {
+      "id": "diff_1.25_1.26",
+      "type": "consecutive_diff",
+      "question": "Which Rust 1.26 features let functions return unnamed trait implementations and let main propagate errors with the ? operator?",
+      "question_revision": 2,
+      "reference_answer": "Rust 1.26 introduced return-position impl Trait and main returning Result.",
+      "response": "In Rust 1.26, two significant language changes were introduced:\n\n1. **Let functions return unnamed trait implementations** : This allows you to define trait implementations for functions without needing to name them. This is particularly useful for small, one-off implementations. For example:\n```rust\nimpl From<u32> for u64 {\n    fn from(x: u32) -> u64 {\n        x as u64\n    }\n}\n```\n2. **Let main propagate errors with the ? operator** : The `?` operator can now be used in the `main` function to propagate errors, allowing `main` to return a `Result`. This is similar to how `?` is used in other functions. For example:\n```rust\nfn main() -> Result<(), Box<dyn std::error::Error>> {\n    let result = do_something_that_can_fail()?;\n    Ok(())\n}\n```\nThese changes were detailed in [RFC 1800](https://github.com/rust-lang/rfcs/pull/1800) and [RFC 1801](https://github.com/rust-lang/rfcs/pull/1801).",
+      "generated_tokens": 248,
+      "finish_reason": "eos",
+      "rubric_pass": false,
+      "fact_coverage": 0.5,
+      "matched_facts": [
+        "main_result"
+      ],
+      "missing_facts": [
+        "impl_trait"
+      ],
+      "contradictions": [],
+      "review_reasons": []
+    },
+    {
+      "id": "reverse_oncelock",
+      "type": "reverse_lookup",
+      "question": "In which Rust version was std::sync::OnceLock stabilized in the standard library?",
+      "question_revision": 1,
+      "reference_answer": "Rust 1.70.0.",
+      "response": "In Rust 1.89.0, `std::sync::OnceLock` was stabilized in the standard library.\n\nFor more information, see [std::sync::OnceLock](https://doc.rust-lang.org/stable/std/sync/struct.OnceLock.html).",
+      "generated_tokens": 57,
+      "finish_reason": "eos",
+      "rubric_pass": false,
+      "fact_coverage": 0.0,
+      "matched_facts": [],
+      "missing_facts": [
+        "version"
+      ],
+      "contradictions": [
+        "unexpected_answer_version"
+      ],
+      "review_reasons": [
+        "no_required_facts"
+      ]
+    },
+    {
+      "id": "reverse_lazylock",
+      "type": "reverse_lookup",
+      "question": "In which Rust version was std::sync::LazyLock stabilized?",
+      "question_revision": 1,
+      "reference_answer": "Rust 1.80.0.",
+      "response": "In Rust 1.94.0, `std::sync::LazyLock` was stabilized in the standard library / compiler.\n\nDetails:\n- [`std::sync::LazyLock`](https://doc.rust-lang.org/stable/std/sync/struct.LazyLock.html)",
+      "generated_tokens": 58,
+      "finish_reason": "eos",
+      "rubric_pass": false,
+      "fact_coverage": 0.0,
+      "matched_facts": [],
+      "missing_facts": [
+        "version"
+      ],
+      "contradictions": [
+        "unexpected_answer_version"
+      ],
+      "review_reasons": [
+        "no_required_facts"
+      ]
+    },
+    {
+      "id": "reverse_let_else",
+      "type": "reverse_lookup",
+      "question": "Which Rust version stabilized let-else syntax (e.g. let Some(x) = val else { ... })?",
+      "question_revision": 1,
+      "reference_answer": "Rust 1.65.0.",
+      "response": "In which Rust version was let-else introduced?",
+      "generated_tokens": 11,
+      "finish_reason": "eos",
+      "rubric_pass": false,
+      "fact_coverage": 0.0,
+      "matched_facts": [],
+      "missing_facts": [
+        "version"
+      ],
+      "contradictions": [],
+      "review_reasons": [
+        "no_required_facts"
+      ]
+    },
+    {
+      "id": "reverse_gat",
+      "type": "reverse_lookup",
+      "question": "In which Rust version were Generic Associated Types (GATs) stabilized?",
+      "question_revision": 1,
+      "reference_answer": "Rust 1.65.0.",
+      "response": "In Rust 1.51.0",
+      "generated_tokens": 10,
+      "finish_reason": "eos",
+      "rubric_pass": false,
+      "fact_coverage": 0.0,
+      "matched_facts": [],
+      "missing_facts": [
+        "version"
+      ],
+      "contradictions": [
+        "unexpected_answer_version"
+      ],
+      "review_reasons": [
+        "no_required_facts"
+      ]
+    },
+    {
+      "id": "reverse_async_fn_trait",
+      "type": "reverse_lookup",
+      "question": "In which version of Rust was native async fn in traits stabilized?",
+      "question_revision": 1,
+      "reference_answer": "Rust 1.75.0.",
+      "response": "In Rust 1.77.0, `native` async fn in traits was stabilized in the standard library / compiler.",
+      "generated_tokens": 27,
+      "finish_reason": "eos",
+      "rubric_pass": false,
+      "fact_coverage": 0.0,
+      "matched_facts": [],
+      "missing_facts": [
+        "version"
+      ],
+      "contradictions": [
+        "unexpected_answer_version"
+      ],
+      "review_reasons": [
+        "no_required_facts"
+      ]
+    },
+    {
+      "id": "reverse_black_box",
+      "type": "reverse_lookup",
+      "question": "In which Rust version was std::hint::black_box stabilized?",
+      "question_revision": 1,
+      "reference_answer": "Rust 1.66.0.",
+      "response": "In Rust 1.15.0",
+      "generated_tokens": 10,
+      "finish_reason": "eos",
+      "rubric_pass": false,
+      "fact_coverage": 0.0,
+      "matched_facts": [],
+      "missing_facts": [
+        "version"
+      ],
+      "contradictions": [
+        "unexpected_answer_version"
+      ],
+      "review_reasons": [
+        "no_required_facts"
+      ]
+    },
+    {
+      "id": "reverse_pin",
+      "type": "reverse_lookup",
+      "question": "When was std::pin::Pin stabilized in the standard library?",
+      "question_revision": 1,
+      "reference_answer": "Rust 1.33.0.",
+      "response": "In Rust 1.39.0",
+      "generated_tokens": 10,
+      "finish_reason": "eos",
+      "rubric_pass": false,
+      "fact_coverage": 0.0,
+      "matched_facts": [],
+      "missing_facts": [
+        "version"
+      ],
+      "contradictions": [
+        "unexpected_answer_version"
+      ],
+      "review_reasons": [
+        "no_required_facts"
+      ]
+    },
+    {
+      "id": "reverse_future",
+      "type": "reverse_lookup",
+      "question": "In which Rust version was the std::future::Future trait stabilized?",
+      "question_revision": 1,
+      "reference_answer": "Rust 1.36.0.",
+      "response": "In Rust 1.39.0, `std::future::Future` was stabilized in the standard library / compiler.\n\nDetails:\n- [`std::future::Future`]",
+      "generated_tokens": 37,
+      "finish_reason": "eos",
+      "rubric_pass": false,
+      "fact_coverage": 0.0,
+      "matched_facts": [],
+      "missing_facts": [
+        "version"
+      ],
+      "contradictions": [],
+      "review_reasons": [
+        "no_required_facts"
+      ]
+    },
+    {
+      "id": "edition_2015",
+      "type": "edition_guide",
+      "question": "What is the Rust 2015 edition and what was its core theme?",
+      "question_revision": 1,
+      "reference_answer": "The foundational edition that began with Rust 1.0, with stability as its theme.",
+      "response": "The Rust 2015 edition was released in May 2015 and its core theme was [“Stability”](https://blog.rust-lang.org/2015/05/14/Rust-2015-stability.html). The goal of this edition was to stabilize the language and standard library, and to make it easier for users to write code that is compatible with future versions of Rust.",
+      "generated_tokens": 91,
+      "finish_reason": "eos",
+      "rubric_pass": false,
+      "fact_coverage": 0.5,
+      "matched_facts": [
+        "stability"
+      ],
+      "missing_facts": [
+        "foundation"
+      ],
+      "contradictions": [],
+      "review_reasons": []
+    },
+    {
+      "id": "edition_2018",
+      "type": "edition_guide",
+      "question": "In Rust 2018, is extern crate generally required, and how did use-path resolution change?",
+      "question_revision": 2,
+      "reference_answer": "extern crate is no longer generally required. Paths in use declarations work the same as other paths.",
+      "response": "In Rust 2018, `extern crate` is generally required for crate-level visibility, and use-path resolution changed to prioritize the current crate's items over external crates.",
+      "generated_tokens": 37,
+      "finish_reason": "eos",
+      "rubric_pass": false,
+      "fact_coverage": 0.0,
+      "matched_facts": [],
+      "missing_facts": [
+        "extern_crate",
+        "paths"
+      ],
+      "contradictions": [],
+      "review_reasons": [
+        "no_required_facts"
+      ]
+    },
+    {
+      "id": "edition_2021_closures",
+      "type": "edition_guide",
+      "question": "How did closure variable capturing change in the Rust 2021 Edition?",
+      "question_revision": 1,
+      "reference_answer": "Closures use disjoint capture: they capture only the fields they use rather than the entire struct.",
+      "response": "In the Rust 2021 Edition, closures now capture variables by value by default, rather than by reference. This change was made to improve performance and reduce the risk of aliasing issues.\n\nHere's an example of how this change affects closures:\n    \n    \n    // Rust 2018 and earlier\n    fn main() {\n        let x = 5;\n        let square_x = || {\n            x * x\n        };\n        println!(\"{}\", square_x());\n    }\n    \n    // Rust 2021 and later\n    fn main() {\n        let x = 5;\n        let square_x = || {\n            x * x\n        };\n        println!(\"{}\", square_x());\n    }\n\nIn the Rust 2018 and earlier version, the closure captures the variable `x` by reference. In the Rust 2021 and later version, the closure captures the variable `x` by value.",
+      "generated_tokens": 190,
+      "finish_reason": "eos",
+      "rubric_pass": false,
+      "fact_coverage": 0.0,
+      "matched_facts": [],
+      "missing_facts": [
+        "capture"
+      ],
+      "contradictions": [],
+      "review_reasons": [
+        "no_required_facts"
+      ]
+    },
+    {
+      "id": "edition_2021_prelude",
+      "type": "edition_guide",
+      "question": "What traits were added to the standard library prelude in Rust 2021?",
+      "question_revision": 1,
+      "reference_answer": "TryInto, TryFrom, and FromIterator.",
+      "response": "In Rust 2021, the prelude of the standard library was expanded to include the following traits:\n\n  * [`core::hash::Hash`](https://doc.rust-lang.org/stable/core/hash/trait.Hash.html)\n  * [`core::hash::Hasher`](https://doc.rust-lang.org/stable/core/hash/trait.Hasher.html)\n  * [`core::marker::Unpin`](https://doc.rust-lang.org/stable/core/marker/trait.Unpin.html)\n  * [`core::marker::PhantomPinned`](https://doc.rust-lang.org/stable/core/marker/struct.PhantomPinned.html)\n  * [`core::panic::PanicInfo`](https://doc.rust-lang.org/stable/core/panic/struct.PanicInfo.html)\n  * [`core::panic::UnwindSafe`](https://doc.rust-lang.org/stable/core/panic/trait.UnwindSafe.html)\n  * [`core::panic::AssertUnwindSafe`](https://doc.rust-lang.org/stable/core/panic/struct.AssertUnwindSafe.html)\n  * [`core::panic::RefUnwindSafe`](https://doc.rust-lang.org/stable/core/panic/struct.RefUnwind",
+      "generated_tokens": 256,
+      "finish_reason": "length",
+      "rubric_pass": false,
+      "fact_coverage": 0.0,
+      "matched_facts": [],
+      "missing_facts": [
+        "try_into",
+        "try_from",
+        "from_iterator"
+      ],
+      "contradictions": [],
+      "review_reasons": [
+        "no_required_facts",
+        "output_token_limit"
+      ]
+    },
+    {
+      "id": "edition_2024_overview",
+      "type": "edition_guide",
+      "question": "In Rust 2024, describe the changes to never-type fallback, extern blocks, the gen keyword, and RPIT lifetime capture.",
+      "question_revision": 2,
+      "reference_answer": "Never type fallback changes from () to !. Extern blocks require unsafe extern. The gen keyword is reserved. RPIT implicitly captures all in-scope generic parameters, including lifetimes.",
+      "response": "In Rust 2024, the following language changes and compatibility updates were introduced:\n\n- [The never-type fallback, `!`, is now co-inductive.][95170] This means that functions and closures that return `!` can now be coerced into other types, such as in the case of `FromIterator<&'a T>`, where `T: Unsize`. This is a backwards compatibility breakage, as it is not possible to coerce `!` into a type that outlives the function or closure that returns it. This is also the intended behavior, as it is not possible to use `!` in a way that outlives the function or closure that returns it.\n\n- [Extern blocks can now be empty.][95171] This allows for the definition of extern blocks without any items inside them, which was previously not allowed.\n\n- [The gen keyword is now reserved.][95172] This keyword was previously used in the `gen` macro, but is now reserved for future use.\n\n- [RPIT lifetime capture is now more permissive.][95173] This means that in cases where a lifetime is captured by a closure, the lifetime is",
+      "generated_tokens": 256,
+      "finish_reason": "length",
+      "rubric_pass": false,
+      "fact_coverage": 0.0,
+      "matched_facts": [],
+      "missing_facts": [
+        "never",
+        "extern",
+        "gen",
+        "capture"
+      ],
+      "contradictions": [],
+      "review_reasons": [
+        "no_required_facts",
+        "output_token_limit"
+      ]
+    },
+    {
+      "id": "msrv_lazylock",
+      "type": "msrv_check",
+      "question": "If my crate's MSRV is 1.75.0, can I use std::sync::LazyLock from the standard library?",
+      "question_revision": 1,
+      "reference_answer": "No. LazyLock requires Rust 1.80 or later.",
+      "response": "Yes, you can use `std::sync::LazyLock` in your crate if your MSRV is 1.75.0.",
+      "generated_tokens": 30,
+      "finish_reason": "eos",
+      "rubric_pass": false,
+      "fact_coverage": 0.0,
+      "matched_facts": [],
+      "missing_facts": [
+        "version"
+      ],
+      "contradictions": [
+        "missing_required_stabilization_version",
+        "wrong_compatibility_decision"
+      ],
+      "review_reasons": [
+        "no_required_facts"
+      ]
+    },
+    {
+      "id": "msrv_let_else",
+      "type": "msrv_check",
+      "question": "Can I use let-else syntax (let Some(x) = val else { return; }) in a library targeting an MSRV of 1.60.0?",
+      "question_revision": 1,
+      "reference_answer": "No. let-else requires Rust 1.65 or later.",
+      "response": "No, you cannot use `let-else` syntax in a library targeting Rust 1.60.0. The `let-else` syntax was stabilized in [Rust 1.61.0](https://blog.rust-lang.org/2023/05/11/Rust-1.61.0.html).",
+      "generated_tokens": 75,
+      "finish_reason": "eos",
+      "rubric_pass": false,
+      "fact_coverage": 0.5,
+      "matched_facts": [],
+      "missing_facts": [
+        "version"
+      ],
+      "contradictions": [
+        "missing_required_stabilization_version"
+      ],
+      "review_reasons": [
+        "conflicting_stabilization_claim",
+        "no_required_facts"
+      ]
+    },
+    {
+      "id": "msrv_core_error",
+      "type": "msrv_check",
+      "question": "Can a no_std crate use core::error::Error on Rust 1.81.0?",
+      "question_revision": 1,
+      "reference_answer": "Yes.",
+      "response": "Yes. `Error` is now stable in `core` (requires Rust 1.81.0).",
+      "generated_tokens": 24,
+      "finish_reason": "eos",
+      "rubric_pass": true,
+      "fact_coverage": 1.0,
+      "matched_facts": [],
+      "missing_facts": [],
+      "contradictions": [],
+      "review_reasons": []
+    }
+  ],
+  "rubric_version": 2,
+  "benchmark_ids": [
+    "diff_1.80_1.81",
+    "diff_1.79_1.80",
+    "diff_1.74_1.75",
+    "diff_1.64_1.65",
+    "diff_1.38_1.39",
+    "diff_1.25_1.26",
+    "reverse_oncelock",
+    "reverse_lazylock",
+    "reverse_let_else",
+    "reverse_gat",
+    "reverse_async_fn_trait",
+    "reverse_black_box",
+    "reverse_pin",
+    "reverse_future",
+    "edition_2015",
+    "edition_2018",
+    "edition_2021_closures",
+    "edition_2021_prelude",
+    "edition_2024_overview",
+    "msrv_lazylock",
+    "msrv_let_else",
+    "msrv_core_error"
+  ],
+  "benchmark_sha256": "b61fa3a0d5d950f91976d98d997775bc0e2015a1a0f64b6e4af757028ae17f12",
+  "summary": {
+    "count": 22,
+    "rubric_pass_count": 1,
+    "rubric_pass_rate": 0.045454545454545456,
+    "average_fact_coverage": 0.1590909090909091,
+    "review_count": 19,
+    "requires_regeneration": 0,
+    "categories": {
+      "consecutive_diff": {
+        "count": 6,
+        "rubric_pass_count": 0,
+        "rubric_pass_rate": 0.0,
+        "average_fact_coverage": 0.25,
+        "review_count": 5
+      },
+      "edition_guide": {
+        "count": 5,
+        "rubric_pass_count": 0,
+        "rubric_pass_rate": 0.0,
+        "average_fact_coverage": 0.1,
+        "review_count": 4
+      },
+      "msrv_check": {
+        "count": 3,
+        "rubric_pass_count": 1,
+        "rubric_pass_rate": 0.3333333333333333,
+        "average_fact_coverage": 0.5,
+        "review_count": 2
+      },
+      "reverse_lookup": {
+        "count": 8,
+        "rubric_pass_count": 0,
+        "rubric_pass_rate": 0.0,
+        "average_fact_coverage": 0.0,
+        "review_count": 8
+      }
+    },
+    "limitations": "Rubric passes are not semantic truth guarantees; inspect extra claims and paraphrases manually."
+  }
+}
