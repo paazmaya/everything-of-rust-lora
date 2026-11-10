@@ -2,6 +2,8 @@
 
 This project contains the complete pipeline to train a specialized LoRA adapter for Rust programming, covering the language standard, top 100 libraries, best practices, and ESP32/Embedded IoT development.
 
+[![CI](https://github.com/paazmaya/everything-of-rust-lora/actions/workflows/ci.yml/badge.svg)](https://github.com/paazmaya/everything-of-rust-lora/actions/workflows/ci.yml)
+[![Code Smells](https://sonarcloud.io/api/project_badges/measure?project=paazmaya_everything-of-rust-lora&metric=code_smells)](https://sonarcloud.io/dashboard?id=paazmaya_everything-of-rust-lora)
 [![Maintainability issues](https://sonarcloud.io/api/project_badges/measure?project=paazmaya_everything-of-rust-lora&metric=software_quality_maintainability_issues)](https://sonarcloud.io/summary/new_code?id=paazmaya_everything-of-rust-lora)
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=paazmaya_everything-of-rust-lora&metric=coverage)](https://sonarcloud.io/summary/new_code?id=paazmaya_everything-of-rust-lora)
 
